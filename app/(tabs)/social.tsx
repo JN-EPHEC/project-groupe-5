@@ -1,11 +1,11 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 
-export default function ProfilScreen() {
+export default function SocialScreen() {
   return (
     <ThemedView style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-      <ThemedText type="title">Mon Profil 👤</ThemedText>
-      <ThemedText>Gère ton compte et tes préférences ici.</ThemedText>
+      <ThemedText type="title">Social 💬</ThemedText>
+      <ThemedText>Discute et partage avec la communauté !</ThemedText>
     </ThemedView>
   );
 }
