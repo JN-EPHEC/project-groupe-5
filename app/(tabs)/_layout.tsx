@@ -86,9 +86,9 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen
-        name="accueil"
+        name="acceuil"
         options={{
-          title: "Accueil",
+          title: "Acceuil",
           tabBarIcon: ({ color, focused }) => (
             <CircleIcon name="home-outline" color={color} focused={focused} light={mode === "light"} />
           ),

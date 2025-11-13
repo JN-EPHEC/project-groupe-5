@@ -30,6 +30,7 @@ export default function SocialScreen() {
   };
 
   if (view === "chat") {
+    // VUE CHAT -> components/ui/social/ChatView
     return (
       <ChatView
         selectedChat={selectedChat}
@@ -45,9 +46,11 @@ export default function SocialScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+  {/* ONGLETS -> components/ui/social/TabsSwitcher */}
       <TabsSwitcher selectedTab={selectedTab} onChange={setSelectedTab} />
 
       <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
+  {/* CARTES CLUBS -> components/ui/social/ClubCard */}
         {selectedTab === "clubs" &&
           clubs.map((club, i) => (
             <ClubCard
@@ -66,6 +69,7 @@ export default function SocialScreen() {
             />
           ))}
 
+  {/* CARTES DÉFIS -> components/ui/social/DefiCard */}
         {selectedTab === "defis" &&
           defis.map((defi, i) => (
             <DefiCard
@@ -85,6 +89,7 @@ export default function SocialScreen() {
             />
           ))}
 
+  {/* LISTE AMIS + RECHERCHE -> components/ui/social/FriendCard */}
         {selectedTab === "amis" && (
           <>
             <View style={[styles.searchContainer, { backgroundColor: colors.surfaceAlt }]}>
