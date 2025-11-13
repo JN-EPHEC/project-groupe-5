@@ -38,7 +38,7 @@ export default function DefiScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* HEADER */}
+  {/* HEADER -> titre + sous-titre inline ; cartes via components/ui/defi */}
       <Text style={[styles.title, { color: colors.text }]}>Défis</Text>
       <Text style={[styles.subtitle, { color: colors.mutedText }]}>
         Relevez des défis et gagnez des points
@@ -51,15 +51,15 @@ export default function DefiScreen() {
         <Text style={styles.clubButtonText}>Rejoindre un club</Text>
       </TouchableOpacity>
 
-      {/* SWITCHER */}
+  {/* SWITCHER -> components/ui/defi/TabSwitcher */}
       <TabSwitcher activeTab={activeTab} onChange={setActiveTab} />
 
-      {/* CATÉGORIES */}
+  {/* CATÉGORIES -> components/ui/defi/CategorySelector */}
       {activeTab === "defis" && (
         <CategorySelector selected={selectedCategory} onSelect={setSelectedCategory} />
       )}
 
-      {/* CONTENU */}
+  {/* CONTENU -> components/ui/defi/ChallengeCard & ValidationCard */}
       <ScrollView
         style={styles.scroll}
         showsVerticalScrollIndicator={false}

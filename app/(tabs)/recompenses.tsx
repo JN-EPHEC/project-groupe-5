@@ -16,14 +16,17 @@ export default function RewardsScreen() {
       contentContainerStyle={{ paddingBottom: 80 }}
       showsVerticalScrollIndicator={false}
     >
+      {/* TITRE ÉCRAN -> texte inline ; composants: PointsCard / RewardCard / ActionButton */}
       <Text style={[styles.header, { color: colors.text }]}>🎁 Récompenses</Text>
 
+      {/* POINTS -> components/ui/recompenses/PointsCard */}
       <PointsCard points={points} />
 
       <Text style={[styles.sectionTitle, { color: colors.text }]}>
         Récompenses disponibles
       </Text>
 
+      {/* LISTE RÉCOMPENSES -> components/ui/recompenses/RewardCard */}
       <FlatList
         data={rewardsData}
         horizontal
@@ -43,6 +46,7 @@ export default function RewardsScreen() {
         Gagner plus de points
       </Text>
 
+      {/* ACTIONS POUR GAGNER DES POINTS -> components/ui/recompenses/ActionButton */}
       <ActionButton
         icon="play-circle-outline"
         label="Regarder une publicité"

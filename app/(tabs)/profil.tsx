@@ -11,25 +11,27 @@ export default function ProfilScreen() {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: 80 }}>
+      {/* EN-TÊTE PROFIL -> components/ui/profil/Header */}
       <Header />
 
-      {/* Stats */}
+  {/* STATS -> components/ui/profil/StatCard */}
       <View style={styles.row}>
         <StatCard icon="people-outline" value="182" label="Abonnés" />
         <StatCard icon="person-add-outline" value="96" label="Abonnements" />
         <StatCard icon="person-add" label="Amis +" accent />
       </View>
 
-      <LargeCard icon="leaf-outline" label="Points totaux" value="115 pts" />
-      <LargeCard icon="flame-outline" label="Série actuelle" value="2 jours" />
+  {/* GRANDES CARTES -> components/ui/profil/LargeCard */}
+  <LargeCard icon="leaf-outline" label="Points totaux" value="115 pts" />
+  <LargeCard icon="flame-outline" label="Série actuelle" value="2 jours" />
 
-      {/* Classements */}
+  {/* CLASSEMENTS -> components/ui/profil/StatCard */}
       <View style={styles.row}>
         <StatCard icon="person-outline" label="Classement individuel" value="#2" />
         <StatCard icon="people" label="Classement club" value="#1" />
       </View>
 
-      {/* Paramètres */}
+      {/* PARAMÈTRES -> components/ui/profil/SettingsSection (+ SettingSwitch) */}
       <SettingsSection />
     </ScrollView>
   );
