@@ -1,19 +1,24 @@
-import { Ionicons } from "@expo/vector-icons";
+import { useClub } from "@/hooks/club-context";
+import { useUser } from "@/hooks/user-context";
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, Text, View } from "react-native";
 
-export const Header = () => (
-  <View style={styles.header}>
-    <View style={styles.avatarContainer}>
-      <Ionicons name="walk-outline" size={60} color="#fff" />
-      <View style={styles.badge}>
-        <Text style={styles.badgeText}>10</Text>
+export const Header = () => {
+  const { user } = useUser();
+  const { joinedClub } = useClub();
+  return (
+    <View style={styles.header}>
+      <View style={styles.avatarContainer}>
+        <Image source={{ uri: user.avatar }} style={{ width: 60, height: 60, borderRadius: 30 }} />
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>10</Text>
+        </View>
       </View>
+      <Text style={styles.name}>Bonjour {user.name}</Text>
+      {joinedClub && <Text style={styles.club}>{joinedClub.name}</Text>}
     </View>
-    <Text style={styles.name}>Bonjour Marie</Text>
-    <Text style={styles.club}>Éco-Warriors</Text>
-  </View>
-);
+  );
+};
 
 const styles = StyleSheet.create({
   header: { alignItems: "center", marginTop: 40, marginBottom: 20 },

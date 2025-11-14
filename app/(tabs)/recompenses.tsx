@@ -2,13 +2,14 @@ import { ActionButton } from "@/components/ui/recompenses/ActionButton";
 import { rewardsData } from "@/components/ui/recompenses/data";
 import { PointsCard } from "@/components/ui/recompenses/PointsCard";
 import { RewardCard } from "@/components/ui/recompenses/RewardCard";
+import { usePoints } from "@/hooks/points-context";
 import { useThemeMode } from "@/hooks/theme-context";
-import React, { useState } from "react";
+import React from "react";
 import { FlatList, ScrollView, StyleSheet, Text } from "react-native";
 
 export default function RewardsScreen() {
   const { colors } = useThemeMode();
-  const [points, setPoints] = useState(320);
+  const { points, addPoints, spendPoints } = usePoints();
 
   return (
     <ScrollView
@@ -20,7 +21,7 @@ export default function RewardsScreen() {
       <Text style={[styles.header, { color: colors.text }]}>🎁 Récompenses</Text>
 
       {/* POINTS -> components/ui/recompenses/PointsCard */}
-      <PointsCard points={points} />
+  <PointsCard points={points} />
 
       <Text style={[styles.sectionTitle, { color: colors.text }]}>
         Récompenses disponibles
@@ -35,7 +36,7 @@ export default function RewardsScreen() {
           <RewardCard
             item={item}
             points={points}
-            onObtain={() => setPoints(points - item.cost)}
+            onObtain={() => spendPoints(item.cost)}
           />
         )}
         keyExtractor={(item) => item.id}
@@ -51,13 +52,13 @@ export default function RewardsScreen() {
         icon="play-circle-outline"
         label="Regarder une publicité"
         rewardText="+10 points"
-        onPress={() => setPoints(points + 10)}
+        onPress={() => addPoints(10)}
       />
       <ActionButton
         icon="share-social-outline"
         label="Partager l'application"
         rewardText="+50 points"
-        onPress={() => setPoints(points + 50)}
+        onPress={() => addPoints(50)}
       />
     </ScrollView>
   );

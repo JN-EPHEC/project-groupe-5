@@ -1,7 +1,9 @@
+import { GradientButton } from "@/components/ui/common/GradientButton";
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { CATEGORY_CONFIG, DIFFICULTY_COLORS } from "./constants";
+import { CATEGORY_CONFIG } from "./constants";
 import { Challenge } from "./types";
 
 type Props = {
@@ -13,6 +15,11 @@ type Props = {
 export function ChallengeCard({ challenge, isOngoing, onToggle }: Props) {
   const { colors } = useThemeMode();
   const category = CATEGORY_CONFIG[challenge.category];
+  const DIFFICULTY_GRADIENTS: Record<Challenge["difficulty"], [string, string]> = {
+    Facile: ["#52D192", "#2BB673"],
+    Moyen: ["#F6D365", "#F4C95D"],
+    Difficile: ["#F9748F", "#F45B69"],
+  };
 
   return (
     <View style={[styles.card, { backgroundColor: colors.surface }]}>
@@ -32,10 +39,15 @@ export function ChallengeCard({ challenge, isOngoing, onToggle }: Props) {
       <Text style={[styles.description, { color: colors.mutedText }]}>{challenge.description}</Text>
 
       <View style={styles.metaRow}>
-        <View style={[styles.metaPill, { backgroundColor: DIFFICULTY_COLORS[challenge.difficulty] }]}>
+        <LinearGradient
+          colors={DIFFICULTY_GRADIENTS[challenge.difficulty]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.metaPill}
+        >
           <Ionicons name="speedometer-outline" size={16} color="#0F3327" />
           <Text style={styles.metaTextDark}>{challenge.difficulty}</Text>
-        </View>
+        </LinearGradient>
 
         <View style={[styles.metaPillMuted, { backgroundColor: colors.surfaceAlt }]}>
           <Ionicons name="time-outline" size={16} color="#9FB9AE" />
@@ -43,20 +55,16 @@ export function ChallengeCard({ challenge, isOngoing, onToggle }: Props) {
         </View>
       </View>
 
-      <TouchableOpacity
-        style={[styles.primaryButton, isOngoing && styles.primaryButtonActive]}
-        onPress={() => onToggle(challenge.id)}
-      >
-        <Text style={[styles.primaryText, isOngoing && styles.primaryTextActive]}>
-          {isOngoing ? "Défi en cours" : "Relever le défi"}
-        </Text>
-        <Ionicons
-          name={isOngoing ? "checkmark-circle" : "arrow-forward"}
-          size={18}
-          color={isOngoing ? "#7DCAB0" : "#0F3327"}
-          style={{ marginLeft: 8 }}
-        />
-      </TouchableOpacity>
+      {isOngoing ? (
+        <TouchableOpacity style={[styles.primaryButtonActive]} onPress={() => onToggle(challenge.id)}>
+          <Text style={[styles.primaryTextActive]}>Défi en cours</Text>
+          <Ionicons name="checkmark-circle" size={18} color="#7DCAB0" style={{ marginLeft: 8 }} />
+        </TouchableOpacity>
+      ) : (
+        <View style={{ marginTop: 24 }}>
+          <GradientButton label="Relever le défi" onPress={() => onToggle(challenge.id)} />
+        </View>
+      )}
     </View>
   );
 }
@@ -75,8 +83,6 @@ const styles = StyleSheet.create({
   metaPillMuted: { flexDirection: "row", alignItems: "center", borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6 },
   metaText: { color: "#9FB9AE", marginLeft: 6, fontWeight: "600" },
   metaTextDark: { color: "#0F3327", marginLeft: 6, fontWeight: "700" },
-  primaryButton: { marginTop: 20, backgroundColor: "#D4F7E7", borderRadius: 18, paddingVertical: 12, flexDirection: "row", justifyContent: "center", alignItems: "center" },
-  primaryButtonActive: { backgroundColor: "#142822", borderWidth: 1, borderColor: "#7DCAB0" },
-  primaryText: { color: "#0F3327", fontWeight: "700" },
-  primaryTextActive: { color: "#7DCAB0" },
+  primaryButtonActive: { marginTop: 24, backgroundColor: "#142822", borderWidth: 1, borderColor: "#7DCAB0", borderRadius: 18, paddingVertical: 12, flexDirection: "row", justifyContent: "center", alignItems: "center" },
+  primaryTextActive: { color: "#7DCAB0", fontWeight: "700" },
 });

@@ -14,24 +14,25 @@ interface FriendCardProps {
   friend: Friend;
   rank: number;
   onChat: () => void;
+  isMe?: boolean;
 }
 
-export const FriendCard: React.FC<FriendCardProps> = ({ friend, rank, onChat }) => {
+export const FriendCard: React.FC<FriendCardProps> = ({ friend, rank, onChat, isMe }) => {
   const { colors } = useThemeMode();
 
   return (
     <TouchableOpacity
       onPress={onChat}
-      style={[styles.container, { backgroundColor: colors.surface }]}
+      style={[styles.container, { backgroundColor: isMe ? colors.accent : colors.surface }]}
       activeOpacity={0.8}
     >
       <View style={styles.left}>
         <Text style={[styles.rank, { color: colors.accent }]}>#{rank}</Text>
-        <Image source={{ uri: friend.avatar }} style={styles.avatar} />
+        <Image source={{ uri: friend.avatar }} style={[styles.avatar, isMe && { borderWidth: 2, borderColor: colors.text }]} />
         <Text style={[styles.name, { color: colors.text }]}>{friend.name}</Text>
         {friend.online && <View style={[styles.dot, { backgroundColor: "#19D07D" }]} />}
       </View>
-      <Text style={[styles.points, { color: colors.mutedText }]}>
+      <Text style={[styles.points, { color: colors.text }]}>
         {friend.points} pts
       </Text>
     </TouchableOpacity>

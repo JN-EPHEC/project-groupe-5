@@ -1,7 +1,8 @@
-import ProgressCircle from "@/components/ProgressCircle";
+// Import ProgressCircle depuis un module commun UI
 import { useThemeMode } from "@/hooks/theme-context";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
+import ProgressCircle from "../common/ProgressCircle";
 
 export type ProgressionCardProps = {
   done: number;

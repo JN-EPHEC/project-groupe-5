@@ -3,8 +3,12 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import "react-native-reanimated";
 
+import { ChallengesProvider } from "@/hooks/challenges-context";
+import { ClubProvider } from "@/hooks/club-context";
+import { PointsProvider } from "@/hooks/points-context";
 import { ThemeProviderCustom, useThemeMode } from "@/hooks/theme-context";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { UserProvider } from "@/hooks/user-context";
 
 export const unstable_settings = {
   initialRouteName: "(tabs)",
@@ -27,7 +31,15 @@ function RootNavigation() {
 export default function RootLayout() {
   return (
     <ThemeProviderCustom>
-      <RootNavigation />
+      <UserProvider>
+        <PointsProvider>
+          <ClubProvider>
+            <ChallengesProvider>
+              <RootNavigation />
+            </ChallengesProvider>
+          </ClubProvider>
+        </PointsProvider>
+      </UserProvider>
     </ThemeProviderCustom>
   );
 }

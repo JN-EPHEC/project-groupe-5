@@ -32,7 +32,7 @@ export const TabsSwitcher: React.FC<TabsSwitcherProps> = ({ selectedTab, onChang
               { color: selectedTab === tab ? colors.text : colors.mutedText },
             ]}
           >
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            {tab === "defis" ? "Compétition" : tab.charAt(0).toUpperCase() + tab.slice(1)}
           </Text>
         </TouchableOpacity>
       ))}
