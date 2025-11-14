@@ -1,16 +1,30 @@
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { CATEGORY_CONFIG } from "./constants";
-import { Challenge } from "./types";
 
-type Props = {
-  challenge: Challenge;
+export type ValidationItem = {
+  id: number;
+  title: string;
+  description: string;
+  category: keyof typeof CATEGORY_CONFIG;
+  difficulty: "Facile" | "Moyen" | "Difficile";
+  points: number;
+  audience: "Membre";
+  timeLeft: string;
+  userName: string;
+  photoUrl: string;
 };
 
-export function ValidationCard({ challenge }: Props) {
+type Props = {
+  item: ValidationItem;
+  onValidate: () => void;
+  onReject: () => void;
+};
+
+export function ValidationCard({ item, onValidate, onReject }: Props) {
   const { colors } = useThemeMode();
-  const category = CATEGORY_CONFIG[challenge.category];
+  const category = CATEGORY_CONFIG[item.category];
 
   return (
     <View style={[styles.card, { backgroundColor: colors.surface }]}>
@@ -23,27 +37,27 @@ export function ValidationCard({ challenge }: Props) {
 
         <View style={styles.pointsBadge}>
           <Ionicons name="leaf" size={16} color="#0F3327" />
-          <Text style={styles.pointsText}>{challenge.points} pts</Text>
+          <Text style={styles.pointsText}>{item.points} pts</Text>
         </View>
       </View>
 
       {/* TITRE */}
-      <Text style={[styles.title, { color: colors.text }]}>{challenge.title}</Text>
+      <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
+      <Text style={[styles.subtitle, { color: colors.mutedText }]}>Par {item.userName}</Text>
 
       {/* BOÎTE DE PREUVE */}
-      <View style={[styles.proofBox, { backgroundColor: colors.surfaceAlt }]}>
-        <Ionicons name="image-outline" size={36} color="#5C6F69" />
-        <Text style={[styles.proofText, { color: colors.mutedText }]}>Preuve à vérifier</Text>
-      </View>
+      <Image source={{ uri: item.photoUrl }} style={styles.photo} />
 
       {/* ACTIONS */}
       <View style={styles.actions}>
-        <TouchableOpacity style={[styles.secondaryButton, { backgroundColor: colors.surfaceAlt }]}>
+        <TouchableOpacity style={[styles.secondaryButton, { backgroundColor: colors.surfaceAlt }]}
+          onPress={onReject}
+        > 
           <Ionicons name="close-circle" size={18} color="#EBE6D3" style={styles.leadingIcon} />
           <Text style={[styles.secondaryText, { color: "#EBE6D3" }]}>Refuser</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.successButton, { backgroundColor: colors.accent }]}>
+        <TouchableOpacity style={[styles.successButton, { backgroundColor: colors.accent }]} onPress={onValidate}>
           <Ionicons name="checkmark-circle" size={18} color="#0F3327" style={styles.leadingIcon} />
           <Text style={styles.successText}>Valider</Text>
         </TouchableOpacity>
@@ -93,14 +107,14 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginTop: 16,
   },
-  proofBox: {
+  subtitle: {
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  photo: {
     borderRadius: 18,
     height: 150,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 18,
-  },
-  proofText: {
+    width: "100%",
     marginTop: 12,
   },
   actions: {

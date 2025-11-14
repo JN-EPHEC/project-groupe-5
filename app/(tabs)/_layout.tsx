@@ -62,7 +62,7 @@ export default function TabLayout() {
           right: 16,
           height: 74,
           paddingHorizontal: 6,
-          backgroundColor: mode === "dark" ? "rgba(20,26,24,0.92)" : "#19D07D",
+          backgroundColor: mode === "dark" ? "rgba(20,26,24,0.92)" : "#E6E9E8",
           borderRadius: 28,
           borderTopWidth: 0,
           borderWidth: mode === "light" ? 2 : 0,

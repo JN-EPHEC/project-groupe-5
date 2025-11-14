@@ -61,7 +61,7 @@ export function CategorySelector({ selected, onSelect }: Props) {
 
 const styles = StyleSheet.create({
   scroll: { marginTop: 18, marginBottom: 10 },
-  content: { paddingRight: 20 },
+  content: { paddingRight: 20, paddingLeft: 20 },
   chip: {
     flexDirection: "row",
     alignItems: "center",

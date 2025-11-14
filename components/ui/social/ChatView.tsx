@@ -1,6 +1,6 @@
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
+import React, { useMemo, useState } from "react";
 import {
     FlatList,
     KeyboardAvoidingView,
@@ -12,14 +12,19 @@ import {
     View,
 } from "react-native";
 
+interface MessageItem { id: string; text: string; sender: string; reactions?: string[] }
+
 interface ChatViewProps {
   selectedChat: any;
-  messages: { id: string; text: string; sender: string }[];
+  messages: MessageItem[];
   input: string;
   setInput: (v: string) => void;
   onSend: () => void;
   onBack: () => void;
   onDeleteMessage: (id: string) => void;
+  onStartEditMessage: (id: string, text: string) => void;
+  onReactMessage: (id: string, emoji: string) => void;
+  editingId?: string | null;
 }
 
 export const ChatView: React.FC<ChatViewProps> = ({
@@ -30,8 +35,14 @@ export const ChatView: React.FC<ChatViewProps> = ({
   onSend,
   onBack,
   onDeleteMessage,
+  onStartEditMessage,
+  onReactMessage,
+  editingId,
 }) => {
   const { colors } = useThemeMode();
+  const [actionFor, setActionFor] = useState<string | null>(null);
+  const [showReactionsFor, setShowReactionsFor] = useState<string | null>(null);
+  const emojis = useMemo(() => ["👍", "😊", "🔥", "🎉", "❤️"], []);
 
   return (
     <KeyboardAvoidingView
@@ -60,7 +71,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <TouchableOpacity
-            onLongPress={() => onDeleteMessage(item.id)}
+            delayLongPress={500}
+            onLongPress={() => setActionFor(item.id)}
             activeOpacity={0.8}
           >
             <View
@@ -75,14 +87,48 @@ export const ChatView: React.FC<ChatViewProps> = ({
               ]}
             >
               <Text style={[styles.text, { color: colors.text }]}>{item.text}</Text>
+              {item.reactions && item.reactions.length > 0 && (
+                <View style={styles.reactionsCorner}>
+                  <Text style={{ fontSize: 12 }}>{Array.from(new Set(item.reactions)).join(" ")}</Text>
+                </View>
+              )}
             </View>
+            {actionFor === item.id && (
+              <View style={[styles.actionsRow, { backgroundColor: colors.surfaceAlt }]}>
+                <TouchableOpacity onPress={() => { setActionFor(null); onDeleteMessage(item.id); }} style={styles.actionBtn}>
+                  <Ionicons name="trash" size={16} color={colors.text} />
+                  <Text style={[styles.actionText, { color: colors.text }]}>Supprimer</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => { setActionFor(null); onStartEditMessage(item.id, item.text); }} style={styles.actionBtn}>
+                  <Ionicons name="create-outline" size={16} color={colors.text} />
+                  <Text style={[styles.actionText, { color: colors.text }]}>Modifier</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => { setShowReactionsFor(item.id); }} style={styles.actionBtn}>
+                  <Ionicons name="happy-outline" size={16} color={colors.text} />
+                  <Text style={[styles.actionText, { color: colors.text }]}>Réagir</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            {showReactionsFor === item.id && (
+              <View style={[styles.emojiRow, { backgroundColor: colors.surface }]}>
+                {emojis.map((e) => (
+                  <TouchableOpacity
+                    key={e}
+                    onPress={() => { onReactMessage(item.id, e); setShowReactionsFor(null); setActionFor(null); }}
+                    style={styles.emojiBtn}
+                  >
+                    <Text style={{ fontSize: 18 }}>{e}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </TouchableOpacity>
         )}
-        contentContainerStyle={{ paddingVertical: 10 }}
+        contentContainerStyle={{ paddingVertical: 10, paddingBottom: 120 }}
       />
 
       {/* --- Input --- */}
-      <View style={styles.inputRow}>
+      <View style={[styles.inputRow, { marginBottom: 90 }]}>
         <TextInput
           value={input}
           onChangeText={setInput}
@@ -108,6 +154,12 @@ const styles = StyleSheet.create({
   header: { fontSize: 18, fontWeight: "600", textAlign: "center", marginBottom: 10 },
   message: { padding: 10, borderRadius: 12, marginVertical: 4, maxWidth: "80%" },
   text: { fontSize: 14 },
+  reactionsCorner: { position: "absolute", top: -6, right: -6, backgroundColor: "#FFFFFFCC", borderRadius: 10, paddingHorizontal: 4, paddingVertical: 2 },
+  actionsRow: { flexDirection: "row", alignItems: "center", borderRadius: 10, paddingVertical: 6, paddingHorizontal: 8, marginTop: 6, alignSelf: "flex-end" },
+  actionBtn: { flexDirection: "row", alignItems: "center", marginHorizontal: 6 },
+  actionText: { marginLeft: 4, fontSize: 12 },
+  emojiRow: { flexDirection: "row", alignItems: "center", borderRadius: 10, padding: 6, marginTop: 6, alignSelf: "flex-end" },
+  emojiBtn: { paddingHorizontal: 6, paddingVertical: 4 },
   empty: { textAlign: "center", marginTop: 40 },
   inputRow: {
     flexDirection: "row",

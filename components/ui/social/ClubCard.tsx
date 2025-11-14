@@ -1,3 +1,4 @@
+import { GradientButton } from "@/components/ui/common/GradientButton";
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
@@ -15,9 +16,10 @@ interface ClubCardProps {
   club: Club;
   onJoin: () => void;
   onChat: () => void;
+  onRanking?: () => void;
 }
 
-export const ClubCard: React.FC<ClubCardProps> = ({ club, onJoin, onChat }) => {
+export const ClubCard: React.FC<ClubCardProps> = ({ club, onJoin, onChat, onRanking }) => {
   const { colors } = useThemeMode();
 
   return (
@@ -29,17 +31,13 @@ export const ClubCard: React.FC<ClubCardProps> = ({ club, onJoin, onChat }) => {
       </Text>
 
       <View style={styles.row}>
-        <TouchableOpacity
-          onPress={onJoin}
-          style={[
-            styles.joinBtn,
-            { backgroundColor: club.joined ? "#D93636" : colors.accent },
-          ]}
-        >
-          <Text style={[styles.joinText, { color: colors.text }]}>
-            {club.joined ? "Quitter ❌" : "Rejoindre"}
-          </Text>
-        </TouchableOpacity>
+        {club.joined ? (
+          <TouchableOpacity onPress={onJoin} style={[styles.joinBtn, { backgroundColor: "#D93636" }]}>
+            <Text style={[styles.joinText, { color: "#fff" }]}>Quitter ❌</Text>
+          </TouchableOpacity>
+        ) : (
+          <GradientButton label="Rejoindre" onPress={onJoin} style={{ flex: 1, borderRadius: 12 }} />
+        )}
 
         <TouchableOpacity
           style={[
@@ -51,6 +49,16 @@ export const ClubCard: React.FC<ClubCardProps> = ({ club, onJoin, onChat }) => {
           <Ionicons name="chatbubbles-outline" size={18} color={colors.accent} />
           <Text style={[styles.chatText, { color: colors.accent }]}>Discuter</Text>
         </TouchableOpacity>
+
+        {club.joined && onRanking && (
+          <TouchableOpacity
+            style={[styles.chatBtn, { borderColor: colors.accent, backgroundColor: colors.pill }]}
+            onPress={onRanking}
+          >
+            <Ionicons name="trophy-outline" size={18} color={colors.accent} />
+            <Text style={[styles.chatText, { color: colors.accent }]}>Classement</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
