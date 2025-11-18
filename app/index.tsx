@@ -1,5 +1,4 @@
-import { Redirect } from "expo-router";
-
 export default function Index() {
-  return <Redirect href="/(tabs)/acceuil" />;
+  // Root routing is handled in app/_layout.tsx based on Firebase auth state.
+  return null;
 }
