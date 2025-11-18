@@ -2,19 +2,21 @@ import { Header } from "@/components/ui/profil/Header";
 import { LargeCard } from "@/components/ui/profil/LargeCard";
 import { SettingsSection } from "@/components/ui/profil/SettingsSection";
 import { StatCard } from "@/components/ui/profil/StatCard";
+import { ShareQRModal } from "@/components/ui/qr/ShareQRModal";
 import { amisData } from "@/components/ui/social/data";
 import { useClub } from "@/hooks/club-context";
 import { usePoints } from "@/hooks/points-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { useUser } from "@/hooks/user-context";
-import React, { useMemo } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import React, { useMemo, useState } from "react";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function ProfilScreen() {
   const { colors } = useThemeMode();
   const { points } = usePoints();
   const { user } = useUser();
   const { joinedClub, members } = useClub();
+  const [showQR, setShowQR] = useState(false);
 
   // Classement entre amis
   const friendRankLabel = useMemo(() => {
@@ -38,6 +40,13 @@ export default function ProfilScreen() {
       {/* EN-TÊTE PROFIL -> components/ui/profil/Header */}
       <Header />
 
+      <TouchableOpacity
+        style={{ backgroundColor: colors.surfaceAlt, alignSelf: 'center', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 14, marginBottom: 12 }}
+        onPress={() => setShowQR(true)}
+      >
+        <Text style={{ color: colors.text, fontWeight: '600' }}>📱 Partager mon profil (QR)</Text>
+      </TouchableOpacity>
+
   {/* STATS -> components/ui/profil/StatCard */}
       <View style={styles.row}>
         <StatCard icon="people-outline" value={String(friendsCount)} label="Abonnés" />
@@ -57,6 +66,16 @@ export default function ProfilScreen() {
 
       {/* PARAMÈTRES -> components/ui/profil/SettingsSection (+ SettingSwitch) */}
       <SettingsSection />
+
+      <ShareQRModal
+        visible={showQR}
+        onClose={() => setShowQR(false)}
+        title={"Partager mon profil"}
+        subtitle={"Scanne pour voir mon profil"}
+        qrValue={`app://user/${encodeURIComponent(user.name)}`}
+        shareText={`Voici mon profil sur l'app : app://user/${encodeURIComponent(user.name)}`}
+        accentColor={colors.accent}
+      />
     </ScrollView>
   );
 }

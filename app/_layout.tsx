@@ -1,4 +1,4 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
+import { DarkTheme, DefaultTheme } from "@react-navigation/native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import "react-native-reanimated";
@@ -19,12 +19,12 @@ function RootNavigation() {
   const colorScheme = useColorScheme();
   const theme = (mode ?? colorScheme) === "dark" ? DarkTheme : DefaultTheme;
   return (
-    <ThemeProvider value={theme}>
+    <>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       </Stack>
       <StatusBar style={mode === "dark" ? "light" : "dark"} />
-    </ThemeProvider>
+    </>
   );
 }
 
