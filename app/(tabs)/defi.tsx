@@ -92,17 +92,25 @@ export default function DefiScreen() {
   {/* SWITCHER -> components/ui/defi/TabSwitcher */}
       <TabSwitcher activeTab={activeTab} onChange={setActiveTab} />
 
-  {/* CATÉGORIES -> components/ui/defi/CategorySelector */}
-      {activeTab === "defis" && (
-        <CategorySelector selected={selectedCategory} onSelect={setSelectedCategory} />
-      )}
 
   {/* CONTENU -> components/ui/defi/ChallengeCard & ValidationCard */}
       <ScrollView
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 140 }}
+        stickyHeaderIndices={[0]} // Make the first child sticky
       >
+        {/* Sticky header */}
+        {activeTab === "defis" && (
+          <View style={{ backgroundColor: colors.background }}>
+            <CategorySelector
+              selected={selectedCategory}
+              onSelect={setSelectedCategory}
+            />
+          </View>
+        )}
+
+        {/* Challenge cards */}
         {activeTab === "defis" &&
           filteredChallenges.map((challenge: Challenge) => (
             <ChallengeCard
@@ -113,20 +121,26 @@ export default function DefiScreen() {
             />
           ))}
 
-        {activeTab === "validations" && (
-          validationQueue.length === 0 ? (
-            <Text style={[styles.emptyText, { color: colors.mutedText }]}>Aucun défi à valider.</Text>
+        {/* Validation cards */}
+        {activeTab === "validations" &&
+          (validationQueue.length === 0 ? (
+            <Text style={[styles.emptyText, { color: colors.mutedText }]}>
+              Aucun défi à valider.
+            </Text>
           ) : (
             validationQueue.map((item) => (
               <ValidationCard
                 key={item.id}
                 item={item}
-                onValidate={() => setValidationQueue((q) => q.filter((x) => x.id !== item.id))}
-                onReject={() => setValidationQueue((q) => q.filter((x) => x.id !== item.id))}
+                onValidate={() =>
+                  setValidationQueue((q) => q.filter((x) => x.id !== item.id))
+                }
+                onReject={() =>
+                  setValidationQueue((q) => q.filter((x) => x.id !== item.id))
+                }
               />
             ))
-          )
-        )}
+          ))}
       </ScrollView>
     </View>
   );
