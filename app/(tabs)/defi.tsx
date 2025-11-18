@@ -10,7 +10,6 @@ import { CHALLENGES } from "@/components/ui/defi/constants";
 import { TabSwitcher } from "@/components/ui/defi/TabSwitcher";
 import { CategoryKey, Challenge, TabKey } from "@/components/ui/defi/types";
 import { ValidationCard } from "@/components/ui/defi/ValidationCard";
-import { useChallenges } from "@/hooks/challenges-context";
 
 export default function DefiScreen() {
   const router = useRouter();
@@ -18,45 +17,7 @@ export default function DefiScreen() {
 
   const [activeTab, setActiveTab] = useState<TabKey>("defis");
   const [selectedCategory, setSelectedCategory] = useState<CategoryKey>("Tous");
-  const { current, start, stop } = useChallenges();
-  const [validationQueue, setValidationQueue] = useState([
-    {
-      id: 101,
-      title: "Recycler des bouteilles",
-      description: "Preuve de recyclage",
-      category: "Recyclage" as const,
-      difficulty: "Facile" as const,
-      points: 10,
-      audience: "Membre" as const,
-      timeLeft: "—",
-      userName: "Alex",
-      photoUrl: "https://images.unsplash.com/photo-1582407947304-fd86f028f716?q=80&w=800&auto=format&fit=crop",
-    },
-    {
-      id: 102,
-      title: "Aller au marché local",
-      description: "Panier local",
-      category: "Local" as const,
-      difficulty: "Moyen" as const,
-      points: 20,
-      audience: "Membre" as const,
-      timeLeft: "—",
-      userName: "Lina",
-      photoUrl: "https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=800&auto=format&fit=crop",
-    },
-    {
-      id: 103,
-      title: "Défi compost maison",
-      description: "Compost",
-      category: "Tri" as const,
-      difficulty: "Difficile" as const,
-      points: 30,
-      audience: "Membre" as const,
-      timeLeft: "—",
-      userName: "Marie",
-      photoUrl: "https://images.unsplash.com/photo-1615485737651-6f6c4110fc94?q=80&w=800&auto=format&fit=crop",
-    },
-  ]);
+  const [ongoingIds, setOngoingIds] = useState<number[]>([]);
 
   const filteredChallenges = useMemo(() => {
     if (selectedCategory === "Tous") return CHALLENGES;
@@ -64,18 +25,16 @@ export default function DefiScreen() {
   }, [selectedCategory]);
 
   const ongoingChallenges = useMemo(
-    () => (current ? [current] : []),
-    [current]
+    () => CHALLENGES.filter((c) => ongoingIds.includes(c.id)),
+    [ongoingIds]
   );
 
   const toggleOngoing = (id: number) => {
-    const challenge = CHALLENGES.find((c) => c.id === id);
-    if (!challenge) return;
-    if (current && current.id === id) {
-      stop();
-    } else {
-      start(challenge);
-    }
+    setOngoingIds((prev) =>
+      prev.includes(id)
+        ? prev.filter((challengeId) => challengeId !== id)
+        : [...prev, id]
+    );
   };
 
   return (
@@ -86,7 +45,7 @@ export default function DefiScreen() {
         Relevez des défis et gagnez des points
       </Text>
 
-      <GradientButton label="Rejoindre un club" onPress={() => router.push({ pathname: "/social", params: { tab: "clubs" } })}
+      <GradientButton label="Rejoindre un club" onPress={() => router.push("/social" as any)}
         style={{ alignSelf: "flex-start", marginTop: 16, width: 180 }} />
 
   {/* SWITCHER -> components/ui/defi/TabSwitcher */}
@@ -116,7 +75,7 @@ export default function DefiScreen() {
             <ChallengeCard
               key={challenge.id}
               challenge={challenge}
-              isOngoing={current?.id === challenge.id}
+              isOngoing={ongoingIds.includes(challenge.id)}
               onToggle={toggleOngoing}
             />
           ))}
@@ -128,7 +87,7 @@ export default function DefiScreen() {
               Aucun défi à valider.
             </Text>
           ) : (
-            validationQueue.map((item) => (
+            ongoingChallenges.map((item) => (
               <ValidationCard
                 key={item.id}
                 item={item}
