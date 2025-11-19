@@ -1,0 +1,63 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthed() {
+      return request.auth != null;
+    }
+
+    function isMember(conversation) {
+      // Expect conversation.members as array of maps with field uid
+      return conversation.members.values().map(m -> m.uid).hasAny([request.auth.uid]);
+    }
+
+    // Helper to load a conversation doc safely
+    function getConversation(conversationId) {
+      return get(/databases/$(database)/documents/conversations/$(conversationId)).data;
+    }
+
+    // Users collection (basic profile)
+    match /users/{userId} {
+      allow read: if true; // public profiles
+      allow create: if isAuthed() && request.auth.uid == userId;
+      allow update: if isAuthed() && request.auth.uid == userId;
+      allow delete: if false; // no deletes
+    }
+
+    // Conversations root
+    match /conversations/{conversationId} {
+      allow read: if isAuthed() && isMember(resource.data);
+      allow create: if isAuthed() &&
+        request.resource.data.type in ['direct','group'] &&
+        request.resource.data.members is list &&
+        request.resource.data.members.size() > 0 &&
+        // creator must be in members
+        request.resource.data.members.values().map(m -> m.uid).hasOnly([request.auth.uid]) == false &&
+        request.resource.data.members.values().map(m -> m.uid).hasAny([request.auth.uid]);
+      allow update: if isAuthed() && isMember(resource.data) &&
+        // Prevent arbitrary member list overwrites except lastRead/unreadCount adjustments
+        (request.resource.data.members == resource.data.members || (
+          request.resource.data.members.size() == resource.data.members.size() &&
+          request.resource.data.members.values().map(m -> m.uid) == resource.data.members.values().map(m -> m.uid)
+        ));
+      allow delete: if false;
+
+      // Messages subcollection (texte uniquement)
+      match /messages/{messageId} {
+        allow read: if isAuthed() && isMember(getConversation(conversationId));
+        allow create: if isAuthed() && isMember(getConversation(conversationId)) &&
+            request.resource.data.senderId == request.auth.uid &&
+          request.resource.data.type in ['text'];
+        allow update: if isAuthed() && isMember(getConversation(conversationId)) && (
+          // Editing own message text or adding reactions
+          (request.resource.data.senderId == request.auth.uid && request.resource.data.editedAt == request.time) ||
+          // Reaction changes: only reactions map changed
+          (request.resource.data.reactions != resource.data.reactions &&
+            request.resource.data.senderId == resource.data.senderId &&
+            request.resource.data.text == resource.data.text &&
+            request.resource.data.type == resource.data.type)
+        );
+        allow delete: if isAuthed() && resource.data.senderId == request.auth.uid;
+      }
+    }
+  }
+}
