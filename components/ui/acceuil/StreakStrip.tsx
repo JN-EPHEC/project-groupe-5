@@ -66,22 +66,32 @@ export function StreakStrip({ onOpenCalendar }: { onOpenCalendar: () => void }) 
   }, [completed]);
 
   return (
-    <View style={[styles.block]}>
-      <View style={[styles.card, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.title, { color: colors.text }]}>Votre série d'activités</Text>
-        <TouchableOpacity onPress={onOpenCalendar}><Text style={[styles.link]}>Voir le calendrier</Text></TouchableOpacity>
+    <View style={[styles.card, { backgroundColor: colors.surface }]}>
+      <View style={styles.headerRow}>
+        <Text style={[styles.title, { color: colors.text }]}>Votre série d'activités</Text>
+        <TouchableOpacity onPress={onOpenCalendar}>
+          <Text style={[styles.link]}>Voir le calendrier</Text>
+        </TouchableOpacity>
       </View>
-      <View style={styles.row}>        
-        <View style={styles.flame}><Text style={styles.flameText}>{streakWeeks}</Text></View>
+
+      <View style={styles.row}>
+        <View style={styles.flame}>
+          <Text style={styles.flameText}>{streakWeeks}</Text>
+        </View>
         <View style={{ flex: 1, flexDirection: "row", justifyContent: "space-between" }}>
           {weekDays.map((d, idx) => (
-            <View key={idx} style={[styles.day]}>              
-                <Text style={[styles.dayLabel, { color: colors.mutedText }]}>{d.label}</Text>
-                <View style={[styles.circle, { backgroundColor: d.entry ? "#FFFFFF" : "transparent", borderColor: "#0F3327" }]}>                
+            <View key={idx} style={[styles.day]}>
+              <Text style={[styles.dayLabel, { color: colors.mutedText }]}>{d.label}</Text>
+              <View
+                style={[
+                  styles.circle,
+                  { backgroundColor: d.entry ? "#FFFFFF" : "transparent", borderColor: "#0F3327" },
+                ]}
+              >
                 {d.entry ? (
-                  <Ionicons name={categoryIcon(d.entry.category)} size={16} color="#fff" />
+                  <Ionicons name={categoryIcon(d.entry.category)} size={16} color="#0F3327" />
                 ) : (
-                    <Text style={[styles.dateNum, { color: colors.mutedText }]}>{d.date.getDate()}</Text>
+                  <Text style={[styles.dateNum, { color: colors.mutedText }]}>{d.date.getDate()}</Text>
                 )}
               </View>
             </View>
@@ -93,9 +103,8 @@ export function StreakStrip({ onOpenCalendar }: { onOpenCalendar: () => void }) 
 }
 
 const styles = StyleSheet.create({
-  block: { marginTop: 10 },
-  card: { marginTop: 10, borderRadius: 16, padding: 12 },
-  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
+  card: { borderRadius: 16, padding: 12, marginTop: 10 },
+  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
   title: { fontWeight: "700", fontSize: 16 },
   link: { color: "#19D07D", fontWeight: "700" },
   row: { flexDirection: "row", alignItems: "center" },

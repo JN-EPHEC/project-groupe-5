@@ -9,6 +9,7 @@ import { PointsProvider } from "@/hooks/points-context";
 import { ThemeProviderCustom, useThemeMode } from "@/hooks/theme-context";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { UserProvider } from "@/hooks/user-context";
+import { configureNotificationHandling, registerPushToken } from "@/services/push";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import React, { useEffect, useState } from "react";
 import { auth } from "../firebaseConfig";
@@ -25,7 +26,13 @@ function RootNavigation() {
   const [user, setUser] = useState<User | null | undefined>(undefined);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (fbUser) => setUser(fbUser));
+    const unsub = onAuthStateChanged(auth, async (fbUser) => {
+      setUser(fbUser);
+      if (fbUser) {
+        configureNotificationHandling();
+        await registerPushToken();
+      }
+    });
     return unsub;
   }, []);
 

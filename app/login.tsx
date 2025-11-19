@@ -1,5 +1,6 @@
 // app/login.tsx
 import { auth } from "@/firebaseConfig";
+import { configureNotificationHandling, registerPushToken } from "@/services/push";
 import { useRouter } from "expo-router";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import React, { useState } from "react";
@@ -14,7 +15,9 @@ export default function LoginScreen() {
   const handleSignup = async () => {
     try {
       setLoading(true);
-      await createUserWithEmailAndPassword(auth, email.trim(), password);
+  const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+  configureNotificationHandling();
+  await registerPushToken();
       Alert.alert("Inscription réussie ✅");
   router.replace("/(tabs)/acceuil" as any);
     } catch (error: any) {
@@ -28,7 +31,9 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     try {
       setLoading(true);
-      await signInWithEmailAndPassword(auth, email.trim(), password);
+  const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+  configureNotificationHandling();
+  await registerPushToken();
       Alert.alert("Connexion réussie ✅");
   router.replace("/(tabs)/acceuil" as any);
     } catch (error: any) {
