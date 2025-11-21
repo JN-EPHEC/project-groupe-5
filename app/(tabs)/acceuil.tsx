@@ -2,6 +2,7 @@ import { ChallengeOfTheDay } from "@/components/ui/acceuil/ChallengeOfTheDay";
 import { HeaderProfile } from "@/components/ui/acceuil/HeaderProfile";
 import { ProgressionCard } from "@/components/ui/acceuil/ProgressionCard";
 import { RankCard } from "@/components/ui/acceuil/RankCard";
+import { StreakStrip } from "@/components/ui/acceuil/StreakStrip";
 import { amisData } from "@/components/ui/social/data";
 import { useChallenges } from "@/hooks/challenges-context";
 import { useClub } from "@/hooks/club-context";
@@ -47,17 +48,20 @@ export default function AcceuilScreen() {
         <Text style={[styles.pointsLabel, { color: colors.mutedText }]}>Points</Text>
       </View>
 
+  {/* Section: Streak (type Strava) */}
+  <StreakStrip onOpenCalendar={() => router.push("/calendrier" as any)} />
+
       {/* Section: Classement -> components/ui/acceuil/RankCard */}
       <Text style={[styles.sectionTitle, { color: colors.text }]}>Classement</Text>
       <View style={styles.row}>
-        <TouchableOpacity activeOpacity={0.85} style={{ width: "48%" }} onPress={() => router.push({ pathname: "/social", params: { tab: "amis" } })}>
+  <TouchableOpacity activeOpacity={0.85} style={{ width: "48%" }} onPress={() => router.push({ pathname: "/social", params: { tab: "amis" } } as any)}>
           <RankCard value={`${positionLabel} sur ${totalFriends}`} label="Entre amis" />
         </TouchableOpacity>
         {joinedClub ? (
           <TouchableOpacity
             activeOpacity={0.85}
             style={{ width: "48%" }}
-            onPress={() => router.push({ pathname: "/social", params: { tab: "clubs", view: "clubRanking" } })}
+            onPress={() => router.push({ pathname: "/social", params: { tab: "clubs", view: "clubRanking" } } as any)}
           >
             <RankCard value={`${clubLabel} sur ${clubTotal}`} label="Club" active />
           </TouchableOpacity>
@@ -95,7 +99,7 @@ export default function AcceuilScreen() {
           title={current.title}
           description={current.description}
           difficulty={current.difficulty}
-          onValidate={() => router.push({ pathname: "/camera", params: { id: String(current.id) } })}
+          onValidate={() => router.push({ pathname: "/camera", params: { id: String(current.id) } } as any)}
         />
       )}
     </ScrollView>

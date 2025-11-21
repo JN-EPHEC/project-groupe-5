@@ -1,0 +1,16 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isAuthed() { return request.auth != null; }
+    function isMember(conversationId) {
+      return exists(/databases/(default)/documents/conversations/$(conversationId)) &&
+        get(/databases/(default)/documents/conversations/$(conversationId)).data.members.values().map(m -> m.uid).hasAny([request.auth.uid]);
+    }
+    match /chat/{conversationId}/{messageId}/{filename} {
+      allow read: if true; // allow public image access (optional)
+      allow write: if isAuthed() && isMember(conversationId) &&
+        request.resource.size < 5 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/.+');
+    }
+  }
+}
