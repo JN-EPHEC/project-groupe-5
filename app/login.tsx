@@ -1,7 +1,7 @@
 // app/login.tsx
 import { auth } from "@/firebaseConfig";
 import { useRouter } from "expo-router";
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword } from "firebase/auth";
 import React, { useState } from "react";
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
@@ -11,32 +11,22 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSignup = async () => {
-    try {
-      setLoading(true);
-      await createUserWithEmailAndPassword(auth, email.trim(), password);
-      Alert.alert("Inscription réussie ✅");
-  router.replace("/(tabs)/acceuil" as any);
-    } catch (error: any) {
-      console.log(error);
-      Alert.alert("Erreur inscription", error.message || "Une erreur est survenue");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleLogin = async () => {
     try {
       setLoading(true);
       await signInWithEmailAndPassword(auth, email.trim(), password);
       Alert.alert("Connexion réussie ✅");
-  router.replace("/(tabs)/acceuil" as any);
+      router.replace("/(tabs)/acceuil" as any);
     } catch (error: any) {
       console.log(error);
       Alert.alert("Erreur connexion", error.message || "Une erreur est survenue");
     } finally {
       setLoading(false);
     }
+  };
+
+  const goToRegister = () => {
+    router.push("/register" as any); // ✔️ On enverra l'utilisateur sur app/register.tsx
   };
 
   return (
@@ -71,7 +61,7 @@ export default function LoginScreen() {
 
       <TouchableOpacity
         style={[styles.buttonOutline, loading && { opacity: 0.7 }]}
-        onPress={handleSignup}
+        onPress={goToRegister}
         disabled={loading}
       >
         <Text style={styles.buttonOutlineText}>Créer un compte</Text>
