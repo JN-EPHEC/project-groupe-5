@@ -1,18 +1,20 @@
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import React, { useMemo, useState } from "react";
 import {
-    FlatList,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
-interface MessageItem { id: string; text: string; sender: string; reactions?: string[] }
+interface MessageItem { id: string; text?: string; imageUri?: string; type?: 'text' | 'image'; sender: string; reactions?: string[] }
 
 interface ChatViewProps {
   selectedChat: any;
@@ -26,6 +28,7 @@ interface ChatViewProps {
   onReactMessage: (id: string, emoji: string) => void;
   editingId?: string | null;
   showBack?: boolean;
+  onSendImage?: (uri: string) => void;
 }
 
 export const ChatView: React.FC<ChatViewProps> = ({
@@ -40,7 +43,18 @@ export const ChatView: React.FC<ChatViewProps> = ({
   onReactMessage,
   editingId,
   showBack = true,
+  onSendImage,
 }) => {
+    const pickImage = async () => {
+      try {
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (perm.status !== 'granted') return;
+        const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
+        if (!res.canceled && res.assets?.[0]?.uri) {
+          onSendImage && onSendImage(res.assets[0].uri);
+        }
+      } catch {}
+    };
   const { colors } = useThemeMode();
   const [actionFor, setActionFor] = useState<string | null>(null);
   const [showReactionsFor, setShowReactionsFor] = useState<string | null>(null);
@@ -92,7 +106,11 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 },
               ]}
             >
-              <Text style={[styles.text, { color: colors.text }]}>{item.text}</Text>
+              {item.imageUri ? (
+                <Image source={{ uri: item.imageUri }} style={{ width: 180, height: 180, borderRadius: 10 }} />
+              ) : (
+                <Text style={[styles.text, { color: colors.text }]}>{item.text}</Text>
+              )}
               {item.reactions && item.reactions.length > 0 && (
                 <View style={styles.reactionsCorner}>
                   <Text style={{ fontSize: 12 }}>{Array.from(new Set(item.reactions)).join(" ")}</Text>
@@ -105,7 +123,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   <Ionicons name="trash" size={16} color={colors.text} />
                   <Text style={[styles.actionText, { color: colors.text }]}>Supprimer</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => { setActionFor(null); onStartEditMessage(item.id, item.text); }} style={styles.actionBtn}>
+                <TouchableOpacity onPress={() => { setActionFor(null); onStartEditMessage(item.id, item.text ?? ""); }} style={styles.actionBtn}>
                   <Ionicons name="create-outline" size={16} color={colors.text} />
                   <Text style={[styles.actionText, { color: colors.text }]}>Modifier</Text>
                 </TouchableOpacity>
@@ -130,11 +148,14 @@ export const ChatView: React.FC<ChatViewProps> = ({
             )}
           </TouchableOpacity>
         )}
-        contentContainerStyle={{ paddingVertical: 10, paddingBottom: 120 }}
+        contentContainerStyle={{ paddingVertical: 10, paddingBottom: 72 }}
       />
 
       {/* --- Input --- */}
-      <View style={[styles.inputRow, { marginBottom: 90 }]}>
+      <View style={[styles.inputRow, { marginBottom: 110 }]}>
+        <TouchableOpacity onPress={pickImage} style={[styles.attach, { backgroundColor: colors.surfaceAlt }]}>
+          <Ionicons name="image-outline" size={20} color={colors.text} />
+        </TouchableOpacity>
         <TextInput
           value={input}
           onChangeText={setInput}
@@ -155,7 +176,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16 },
+  container: { flex: 1, paddingTop: 8, paddingHorizontal: 12, paddingBottom: 0 },
   backBtn: { marginBottom: 10 },
   header: { fontSize: 18, fontWeight: "600", textAlign: "center", marginBottom: 10 },
   message: { padding: 10, borderRadius: 12, marginVertical: 4, maxWidth: "80%" },
@@ -175,5 +196,6 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   input: { flex: 1, borderRadius: 20, padding: 10, fontSize: 14 },
+  attach: { marginRight: 8, borderRadius: 20, padding: 10 },
   send: { marginLeft: 8, borderRadius: 20, padding: 10 },
 });

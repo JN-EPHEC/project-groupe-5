@@ -2,7 +2,7 @@ import { GradientButton } from "@/components/ui/common/GradientButton";
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export interface Club {
   id: string;
@@ -11,6 +11,8 @@ export interface Club {
   participants: number;
   joined: boolean;
   city?: string;
+  emoji?: string;
+  photoUri?: string;
 }
 
 interface ClubCardProps {
@@ -26,7 +28,16 @@ export const ClubCard: React.FC<ClubCardProps> = ({ club, onJoin, onChat, onRank
 
   return (
     <View style={[styles.card, { backgroundColor: colors.surface }]}>
-      <Text style={[styles.title, { color: colors.text }]}>{club.name}</Text>
+      <View style={styles.headerRow}>
+        {club.photoUri ? (
+          <Image source={{ uri: club.photoUri }} style={styles.avatar} />
+        ) : (
+          <View style={[styles.avatar, { backgroundColor: colors.pill, alignItems: 'center', justifyContent: 'center' }]}>
+            <Text style={{ fontSize: 18 }}>{club.emoji || '🌿'}</Text>
+          </View>
+        )}
+        <Text style={[styles.title, { color: colors.text }]}>{club.name}</Text>
+      </View>
       <Text style={[styles.desc, { color: colors.mutedText }]}>{club.desc}</Text>
       {club.city ? (
         <Text style={[styles.city, { color: colors.mutedText }]}>🏙️ {club.city}</Text>
@@ -60,7 +71,7 @@ export const ClubCard: React.FC<ClubCardProps> = ({ club, onJoin, onChat, onRank
             style={[styles.chatBtn, { borderColor: colors.accent, backgroundColor: colors.pill }]}
             onPress={onRanking}
           >
-            <Ionicons name="document-text-outline" size={18} color={colors.accent} />
+            <Ionicons name="leaf-outline" size={18} color={colors.accent} />
             <Text style={[styles.chatText, { color: colors.accent }]}>
               {typeof totalPoints === 'number' ? `${totalPoints} pts` : 'Points'}
             </Text>
@@ -73,6 +84,7 @@ export const ClubCard: React.FC<ClubCardProps> = ({ club, onJoin, onChat, onRank
 
 const styles = StyleSheet.create({
   card: { borderRadius: 16, padding: 16, marginBottom: 12 },
+  headerRow: { flexDirection: 'row', alignItems: 'center' },
   title: { fontSize: 16, fontWeight: "bold" },
   desc: { marginVertical: 6 },
   city: { marginBottom: 6 },
@@ -80,6 +92,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row" },
   joinBtn: { flex: 1, padding: 10, borderRadius: 12, alignItems: "center" },
   joinText: { fontWeight: "600" },
+  avatar: { width: 36, height: 36, borderRadius: 18, marginRight: 8 },
   chatBtn: {
     flexDirection: "row",
     alignItems: "center",

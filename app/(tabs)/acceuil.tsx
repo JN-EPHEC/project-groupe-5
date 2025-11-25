@@ -94,8 +94,8 @@ export default function AcceuilScreen() {
       {/* Section: Progression -> components/ui/acceuil/ProgressionCard + components/ProgressCircle */}
       <ProgressionCard done={defisFaient} total={defisTotal} pointsText="50 Points gagnés" streakText="2 jours de suite 🔥" />
 
-      {/* Section: Défi en cours (affiché uniquement s'il y en a un) */}
-      {current && (
+      {/* Section: Défi en cours (seulement si status active) */}
+      {current && current.status === 'active' && (
         <ChallengeOfTheDay
           title={current.title}
           description={current.description}
