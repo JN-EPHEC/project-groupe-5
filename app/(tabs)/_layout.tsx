@@ -1,15 +1,27 @@
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
-import { Tabs } from "expo-router";
-import { useRef } from "react";
+import { Redirect, Tabs } from "expo-router";
+import { onAuthStateChanged } from "firebase/auth";
+import React, { useEffect, useRef, useState } from "react";
 import { Animated } from "react-native";
+import { auth } from "../../firebaseConfig";
 
 // Couleurs constantes
 const BG_DARK = "#0B1412";
-const TAB_BG = "rgba(20,26,24,0.92)"; // gris très sombre translucide
-const TAB_ACTIVE_GRADIENT = ["#90F7D5", "#38D793", "#23C37A"]; // utilisé via style simple
+const TAB_BG = "rgba(20,26,24,0.92)";
+const TAB_ACTIVE_GRADIENT = ["#90F7D5", "#38D793", "#23C37A"];
 
-function CircleIcon({ name, color, focused, light }: { name: any; color: string; focused: boolean; light?: boolean }) {
+function CircleIcon({
+  name,
+  color,
+  focused,
+  light,
+}: {
+  name: any;
+  color: string;
+  focused: boolean;
+  light?: boolean;
+}) {
   const scale = useRef(new Animated.Value(focused ? 1 : 0.9)).current;
   const opacity = useRef(new Animated.Value(focused ? 1 : 0.6)).current;
 
@@ -34,7 +46,7 @@ function CircleIcon({ name, color, focused, light }: { name: any; color: string;
         alignItems: "center",
         backgroundColor: focused
           ? light
-            ? "#FFFFFF" // cercle blanc en mode clair actif
+            ? "#FFFFFF"
             : "#E3F9F1"
           : "transparent",
         borderWidth: focused && light ? 2 : 0,
@@ -43,13 +55,36 @@ function CircleIcon({ name, color, focused, light }: { name: any; color: string;
         opacity,
       }}
     >
-      <Ionicons name={name} size={24} color={focused ? (light ? "#0F3327" : "#0F3327") : color} />
+      <Ionicons
+        name={name}
+        size={24}
+        color={focused ? (light ? "#0F3327" : "#0F3327") : color}
+      />
     </Animated.View>
   );
 }
 
 export default function TabLayout() {
   const { colors, mode } = useThemeMode();
+  const [user, setUser] = useState<any>(undefined);
+
+  // Firebase auth guard
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
+    return unsub;
+  }, []);
+
+  // Still checking auth state
+  if (user === undefined) {
+    return null;
+  }
+
+  // Not logged in → go to login
+  if (!user) {
+    return <Redirect href="/(auth)/login" />;
+  }
+
+  // Logged in → show tabs
   return (
     <Tabs
       screenOptions={{
@@ -85,12 +120,20 @@ export default function TabLayout() {
         tabBarInactiveTintColor: mode === "dark" ? "#8AA39C" : "#0F3327AA",
       }}
     >
+      {/* hidden index route, used only as default redirect target */}
+      <Tabs.Screen name="index" options={{ href: null }} />
+
       <Tabs.Screen
         name="acceuil"
         options={{
           title: "Acceuil",
           tabBarIcon: ({ color, focused }) => (
-            <CircleIcon name="home-outline" color={color} focused={focused} light={mode === "light"} />
+            <CircleIcon
+              name="home-outline"
+              color={color}
+              focused={focused}
+              light={mode === "light"}
+            />
           ),
         }}
       />
@@ -99,7 +142,12 @@ export default function TabLayout() {
         options={{
           title: "Défis",
           tabBarIcon: ({ color, focused }) => (
-            <CircleIcon name="trophy-outline" color={color} focused={focused} light={mode === "light"} />
+            <CircleIcon
+              name="trophy-outline"
+              color={color}
+              focused={focused}
+              light={mode === "light"}
+            />
           ),
         }}
       />
@@ -108,7 +156,12 @@ export default function TabLayout() {
         options={{
           title: "Social",
           tabBarIcon: ({ color, focused }) => (
-            <CircleIcon name="people-outline" color={color} focused={focused} light={mode === "light"} />
+            <CircleIcon
+              name="people-outline"
+              color={color}
+              focused={focused}
+              light={mode === "light"}
+            />
           ),
         }}
       />
@@ -117,7 +170,12 @@ export default function TabLayout() {
         options={{
           title: "Récompenses",
           tabBarIcon: ({ color, focused }) => (
-            <CircleIcon name="gift-outline" color={color} focused={focused} light={mode === "light"} />
+            <CircleIcon
+              name="gift-outline"
+              color={color}
+              focused={focused}
+              light={mode === "light"}
+            />
           ),
         }}
       />
@@ -126,7 +184,12 @@ export default function TabLayout() {
         options={{
           title: "Profil",
           tabBarIcon: ({ color, focused }) => (
-            <CircleIcon name="person-circle-outline" color={color} focused={focused} light={mode === "light"} />
+            <CircleIcon
+              name="person-circle-outline"
+              color={color}
+              focused={focused}
+              light={mode === "light"}
+            />
           ),
         }}
       />

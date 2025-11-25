@@ -1,11 +1,14 @@
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
+import { signOut } from "firebase/auth";
 import React, { useState } from "react";
-import { StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import { Alert, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import { auth } from "../../../firebaseConfig";
 import { SettingSwitch } from "./SettingSwitch";
 
 export const SettingsSection = () => {
   const { colors, mode, toggle } = useThemeMode();
+
   const [showNotifications, setShowNotifications] = useState(false);
   const [showLanguage, setShowLanguage] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -15,13 +18,26 @@ export const SettingsSection = () => {
   const [email, setEmail] = useState(false);
   const [sound, setSound] = useState(true);
 
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch {
+      Alert.alert("Error", "Could not log out. Please try again.");
+    }
+  };
+
+
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
       {/* Notifications */}
       <TouchableOpacity style={styles.row} onPress={() => setShowNotifications(!showNotifications)}>
         <Ionicons name="notifications-outline" size={22} color={colors.text} />
         <Text style={[styles.text, { color: colors.text }]}>Notifications</Text>
-        <Ionicons name={showNotifications ? "chevron-down" : "chevron-forward"} size={18} color={colors.mutedText} />
+        <Ionicons
+          name={showNotifications ? "chevron-down" : "chevron-forward"}
+          size={18}
+          color={colors.mutedText}
+        />
       </TouchableOpacity>
 
       {showNotifications && (
@@ -32,28 +48,37 @@ export const SettingsSection = () => {
         </View>
       )}
 
-      {/* Thème */}
+      {/* Theme */}
       <View style={styles.row}>
         <Ionicons name="moon-outline" size={22} color={colors.text} />
         <Text style={[styles.text, { color: colors.text }]}>Thème sombre</Text>
         <Switch value={mode === "dark"} onValueChange={toggle} thumbColor="#19D07D" />
       </View>
 
-      {/* Langue */}
+      {/* Language */}
       <TouchableOpacity style={styles.row} onPress={() => setShowLanguage(!showLanguage)}>
         <Ionicons name="language-outline" size={22} color={colors.text} />
         <Text style={[styles.text, { color: colors.text }]}>Langue</Text>
-        <Ionicons name={showLanguage ? "chevron-down" : "chevron-forward"} size={18} color={colors.mutedText} />
+        <Ionicons
+          name={showLanguage ? "chevron-down" : "chevron-forward"}
+          size={18}
+          color={colors.mutedText}
+        />
       </TouchableOpacity>
 
       {showLanguage && (
         <View style={styles.subMenu}>
           {["Français", "Anglais"].map((lang) => (
             <TouchableOpacity key={lang} onPress={() => setLanguage(lang)} style={styles.langOption}>
-              <Text style={[
-                styles.langText,
-                { color: language === lang ? colors.accent : colors.mutedText, fontWeight: language === lang ? "700" : "400" },
-              ]}>
+              <Text
+                style={[
+                  styles.langText,
+                  {
+                    color: language === lang ? colors.accent : colors.mutedText,
+                    fontWeight: language === lang ? "700" : "400",
+                  },
+                ]}
+              >
                 {lang}
               </Text>
             </TouchableOpacity>
@@ -61,11 +86,15 @@ export const SettingsSection = () => {
         </View>
       )}
 
-      {/* Paramètres */}
+      {/* Settings */}
       <TouchableOpacity style={styles.row} onPress={() => setShowSettings(!showSettings)}>
         <Ionicons name="settings-outline" size={22} color={colors.text} />
         <Text style={[styles.text, { color: colors.text }]}>Paramètres</Text>
-        <Ionicons name={showSettings ? "chevron-down" : "chevron-forward"} size={18} color={colors.mutedText} />
+        <Ionicons
+          name={showSettings ? "chevron-down" : "chevron-forward"}
+          size={18}
+          color={colors.mutedText}
+        />
       </TouchableOpacity>
 
       {showSettings && (
@@ -76,8 +105,11 @@ export const SettingsSection = () => {
         </View>
       )}
 
-      {/* Déconnexion */}
-      <TouchableOpacity style={[styles.row, { borderTopWidth: 0.5, borderColor: "#24403A" }]}>
+      {/* Logout */}
+      <TouchableOpacity
+        style={[styles.row, { borderTopWidth: 0.5, borderColor: "#24403A" }]}
+        onPress={handleLogout}
+      >
         <Ionicons name="exit-outline" size={22} color="#F26767" />
         <Text style={[styles.text, { color: "#F26767" }]}>Se déconnecter</Text>
       </TouchableOpacity>
