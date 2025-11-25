@@ -8,9 +8,10 @@ import { CategorySelector } from "@/components/ui/defi/CategorySelector";
 import { ChallengeCard } from "@/components/ui/defi/ChallengeCard";
 import { CHALLENGES } from "@/components/ui/defi/constants";
 import { TabSwitcher } from "@/components/ui/defi/TabSwitcher";
-import { CategoryKey, Challenge, TabKey } from "@/components/ui/defi/types";
+import { CategoryKey, TabKey } from "@/components/ui/defi/types";
 import { ValidationCard } from "@/components/ui/defi/ValidationCard";
 import { useChallenges } from "@/hooks/challenges-context";
+import * as ImagePicker from 'expo-image-picker';
 
 export default function DefiScreen() {
   const router = useRouter();
@@ -69,6 +70,7 @@ export default function DefiScreen() {
   );
 
   const challengesToDisplay = useMemo(() => {
+    // If we have a current challenge in pendingValidation or validated state, still show only that one
     return current ? [current] : filteredChallenges;
   }, [current, filteredChallenges]);
 
@@ -79,6 +81,21 @@ export default function DefiScreen() {
       stop();
     } else {
       start(challenge);
+    }
+  };
+
+  const openCamera = (challengeId: number) => {
+    router.push({ pathname: '/camera', params: { id: String(challengeId) } });
+  };
+
+  const pickFromGallery = async (challengeId: number) => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (perm.status !== 'granted') return;
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
+    if (!res.canceled && res.assets[0]?.uri) {
+      // Re-use camera flow by navigating with a param? Simpler: push camera with temp param and rely on manual retake not needed.
+      // For simplicity we can navigate to camera to confirm, or extend context directly; keep camera for consistency.
+      router.push({ pathname: '/camera', params: { id: String(challengeId), preset: res.assets[0].uri } });
     }
   };
 
@@ -116,12 +133,14 @@ export default function DefiScreen() {
 
         {/* Challenge cards */}
         {activeTab === "defis" &&
-          challengesToDisplay.map((challenge: Challenge) => (
+          challengesToDisplay.map((challenge: any) => (
             <ChallengeCard
               key={challenge.id}
               challenge={challenge}
               isOngoing={current?.id === challenge.id}
+              status={current?.id === challenge.id ? current?.status : undefined}
               onToggle={toggleOngoing}
+              onValidatePhoto={current?.id === challenge.id && current.status === 'active' ? () => openCamera(challenge.id) : undefined}
             />
           ))}
 
