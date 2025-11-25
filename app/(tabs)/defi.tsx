@@ -68,6 +68,10 @@ export default function DefiScreen() {
     [current]
   );
 
+  const challengesToDisplay = useMemo(() => {
+    return current ? [current] : filteredChallenges;
+  }, [current, filteredChallenges]);
+
   const toggleOngoing = (id: number) => {
     const challenge = CHALLENGES.find((c) => c.id === id);
     if (!challenge) return;
@@ -101,7 +105,7 @@ export default function DefiScreen() {
         stickyHeaderIndices={[0]} // Make the first child sticky
       >
         {/* Sticky header */}
-        {activeTab === "defis" && (
+        {activeTab === "defis" && !current && (
           <View style={{ backgroundColor: colors.background }}>
             <CategorySelector
               selected={selectedCategory}
@@ -112,7 +116,7 @@ export default function DefiScreen() {
 
         {/* Challenge cards */}
         {activeTab === "defis" &&
-          filteredChallenges.map((challenge: Challenge) => (
+          challengesToDisplay.map((challenge: Challenge) => (
             <ChallengeCard
               key={challenge.id}
               challenge={challenge}

@@ -1,15 +1,17 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
 
 export type ClubVisibility = "public" | "private";
-export type ClubInfo = { id: string; name: string; participants: number; desc?: string; visibility?: ClubVisibility; emoji?: string; photoUri?: string };
+export type ClubInfo = { id: string; name: string; participants: number; desc?: string; visibility?: ClubVisibility; emoji?: string; photoUri?: string; city?: string; ownerId?: string; officers?: string[] };
 export type ClubMember = { id: string; name: string; avatar: string; points: number };
 
 type ClubContextType = {
   joinedClub: ClubInfo | null;
   members: ClubMember[]; // members of the joined club (excluding current user)
   joinClub: (club: ClubInfo) => boolean; // false if already in another club
-  createClub: (data: { name: string; desc: string; visibility: ClubVisibility; emoji?: string; photoUri?: string }) => ClubInfo; // returns created club
+  createClub: (data: { name: string; desc: string; visibility: ClubVisibility; emoji?: string; photoUri?: string; city: string }) => ClubInfo; // returns created club
   leaveClub: () => void;
+  promoteToOfficer: (memberId: string) => void;
+  demoteOfficer: (memberId: string) => void;
 };
 
 const ClubContext = createContext<ClubContextType | undefined>(undefined);
@@ -25,7 +27,7 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
     }
     // if not in a club, set and hydrate members from amisData as placeholder
     if (!joinedClub) {
-      setJoinedClub({ id: club.id, name: club.name, participants: club.participants, desc: club.desc, visibility: club.visibility, emoji: club.emoji, photoUri: club.photoUri });
+      setJoinedClub({ id: club.id, name: club.name, participants: club.participants, desc: club.desc, visibility: club.visibility, emoji: club.emoji, photoUri: club.photoUri, city: club.city, ownerId: club.ownerId ?? club.ownerId ?? undefined, officers: club.officers ?? [] });
       // generate club members (excluding current user). We'll create N-1 generic members
       const total = Math.max(1, club.participants);
       const generated: ClubMember[] = Array.from({ length: Math.max(0, total - 1) }).map((_, idx) => {
@@ -46,7 +48,7 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
     setMembers([]);
   }, []);
 
-  const createClub = useCallback((data: { name: string; desc: string; visibility: ClubVisibility; emoji?: string; photoUri?: string }) => {
+  const createClub = useCallback((data: { name: string; desc: string; visibility: ClubVisibility; emoji?: string; photoUri?: string; city: string }) => {
     const newClub: ClubInfo = {
       id: Date.now().toString(),
       name: data.name,
@@ -55,13 +57,32 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
       visibility: data.visibility,
       emoji: data.emoji,
       photoUri: data.photoUri,
+      city: data.city,
+      ownerId: 'me',
+      officers: [],
     };
     // auto-join creator
     joinClub(newClub);
     return newClub;
   }, [joinClub]);
 
-  const value = useMemo(() => ({ joinedClub, members, joinClub, leaveClub, createClub }), [joinedClub, members, joinClub, leaveClub, createClub]);
+  const promoteToOfficer = useCallback((memberId: string) => {
+    setJoinedClub((c) => {
+      if (!c) return c;
+      const officers = Array.from(new Set([...(c.officers || []), memberId]));
+      return { ...c, officers };
+    });
+  }, []);
+
+  const demoteOfficer = useCallback((memberId: string) => {
+    setJoinedClub((c) => {
+      if (!c) return c;
+      const officers = (c.officers || []).filter((id) => id !== memberId);
+      return { ...c, officers };
+    });
+  }, []);
+
+  const value = useMemo(() => ({ joinedClub, members, joinClub, leaveClub, createClub, promoteToOfficer, demoteOfficer }), [joinedClub, members, joinClub, leaveClub, createClub, promoteToOfficer, demoteOfficer]);
   return <ClubContext.Provider value={value}>{children}</ClubContext.Provider>;
 }
 

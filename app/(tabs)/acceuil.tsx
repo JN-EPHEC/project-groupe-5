@@ -2,14 +2,14 @@ import { ChallengeOfTheDay } from "@/components/ui/acceuil/ChallengeOfTheDay";
 import { HeaderProfile } from "@/components/ui/acceuil/HeaderProfile";
 import { ProgressionCard } from "@/components/ui/acceuil/ProgressionCard";
 import { RankCard } from "@/components/ui/acceuil/RankCard";
-import { amisData } from "@/components/ui/social/data";
+import StreakCalendar from "@/components/ui/acceuil/StreakCalendar";
 import { useChallenges } from "@/hooks/challenges-context";
 import { useClub } from "@/hooks/club-context";
+import { useFriends } from "@/hooks/friends-context";
 import { usePoints } from "@/hooks/points-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { useUser } from "@/hooks/user-context";
 import { useRouter } from "expo-router";
-import React from "react";
 import { Image, ScrollView as RNScrollView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function AcceuilScreen() {
@@ -19,11 +19,12 @@ export default function AcceuilScreen() {
   const router = useRouter();
   const { joinedClub, members } = useClub();
   const { current } = useChallenges();
+  const { friends } = useFriends();
   const defisFaient = 2;
   const defisTotal = 5;
 
   // Calcul classement entre amis (user + amisData)
-  const friendPoints = [...amisData.map(a => a.points), points];
+  const friendPoints = [...friends.map(a => a.points), points];
   const sorted = [...friendPoints].sort((a,b) => b - a); // desc
   const position = sorted.indexOf(points) + 1;
   const totalFriends = sorted.length;
@@ -70,7 +71,7 @@ export default function AcceuilScreen() {
 
       {/* Avatars des amis (en ligne: cercle vert) - sans l'utilisateur */}
       <RNScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 10 }}>
-        {amisData.map((a: any) => (
+            {friends.map((a: any) => (
           <Image
             key={a.id}
             source={{ uri: a.avatar }}
@@ -85,6 +86,9 @@ export default function AcceuilScreen() {
           />
         ))}
       </RNScrollView>
+
+      {/* Série d'activités (streak) */}
+      <StreakCalendar />
 
       {/* Section: Progression -> components/ui/acceuil/ProgressionCard + components/ProgressCircle */}
       <ProgressionCard done={defisFaient} total={defisTotal} pointsText="50 Points gagnés" streakText="2 jours de suite 🔥" />

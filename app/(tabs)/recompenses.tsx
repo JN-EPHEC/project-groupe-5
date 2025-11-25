@@ -1,10 +1,10 @@
 import { ActionButton } from "@/components/ui/recompenses/ActionButton";
 import { rewardsData } from "@/components/ui/recompenses/data";
 import { PointsCard } from "@/components/ui/recompenses/PointsCard";
+import { PremiumCard } from "@/components/ui/recompenses/PremiumCard";
 import { RewardCard } from "@/components/ui/recompenses/RewardCard";
 import { usePoints } from "@/hooks/points-context";
 import { useThemeMode } from "@/hooks/theme-context";
-import React from "react";
 import { FlatList, ScrollView, StyleSheet, Text } from "react-native";
 
 export default function RewardsScreen() {
@@ -60,6 +60,9 @@ export default function RewardsScreen() {
         rewardText="+50 points"
         onPress={() => addPoints(50)}
       />
+
+      {/* PREMIUM CARD */}
+      <PremiumCard onSubscribe={() => { /* TODO: subscription flow */ }} />
     </ScrollView>
   );
 }

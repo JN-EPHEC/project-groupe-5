@@ -1,18 +1,18 @@
 import { useThemeMode } from "@/hooks/theme-context";
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Alert, FlatList, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 // Composants UI
 import { ChatView } from "@/components/ui/social/ChatView";
 import { ClubCard } from "@/components/ui/social/ClubCard";
-import { DefiCard } from "@/components/ui/social/DefiCard";
 import { FriendCard } from "@/components/ui/social/FriendCard";
 import { TabsSwitcher } from "@/components/ui/social/TabsSwitcher";
 
 // Données statiques
 import { ShareQRModal } from "@/components/ui/qr/ShareQRModal";
-import { amisData, clubsData, defisData } from "@/components/ui/social/data";
+import { clubsData } from "@/components/ui/social/data";
 import { useClub } from "@/hooks/club-context";
+import { useFriends } from "@/hooks/friends-context";
 import { usePoints } from "@/hooks/points-context";
 import { useUser } from "@/hooks/user-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,7 +22,7 @@ import { useEffect } from "react";
 
 export default function SocialScreen() {
   const { colors } = useThemeMode();
-  const [selectedTab, setSelectedTab] = useState<"clubs" | "amis" | "defis">("clubs");
+  const [selectedTab, setSelectedTab] = useState<"clubs" | "amis">("clubs");
   const [view, setView] = useState<"main" | "chat" | "clubRanking" | "createClub">("main");
   const [selectedChat, setSelectedChat] = useState<any>(null);
   const [input, setInput] = useState(""); // chat input
@@ -32,19 +32,22 @@ export default function SocialScreen() {
   const [newClubVisibility, setNewClubVisibility] = useState<"public" | "private">("public");
   const [newClubEmoji, setNewClubEmoji] = useState<string>("");
   const [newClubPhoto, setNewClubPhoto] = useState<string>("");
+  const [newClubCity, setNewClubCity] = useState<string>("");
   const [showClubQR, setShowClubQR] = useState(false);
   const [messages, setMessages] = useState<any[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [clubSearch, setClubSearch] = useState("");
   const [clubs, setClubs] = useState(clubsData);
-  const { joinedClub, joinClub, leaveClub, members, createClub } = useClub();
+  const { joinedClub, joinClub, leaveClub, members, createClub, promoteToOfficer, demoteOfficer } = useClub();
   const { points } = usePoints();
   const { user } = useUser();
   const params = useLocalSearchParams();
+  const { friends } = useFriends();
 
   useEffect(() => {
     const tabParam = (params?.tab as string) || "";
-    if (tabParam === "amis" || tabParam === "clubs" || tabParam === "defis") {
+    if (tabParam === "amis" || tabParam === "clubs") {
       setSelectedTab(tabParam as any);
     }
   }, [params]);
@@ -57,7 +60,7 @@ export default function SocialScreen() {
       if (joinedClub) setView("clubRanking");
     }
   }, [params, joinedClub]);
-  const [defis, setDefis] = useState(defisData);
+  // plus d'onglet compétition
 
   const handleSend = () => {
     if (!input.trim()) return;
@@ -79,53 +82,19 @@ export default function SocialScreen() {
     return all.sort((a, b) => b.points - a.points).map((m, idx) => ({ ...m, rank: idx + 1 }));
   }, [members, points]);
 
-  if (view === "chat") {
-    // VUE CHAT -> components/ui/social/ChatView
-    return (
-      <ChatView
-        selectedChat={selectedChat}
-        messages={messages}
-        input={input}
-        setInput={setInput}
-        onSend={handleSend}
-        onBack={() => setView("main")}
-        onDeleteMessage={(id) => setMessages((m) => m.filter((msg) => msg.id !== id))}
-        onStartEditMessage={(id, text) => { setEditingId(id); setInput(text); }}
-        onReactMessage={(id, emoji) => setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, reactions: [...(m.reactions || []), emoji] } : m)))}
-        editingId={editingId}
-      />
-    );
-  }
+  const clanTotalPoints = useMemo(() => {
+    const membersSum = members.reduce((s, m) => s + (m.points || 0), 0);
+    return membersSum + (points || 0);
+  }, [members, points]);
 
-  if (view === "clubRanking") {
-    // VUE CLASSEMENT CLUB -> construit à partir de ClubContext + PointsContext
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}> 
-        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 12 }}>
-          <TouchableOpacity onPress={() => setView("main")} style={{ marginRight: 8 }}>
-            <Ionicons name="arrow-back" size={22} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={{ color: colors.text, fontSize: 18, fontWeight: "700" }}>
-            Classement du club {joinedClub?.name ?? ""}
-          </Text>
-        </View>
-        <FlatList
-          data={clubRankingData}
-          keyExtractor={(item) => String(item.id) + String(item.rank)}
-          renderItem={({ item }) => (
-            <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 10, paddingHorizontal: 8, borderRadius: 12, backgroundColor: item.isMe ? colors.accent : "transparent" }}>
-              <Text style={{ width: 30, textAlign: "center", color: item.isMe ? "#0F3327" : colors.text, fontWeight: "700" }}>{item.rank}</Text>
-              <Image source={{ uri: item.isMe ? user.avatar : item.avatar }} style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10, borderWidth: 0 }} />
-              <Text style={{ flex: 1, color: item.isMe ? "#0F3327" : colors.text, fontWeight: item.isMe ? "700" : "500" }}>{item.isMe ? user.name : item.name}</Text>
-              <Text style={{ color: item.isMe ? "#0F3327" : colors.accent, fontWeight: "700" }}>{item.points} pts</Text>
-            </View>
-          )}
-          contentContainerStyle={{ paddingBottom: 140 }}
-          ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: colors.surfaceAlt }} />}
-        />
-      </View>
-    );
-  }
+  // no early return; keep tabs visible in all views
+
+  const handleLeaveClub = () => {
+    // update local list
+    setClubs((prev) => prev.map((c) => (c.joined ? { ...c, joined: false, participants: Math.max(0, (c.participants || 1) - 1) } : c)));
+    leaveClub();
+    setView("main");
+  };
 
   if (view === "createClub") {
     return (
@@ -136,6 +105,22 @@ export default function SocialScreen() {
         <Text style={{ color: colors.text, fontSize: 22, fontWeight: "700", marginBottom: 6 }}>Créer un club</Text>
         <Text style={{ color: colors.mutedText, marginBottom: 20 }}>Définis les informations de ton nouveau club.</Text>
         <View style={{ gap: 14 }}>
+          <View>
+            <Text style={{ color: colors.text, fontWeight: "600", marginBottom: 6 }}>Ville</Text>
+            <TextInput
+              value={newClubCity}
+              onChangeText={setNewClubCity}
+              placeholder="Ex: Bruxelles"
+              placeholderTextColor={colors.mutedText}
+              style={{
+                backgroundColor: colors.surfaceAlt,
+                color: colors.text,
+                padding: 14,
+                borderRadius: 14,
+                fontWeight: "600",
+              }}
+            />
+          </View>
           <View>
             <Text style={{ color: colors.text, fontWeight: "600", marginBottom: 6 }}>Nom du club</Text>
             <TextInput
@@ -248,22 +233,23 @@ export default function SocialScreen() {
           </View>
           <TouchableOpacity
             style={{
-              backgroundColor: newClubName.trim() ? colors.accent : colors.surfaceAlt,
+              backgroundColor: (newClubName.trim() && newClubCity.trim()) ? colors.accent : colors.surfaceAlt,
               paddingVertical: 16,
               borderRadius: 18,
               alignItems: "center",
             }}
-            disabled={!newClubName.trim()}
+            disabled={!(newClubName.trim() && newClubCity.trim())}
             onPress={() => {
-              if (!newClubName.trim()) return;
-              const created = createClub({ name: newClubName.trim(), desc: newClubDesc.trim(), visibility: newClubVisibility, emoji: newClubEmoji || undefined, photoUri: newClubPhoto || undefined });
-              setClubs([{ id: created.id, name: created.name, desc: created.desc || "", participants: 1, joined: true }, ...clubs]);
+              if (!(newClubName.trim() && newClubCity.trim())) return;
+              const created = createClub({ name: newClubName.trim(), desc: newClubDesc.trim(), visibility: newClubVisibility, emoji: newClubEmoji || undefined, photoUri: newClubPhoto || undefined, city: newClubCity.trim() });
+              setClubs([{ id: created.id, name: created.name, desc: created.desc || "", participants: 1, joined: true, city: created.city }, ...clubs]);
               // reset form
               setNewClubName("");
               setNewClubDesc("");
               setNewClubVisibility("public");
               setNewClubEmoji("");
               setNewClubPhoto("");
+              setNewClubCity("");
               setView("main");
             }}
           >
@@ -283,85 +269,106 @@ export default function SocialScreen() {
   {/* CARTES CLUBS -> components/ui/social/ClubCard */}
         {selectedTab === "clubs" && (
           <>
-            <TouchableOpacity
-              style={{
-                backgroundColor: colors.accent,
-                paddingVertical: 14,
-                borderRadius: 18,
-                alignItems: "center",
-                marginBottom: 16,
-              }}
-              onPress={() => setView("createClub")}
-            >
-              <Text style={{ fontWeight: "700", color: "#0F3327" }}>➕ Créer un club</Text>
-            </TouchableOpacity>
-            {joinedClub && (
-              <TouchableOpacity
-                style={{ backgroundColor: colors.surfaceAlt, paddingVertical: 12, borderRadius: 14, alignItems: "center", marginBottom: 16, borderWidth: 1, borderColor: colors.surfaceAlt }}
-                onPress={() => setShowClubQR(true)}
-              >
-                <Text style={{ color: colors.text, fontWeight: "600" }}>📱 Partager mon club (QR)</Text>
-              </TouchableOpacity>
+            {joinedClub ? (
+              <>
+                {/* Clan banner always visible when in a club */}
+                <TouchableOpacity
+                  onPress={() => setView("clubRanking")}
+                  style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: 14, padding: 12, marginBottom: 10 }}
+                >
+                  <Ionicons name="shield-outline" size={20} color={colors.accent} />
+                  <Text style={{ color: colors.text, fontWeight: '700', marginLeft: 8, flex: 1 }}>{joinedClub.name}</Text>
+                  <Ionicons name="document-text-outline" size={16} color={colors.accent} />
+                  <Text style={{ color: colors.accent, fontWeight: '700', marginLeft: 6 }}>{clanTotalPoints} pts</Text>
+                </TouchableOpacity>
+
+                {/* Chat view embedded (no back) */}
+                <ChatView
+                  selectedChat={{ ...joinedClub, type: 'club' }}
+                  messages={messages}
+                  input={input}
+                  setInput={setInput}
+                  onSend={handleSend}
+                  onBack={() => {}}
+                  onDeleteMessage={(id) => setMessages((m) => m.filter((msg) => msg.id !== id))}
+                  onStartEditMessage={(id, text) => { setEditingId(id); setInput(text); }}
+                  onReactMessage={(id, emoji) => setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, reactions: [...(m.reactions || []), emoji] } : m)))}
+                  editingId={editingId}
+                  showBack={false}
+                />
+              </>
+            ) : (
+              <>
+                <View style={[styles.searchContainer, { backgroundColor: colors.surfaceAlt }]}> 
+                  <Ionicons name="search" size={18} color={colors.mutedText} />
+                  <TextInput
+                    value={clubSearch}
+                    onChangeText={setClubSearch}
+                    placeholder="Rechercher un club ou une ville..."
+                    placeholderTextColor={colors.mutedText}
+                    style={[styles.searchInput, { color: colors.text }]}
+                  />
+                </View>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: colors.accent,
+                    paddingVertical: 14,
+                    borderRadius: 18,
+                    alignItems: "center",
+                    marginBottom: 16,
+                  }}
+                  onPress={() => setView("createClub")}
+                >
+                  <Text style={{ fontWeight: "700", color: "#0F3327" }}>➕ Créer un club</Text>
+                </TouchableOpacity>
+                {(clubs.some((c) => c.joined) ? clubs.filter((c) => c.joined) : clubs)
+                  .filter(c => c.name.toLowerCase().includes(clubSearch.toLowerCase()) || (c.city || "").toLowerCase().includes(clubSearch.toLowerCase()))
+                  .map((club, i) => (
+                <ClubCard
+                  key={club.id}
+                  club={club}
+                  onJoin={() => {
+                    const updated = [...clubs];
+                    const currentlyJoinedIndex = updated.findIndex((c) => c.joined);
+                    if (!updated[i].joined) {
+                      // trying to join
+                        const ok = joinClub({ id: club.id, name: club.name, participants: updated[i].participants + 1, desc: club.desc, visibility: "public", city: club.city });
+                      if (!ok && (joinedClub && joinedClub.id !== club.id)) {
+                        Alert.alert("Information", "Vous faites déjà partie d'un club");
+                        return;
+                      }
+                      // if joining, ensure only one club joined
+                      if (currentlyJoinedIndex !== -1 && currentlyJoinedIndex !== i) {
+                        updated[currentlyJoinedIndex].joined = false;
+                      }
+                      updated[i].joined = true;
+                      updated[i].participants += 1;
+                      // open chat immediately on join
+                      setSelectedChat({ ...club, type: "club" });
+                      setView("chat");
+                    } else {
+                      // leaving club
+                      leaveClub();
+                      updated[i].joined = false;
+                      updated[i].participants = Math.max(0, updated[i].participants - 1);
+                    }
+                    setClubs(updated);
+                  }}
+                  onChat={() => {
+                    setSelectedChat({ ...club, type: "club" });
+                    setView("chat");
+                  }}
+                  onRanking={() => {
+                    if (club.joined) setView("clubRanking");
+                  }}
+                  totalPoints={club.joined ? clanTotalPoints : undefined}
+                />
+                ))}
+              </>
             )}
-            {clubs.map((club, i) => (
-            <ClubCard
-              key={club.id}
-              club={club}
-              onJoin={() => {
-                const updated = [...clubs];
-                const currentlyJoinedIndex = updated.findIndex((c) => c.joined);
-                if (!updated[i].joined) {
-                  // trying to join
-                    const ok = joinClub({ id: club.id, name: club.name, participants: updated[i].participants + 1, desc: club.desc, visibility: "public" });
-                  if (!ok && (joinedClub && joinedClub.id !== club.id)) {
-                    Alert.alert("Information", "Vous faites déjà partie d'un club");
-                    return;
-                  }
-                  // if joining, ensure only one club joined
-                  if (currentlyJoinedIndex !== -1 && currentlyJoinedIndex !== i) {
-                    updated[currentlyJoinedIndex].joined = false;
-                  }
-                  updated[i].joined = true;
-                  updated[i].participants += 1;
-                } else {
-                  // leaving club
-                  leaveClub();
-                  updated[i].joined = false;
-                  updated[i].participants = Math.max(0, updated[i].participants - 1);
-                }
-                setClubs(updated);
-              }}
-              onChat={() => {
-                setSelectedChat({ ...club, type: "club" });
-                setView("chat");
-              }}
-              onRanking={() => {
-                if (club.joined) setView("clubRanking");
-              }}
-            />
-            ))}
           </>
         )}
 
-  {/* CARTES DÉFIS -> components/ui/social/DefiCard */}
-        {selectedTab === "defis" &&
-          defis.map((defi, i) => (
-            <DefiCard
-              key={defi.id}
-              defi={defi}
-              onJoin={() => {
-                const updated = [...defis];
-                if (!updated[i].joined && updated[i].places > 0) {
-                  updated[i].joined = true;
-                  updated[i].places -= 1;
-                } else if (updated[i].joined) {
-                  updated[i].joined = false;
-                  updated[i].places += 1;
-                }
-                setDefis(updated);
-              }}
-            />
-          ))}
 
   {/* LISTE AMIS + RECHERCHE -> components/ui/social/FriendCard */}
         {selectedTab === "amis" && (
@@ -378,7 +385,7 @@ export default function SocialScreen() {
 
             {(() => {
               const me = { id: "me", name: user.name, points, avatar: user.avatar, online: true } as any;
-              const sorted = [...amisData, me]
+              const sorted = [...friends, me]
                 .filter((a) => a.name.toLowerCase().includes(search.toLowerCase()))
                 .sort((a, b) => b.points - a.points);
 
@@ -409,6 +416,56 @@ export default function SocialScreen() {
           shareText={`Rejoins mon club ${joinedClub?.name} sur l'app ! app://club/${joinedClub?.id ?? ''}`}
           accentColor={colors.accent}
         />
+      )}
+
+      {/* Club ranking overlay below tabs */}
+      {selectedTab === 'clubs' && view === 'clubRanking' && (
+        <View style={{ position: 'absolute', top: 56, left: 0, right: 0, bottom: 0, backgroundColor: colors.background, padding: 16 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+            <TouchableOpacity onPress={() => setView('main')} style={{ marginRight: 8 }}>
+              <Ionicons name="arrow-back" size={22} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={{ color: colors.text, fontSize: 18, fontWeight: '700', flex: 1 }}>
+              Classement du club {joinedClub?.name ?? ''}
+            </Text>
+            <TouchableOpacity onPress={handleLeaveClub} style={{ backgroundColor: '#D93636', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10 }}>
+              <Text style={{ color: '#fff', fontWeight: '700' }}>Quitter</Text>
+            </TouchableOpacity>
+          </View>
+          <FlatList
+            data={clubRankingData}
+            keyExtractor={(item) => String(item.id) + String(item.rank)}
+            renderItem={({ item }) => (
+              <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 8, borderRadius: 12, backgroundColor: item.isMe ? colors.accent : 'transparent' }}>
+                <Text style={{ width: 30, textAlign: 'center', color: item.isMe ? '#0F3327' : colors.text, fontWeight: '700' }}>{item.rank}</Text>
+                <Image source={{ uri: item.isMe ? user.avatar : item.avatar }} style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10, borderWidth: 0 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: item.isMe ? '#0F3327' : colors.text, fontWeight: item.isMe ? '700' : '500' }}>{item.isMe ? user.name : item.name}</Text>
+                  {joinedClub && (
+                    <Text style={{ color: item.isMe ? '#0F3327' : colors.mutedText, fontSize: 12 }}>
+                      {joinedClub.ownerId === (item.isMe ? 'me' : item.id) ? 'Chef' : (joinedClub.officers || []).includes(item.isMe ? 'me' : item.id) ? 'Adjoint' : 'Membre'}
+                    </Text>
+                  )}
+                </View>
+                <Text style={{ color: item.isMe ? '#0F3327' : colors.accent, fontWeight: '700' }}>{item.points} pts</Text>
+                {joinedClub?.ownerId === 'me' && !item.isMe && (
+                  (joinedClub.officers || []).includes(item.id)
+                    ? (
+                      <TouchableOpacity onPress={() => demoteOfficer(item.id)} style={{ marginLeft: 10, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: colors.surfaceAlt }}>
+                        <Text style={{ color: colors.text, fontSize: 12 }}>Rétrograder</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity onPress={() => promoteToOfficer(item.id)} style={{ marginLeft: 10, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: colors.surfaceAlt }}>
+                        <Text style={{ color: colors.text, fontSize: 12 }}>Nommer adjoint</Text>
+                      </TouchableOpacity>
+                    )
+                )}
+              </View>
+            )}
+            contentContainerStyle={{ paddingBottom: 140 }}
+            ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: colors.surfaceAlt }} />}
+          />
+        </View>
       )}
     </View>
   );
