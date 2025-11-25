@@ -49,7 +49,7 @@ export default function Login() {
     setLoading(true);
     try {
       const res = await signInWithEmailAndPassword(auth, email.trim(), password);
-      Alert.alert("✅ Logged in", res.user?.email ?? "Success");
+      Alert.alert("✅ Logged in", res.user?.email ?? "Succès");
       router.replace("/(tabs)");
     } catch (e: any) {
       Alert.alert("❌ Login error", e?.code ?? e?.message ?? String(e));
@@ -64,7 +64,7 @@ export default function Login() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <View style={styles.container}>
-        <Text style={styles.title}>Login</Text>
+        <Text style={styles.title}>Connexion</Text>
 
         <TextInput
           style={styles.input}
@@ -92,6 +92,11 @@ export default function Login() {
         >
           <Text style={styles.btnText}>{loading ? "..." : "Login"}</Text>
         </Pressable>
+        <Pressable onPress={() => router.push("/register")}>
+            <Text style={{ marginTop: 10, textAlign: "center" }}>
+                Pas de compte ? Créer un compte
+            </Text>
+            </Pressable>
       </View>
     </KeyboardAvoidingView>
   );

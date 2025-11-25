@@ -15,11 +15,12 @@ import { Image, ScrollView as RNScrollView, ScrollView, StyleSheet, Text, Toucha
 export default function AcceuilScreen() {
   const { colors } = useThemeMode();
   const { points } = usePoints();
-  const { user } = useUser();
+  const { user, loading } = useUser();
   const router = useRouter();
   const { joinedClub, members } = useClub();
   const { current } = useChallenges();
   const { friends } = useFriends();
+
   const defisFaient = 2;
   const defisTotal = 5;
 

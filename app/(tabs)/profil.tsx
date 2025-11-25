@@ -17,6 +17,7 @@ export default function ProfilScreen() {
   const { colors } = useThemeMode();
   const { points } = usePoints();
   const { user } = useUser();
+  const fullName = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim();
   const { joinedClub, members } = useClub();
   const [showQR, setShowQR] = useState(false);
   const { friends } = useFriends();
@@ -81,8 +82,8 @@ export default function ProfilScreen() {
         onClose={() => setShowQR(false)}
         title={"Partager mon profil"}
         subtitle={"Scanne pour voir mon profil"}
-        qrValue={`app://user/${encodeURIComponent(user.name)}`}
-        shareText={`Voici mon profil sur l'app : app://user/${encodeURIComponent(user.name)}`}
+        qrValue={`app://user/${encodeURIComponent(fullName)}`}
+        shareText={`Voici mon profil sur l'app : app://user/${encodeURIComponent(fullName)}`}
         accentColor={colors.accent}
       />
     </ScrollView>

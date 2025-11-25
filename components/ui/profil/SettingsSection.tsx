@@ -55,36 +55,6 @@ export const SettingsSection = () => {
         <Switch value={mode === "dark"} onValueChange={toggle} thumbColor="#19D07D" />
       </View>
 
-      {/* Language */}
-      <TouchableOpacity style={styles.row} onPress={() => setShowLanguage(!showLanguage)}>
-        <Ionicons name="language-outline" size={22} color={colors.text} />
-        <Text style={[styles.text, { color: colors.text }]}>Langue</Text>
-        <Ionicons
-          name={showLanguage ? "chevron-down" : "chevron-forward"}
-          size={18}
-          color={colors.mutedText}
-        />
-      </TouchableOpacity>
-
-      {showLanguage && (
-        <View style={styles.subMenu}>
-          {["Français", "Anglais"].map((lang) => (
-            <TouchableOpacity key={lang} onPress={() => setLanguage(lang)} style={styles.langOption}>
-              <Text
-                style={[
-                  styles.langText,
-                  {
-                    color: language === lang ? colors.accent : colors.mutedText,
-                    fontWeight: language === lang ? "700" : "400",
-                  },
-                ]}
-              >
-                {lang}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
 
       {/* Settings */}
       <TouchableOpacity style={styles.row} onPress={() => setShowSettings(!showSettings)}>

@@ -1,23 +1,38 @@
 import { useThemeMode } from "@/hooks/theme-context";
+import { useUser } from "@/hooks/user-context";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 export function HeaderProfile() {
   const { colors } = useThemeMode();
+  const { user } = useUser(); // 🔥 get real user from Firestore
+
+  // Build first name safely
+  const firstName = user.firstName ?? "Utilisateur";
+
   return (
     <View style={styles.center}>
+      {/* Avatar placeholder */}
       <View style={styles.avatar}>
         <Ionicons name="walk-outline" size={40} color="#fff" />
       </View>
 
+      {/* Points badge (you can connect this later) */}
       <View style={[styles.badge, { backgroundColor: colors.accent }]}>
         <Ionicons name="leaf-outline" size={14} color="#fff" />
-        <Text style={styles.badgeText}>10</Text>
+        <Text style={styles.badgeText}>{user.points ?? 0}</Text>
       </View>
 
-      <Text style={[styles.username, { color: colors.text }]}>Bonjour Marie</Text>
-      <Text style={[styles.team, { color: colors.mutedText }]}>Éco-Warriors</Text>
+      {/* 🔥 Replace “Bonjour Marie” with Firestore data */}
+      <Text style={[styles.username, { color: colors.text }]}>
+        Bonjour {firstName}
+      </Text>
+
+      {/* Team name static for now — you can connect clubs later */}
+      <Text style={[styles.team, { color: colors.mutedText }]}>
+        Éco-Warriors
+      </Text>
     </View>
   );
 }

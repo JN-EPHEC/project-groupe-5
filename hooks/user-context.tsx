@@ -1,24 +1,131 @@
-import React, { createContext, useContext, useMemo, useState } from "react";
+import { Redirect, useSegments } from "expo-router";
+import { User as FirebaseUser, onAuthStateChanged } from "firebase/auth";
+import { doc, onSnapshot } from "firebase/firestore";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { Text, View } from "react-native";
+import { auth, db } from "../firebaseConfig";
 
-export type User = { name: string; avatar: string };
+// 🔥 Full user profile (Option B)
+export type UserProfile = {
+  uid: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  postalCode: string | null;
+  birthDate: string | null;
+  points: number;
+  isAdmin: boolean;
+  clubId: string | null;
+  abonnementId: string | null;
+};
 
 type UserContextType = {
-  user: User;
-  setUser: (u: User) => void;
+  user: UserProfile;
+  loading: boolean;
 };
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User>({
-    name: "Marie",
-    avatar: "https://randomuser.me/api/portraits/women/68.jpg",
-  });
+  const segments = useSegments(); // 👈 Detect whether we are inside (auth) or (tabs)
 
-  const value = useMemo(() => ({ user, setUser }), [user]);
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // 1️⃣ Listen to Firebase Auth state
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setFirebaseUser(user);
+
+      if (!user) {
+        // If logged out, delete profile and stop loading
+        setUserProfile(null);
+        setLoading(false);
+      }
+    });
+
+    return unsub;
+  }, []);
+
+  // 2️⃣ Listen to Firestore user profile (only when logged in)
+  useEffect(() => {
+    if (!firebaseUser) return;
+
+    const ref = doc(db, "users", firebaseUser.uid);
+
+    const unsub = onSnapshot(
+      ref,
+      (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+
+          setUserProfile({
+            uid: firebaseUser.uid,
+            email: firebaseUser.email ?? "",
+            firstName: data.firstName ?? null,
+            lastName: data.lastName ?? null,
+            postalCode: data.postalCode ?? null,
+            birthDate: data.birthDate ?? null,
+            points: data.points ?? 0,
+            isAdmin: data.isAdmin ?? false,
+            clubId: data.clubId ?? null,
+            abonnementId: data.abonnementId ?? null,
+          });
+        }
+        setLoading(false);
+      },
+      (err) => {
+        console.error("Firestore user error:", err);
+        setLoading(false);
+      }
+    );
+
+    return unsub;
+  }, [firebaseUser]);
+
+  // Memoized context value
+  const value = useMemo(
+    () => ({
+      user: userProfile as UserProfile, // 👍 safe because guarded below
+      loading,
+    }),
+    [userProfile, loading]
+  );
+
+  // 3️⃣ Global screen-level guards
+  const inAuthGroup = segments[0] === "(auth)"; // scenes like /login and /register
+
+  // Loading screen (Auth + Firestore)
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <Text>Chargement...</Text>
+      </View>
+    );
+  }
+
+  // Not logged in, trying to access protected routes → redirect to login
+  if (!firebaseUser && !inAuthGroup) {
+    return <Redirect href="/login" />;
+  }
+
+  // Logged in but visiting /login or /register → redirect to /acceuil
+  if (firebaseUser && inAuthGroup) {
+    return <Redirect href="/acceuil" />;
+  }
+
+  // All good → render children
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 }
 
+// Hook to access the user
 export function useUser() {
   const ctx = useContext(UserContext);
   if (!ctx) throw new Error("useUser must be used within a UserProvider");
