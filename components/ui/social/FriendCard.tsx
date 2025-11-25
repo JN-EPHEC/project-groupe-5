@@ -19,6 +19,7 @@ interface FriendCardProps {
 
 export const FriendCard: React.FC<FriendCardProps> = ({ friend, rank, onChat, isMe }) => {
   const { colors } = useThemeMode();
+  const rankColor = isMe ? "#0F3327" : colors.accent;
 
   return (
     <TouchableOpacity
@@ -27,7 +28,7 @@ export const FriendCard: React.FC<FriendCardProps> = ({ friend, rank, onChat, is
       activeOpacity={0.8}
     >
       <View style={styles.left}>
-        <Text style={[styles.rank, { color: colors.accent }]}>#{rank}</Text>
+        <Text style={[styles.rank, { color: rankColor }]}>#{rank}</Text>
         <Image source={{ uri: friend.avatar }} style={[styles.avatar, isMe && { borderWidth: 2, borderColor: colors.text }]} />
         <Text style={[styles.name, { color: colors.text }]}>{friend.name}</Text>
         {friend.online && <View style={[styles.dot, { backgroundColor: "#19D07D" }]} />}

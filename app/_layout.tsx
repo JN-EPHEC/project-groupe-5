@@ -5,6 +5,7 @@ import "react-native-reanimated";
 
 import { ChallengesProvider } from "@/hooks/challenges-context";
 import { ClubProvider } from "@/hooks/club-context";
+import { FriendsProvider } from "@/hooks/friends-context";
 import { PointsProvider } from "@/hooks/points-context";
 import { ThemeProviderCustom, useThemeMode } from "@/hooks/theme-context";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -22,6 +23,8 @@ function RootNavigation() {
     <>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="amis-plus" options={{ headerShown: false }} />
+        <Stack.Screen name="calendar" options={{ headerShown: false }} />
       </Stack>
       <StatusBar style={mode === "dark" ? "light" : "dark"} />
     </>
@@ -35,7 +38,9 @@ export default function RootLayout() {
         <PointsProvider>
           <ClubProvider>
             <ChallengesProvider>
-              <RootNavigation />
+              <FriendsProvider>
+                <RootNavigation />
+              </FriendsProvider>
             </ChallengesProvider>
           </ClubProvider>
         </PointsProvider>

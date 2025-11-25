@@ -25,6 +25,7 @@ interface ChatViewProps {
   onStartEditMessage: (id: string, text: string) => void;
   onReactMessage: (id: string, emoji: string) => void;
   editingId?: string | null;
+  showBack?: boolean;
 }
 
 export const ChatView: React.FC<ChatViewProps> = ({
@@ -38,6 +39,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   onStartEditMessage,
   onReactMessage,
   editingId,
+  showBack = true,
 }) => {
   const { colors } = useThemeMode();
   const [actionFor, setActionFor] = useState<string | null>(null);
@@ -50,14 +52,18 @@ export const ChatView: React.FC<ChatViewProps> = ({
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       {/* --- Header --- */}
-      <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-        <Ionicons name="arrow-back" size={24} color={colors.text} />
-      </TouchableOpacity>
-      <Text style={[styles.header, { color: colors.text }]}>
-        {selectedChat?.type === "club"
-          ? `Salon ${selectedChat.name}`
-          : `Chat avec ${selectedChat.name}`}
-      </Text>
+      {showBack && (
+        <TouchableOpacity onPress={onBack} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+      )}
+      {showBack && (
+        <Text style={[styles.header, { color: colors.text }]}>
+          {selectedChat?.type === "club"
+            ? `Salon ${selectedChat.name}`
+            : `Chat avec ${selectedChat.name}`}
+        </Text>
+      )}
 
       {/* --- Messages --- */}
       {messages.length === 0 && (

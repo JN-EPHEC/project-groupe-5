@@ -2,7 +2,7 @@ import { useThemeMode } from "@/hooks/theme-context";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-type Tab = "clubs" | "amis" | "defis";
+type Tab = "clubs" | "amis";
 
 interface TabsSwitcherProps {
   selectedTab: Tab;
@@ -11,7 +11,7 @@ interface TabsSwitcherProps {
 
 export const TabsSwitcher: React.FC<TabsSwitcherProps> = ({ selectedTab, onChange }) => {
   const { colors } = useThemeMode();
-  const tabs: Tab[] = ["clubs", "amis", "defis"];
+  const tabs: Tab[] = ["clubs", "amis"];
 
   return (
     <View style={styles.container}>
@@ -32,7 +32,7 @@ export const TabsSwitcher: React.FC<TabsSwitcherProps> = ({ selectedTab, onChang
               { color: selectedTab === tab ? colors.text : colors.mutedText },
             ]}
           >
-            {tab === "defis" ? "Compétition" : tab.charAt(0).toUpperCase() + tab.slice(1)}
+            {tab.charAt(0).toUpperCase() + tab.slice(1)}
           </Text>
         </TouchableOpacity>
       ))}
