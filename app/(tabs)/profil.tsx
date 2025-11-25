@@ -1,14 +1,16 @@
+import DonationBanner from "@/components/ui/profil/DonationBanner";
 import { Header } from "@/components/ui/profil/Header";
 import { LargeCard } from "@/components/ui/profil/LargeCard";
 import { SettingsSection } from "@/components/ui/profil/SettingsSection";
 import { StatCard } from "@/components/ui/profil/StatCard";
 import { ShareQRModal } from "@/components/ui/qr/ShareQRModal";
-import { amisData } from "@/components/ui/social/data";
 import { useClub } from "@/hooks/club-context";
+import { useFriends } from "@/hooks/friends-context";
 import { usePoints } from "@/hooks/points-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { useUser } from "@/hooks/user-context";
-import React, { useMemo, useState } from "react";
+import { useRouter } from "expo-router";
+import { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function ProfilScreen() {
@@ -17,13 +19,15 @@ export default function ProfilScreen() {
   const { user } = useUser();
   const { joinedClub, members } = useClub();
   const [showQR, setShowQR] = useState(false);
+  const { friends } = useFriends();
+  const router = useRouter();
 
   // Classement entre amis
   const friendRankLabel = useMemo(() => {
-    const all = [...amisData.map(a => a.points), points].sort((a,b) => b - a);
+    const all = [...friends.map(a => a.points), points].sort((a,b) => b - a);
     const position = all.indexOf(points) + 1;
     return `#${position}`;
-  }, [points]);
+  }, [friends, points]);
 
   // Classement club (si club)
   const clubRankLabel = useMemo(() => {
@@ -33,7 +37,7 @@ export default function ProfilScreen() {
     return `#${pos}`;
   }, [joinedClub, members, points]);
 
-  const friendsCount = amisData.length;
+  const friendsCount = friends.length;
 
   return (
   <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: 140 }}>
@@ -51,7 +55,9 @@ export default function ProfilScreen() {
       <View style={styles.row}>
         <StatCard icon="people-outline" value={String(friendsCount)} label="Abonnés" />
         <StatCard icon="person-add-outline" value={String(friendsCount)} label="Abonnements" />
-        <StatCard icon="person-add" label="Amis +" accent />
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={0.8} onPress={() => router.push("/amis-plus")}> 
+          <StatCard icon="person-add" label="Amis +" accent />
+        </TouchableOpacity>
       </View>
 
   {/* GRANDES CARTES -> components/ui/profil/LargeCard */}
@@ -63,6 +69,9 @@ export default function ProfilScreen() {
         <StatCard icon="person-outline" label="Classement entre amis" value={friendRankLabel} />
         {clubRankLabel && <StatCard icon="people" label="Classement club" value={clubRankLabel} />}
       </View>
+
+      {/* BANNIÈRE DON */}
+      <DonationBanner />
 
       {/* PARAMÈTRES -> components/ui/profil/SettingsSection (+ SettingSwitch) */}
       <SettingsSection />

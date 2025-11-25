@@ -7,12 +7,14 @@ type ChallengesContextType = {
   start: (challenge: Challenge) => void;
   stop: () => void;
   validateWithPhoto: (photoUri: string) => void;
+  activities: Record<string, Challenge["category"]>;
 };
 
 const ChallengesContext = createContext<ChallengesContextType | undefined>(undefined);
 
 export function ChallengesProvider({ children }: { children: React.ReactNode }) {
   const [current, setCurrent] = useState<Challenge | null>(null);
+  const [activities, setActivities] = useState<Record<string, Challenge["category"]>>({});
   const { addPoints } = usePoints();
 
   const start = useCallback((challenge: Challenge) => {
@@ -25,13 +27,14 @@ export function ChallengesProvider({ children }: { children: React.ReactNode }) 
 
   const validateWithPhoto = useCallback((photoUri: string) => {
     if (current) {
-      // Reward points when validating
+      const dateKey = new Date().toISOString().slice(0, 10);
       addPoints(current.points);
+      setActivities((prev) => ({ ...prev, [dateKey]: current.category }));
       setCurrent(null);
     }
   }, [current, addPoints]);
 
-  const value = useMemo(() => ({ current, start, stop, validateWithPhoto }), [current, start, stop, validateWithPhoto]);
+  const value = useMemo(() => ({ current, start, stop, validateWithPhoto, activities }), [current, start, stop, validateWithPhoto, activities]);
   return <ChallengesContext.Provider value={value}>{children}</ChallengesContext.Provider>;
 }
 

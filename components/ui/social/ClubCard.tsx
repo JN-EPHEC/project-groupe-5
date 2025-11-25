@@ -10,6 +10,7 @@ export interface Club {
   desc: string;
   participants: number;
   joined: boolean;
+  city?: string;
 }
 
 interface ClubCardProps {
@@ -17,15 +18,19 @@ interface ClubCardProps {
   onJoin: () => void;
   onChat: () => void;
   onRanking?: () => void;
+  totalPoints?: number;
 }
 
-export const ClubCard: React.FC<ClubCardProps> = ({ club, onJoin, onChat, onRanking }) => {
+export const ClubCard: React.FC<ClubCardProps> = ({ club, onJoin, onChat, onRanking, totalPoints }) => {
   const { colors } = useThemeMode();
 
   return (
     <View style={[styles.card, { backgroundColor: colors.surface }]}>
       <Text style={[styles.title, { color: colors.text }]}>{club.name}</Text>
       <Text style={[styles.desc, { color: colors.mutedText }]}>{club.desc}</Text>
+      {club.city ? (
+        <Text style={[styles.city, { color: colors.mutedText }]}>🏙️ {club.city}</Text>
+      ) : null}
       <Text style={[styles.participants, { color: colors.mutedText }]}>
         👥 {club.participants} membres
       </Text>
@@ -55,8 +60,10 @@ export const ClubCard: React.FC<ClubCardProps> = ({ club, onJoin, onChat, onRank
             style={[styles.chatBtn, { borderColor: colors.accent, backgroundColor: colors.pill }]}
             onPress={onRanking}
           >
-            <Ionicons name="trophy-outline" size={18} color={colors.accent} />
-            <Text style={[styles.chatText, { color: colors.accent }]}>Classement</Text>
+            <Ionicons name="document-text-outline" size={18} color={colors.accent} />
+            <Text style={[styles.chatText, { color: colors.accent }]}>
+              {typeof totalPoints === 'number' ? `${totalPoints} pts` : 'Points'}
+            </Text>
           </TouchableOpacity>
         )}
       </View>
@@ -68,6 +75,7 @@ const styles = StyleSheet.create({
   card: { borderRadius: 16, padding: 16, marginBottom: 12 },
   title: { fontSize: 16, fontWeight: "bold" },
   desc: { marginVertical: 6 },
+  city: { marginBottom: 6 },
   participants: { marginBottom: 10 },
   row: { flexDirection: "row" },
   joinBtn: { flex: 1, padding: 10, borderRadius: 12, alignItems: "center" },
