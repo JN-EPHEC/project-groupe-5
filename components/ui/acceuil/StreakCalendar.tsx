@@ -30,23 +30,23 @@ export default function StreakCalendar() {
   const weekCount = week.reduce((acc, d) => acc + (activities[d.toISOString().slice(0,10)] ? 1 : 0), 0);
 
   return (
-    <View style={[styles.card, { backgroundColor: "#0B0F0E", borderColor: colors.surfaceAlt }]}> 
+    <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.surfaceAlt }]}> 
       <View style={styles.headerRow}>
-        <Text style={[styles.title, { color: "#FFFFFF" }]}>Votre série d'activités</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Votre série d'activités</Text>
         <Text onPress={() => router.push("/calendar")} style={[styles.link, { color: colors.accent }]}>Voir le calendrier</Text>
       </View>
 
       <View style={styles.contentRow}>
         <View style={[styles.flame, { backgroundColor: colors.pill, borderColor: colors.accent }]}> 
-          <Text style={[styles.flameCount, { color: "#FFFFFF", marginRight: 8 }]}>{weekCount}</Text>
-          <Ionicons name="flame" size={22} color={colors.accent} />
+          <Text style={[styles.flameCount, { color: colors.text, marginRight: 6 }]}>{weekCount}</Text>
+          <Ionicons name="flame" size={18} color={colors.accent} />
         </View>
 
         <View style={{ flex: 1 }}>
           <View style={styles.daysRow}>
             {['L','M','M','J','V','S','D'].map((d, i) => (
               <View key={i} style={styles.col}> 
-                <Text style={[styles.dayLabel, { color: "#B8C7C0" }]}>{d}</Text>
+                <Text style={[styles.dayLabel, { color: colors.mutedText }]}>{d}</Text>
               </View>
             ))}
           </View>
@@ -56,14 +56,14 @@ export default function StreakCalendar() {
               const key = date.toISOString().slice(0, 10);
               const cat = activities[key];
               const hasActivity = Boolean(cat);
-              const bg = hasActivity ? "#0F3327" : "transparent";
+              const bg = hasActivity ? colors.accent : "transparent";
               return (
                 <View key={i} style={styles.col}>
-                  <View style={[styles.circle, { borderColor: "#2B3A35", backgroundColor: bg, borderWidth: isToday ? 3 : 2 }]}> 
+                  <View style={[styles.circle, { borderColor: colors.surfaceAlt, backgroundColor: bg, borderWidth: isToday ? 3 : 2 }]}> 
                   {hasActivity ? (
                     <Ionicons name={CATEGORY_CONFIG[cat as keyof typeof CATEGORY_CONFIG].icon as any} size={18} color="#FFFFFF" />
                   ) : (
-                    <Text style={[styles.circleText, { color: "#FFFFFF" }]}>{String(date.getDate())}</Text>
+                    <Text style={[styles.circleText, { color: colors.text }]}>{String(date.getDate())}</Text>
                   )}
                   </View>
                 </View>
@@ -76,8 +76,7 @@ export default function StreakCalendar() {
   );
 }
 
-const COL_PERCENT = '14.285%';
-const SIZE = 34;
+const SIZE = 30;
 
 const styles = StyleSheet.create({
   card: {
@@ -91,21 +90,21 @@ const styles = StyleSheet.create({
   link: { fontWeight: "800" },
   contentRow: { flexDirection: "row", marginTop: 12, alignItems: "center" },
   flame: {
-    width: 96,
-    borderRadius: 16,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
+    width: 72,
+    borderRadius: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
     alignItems: "center",
     marginRight: 12,
     borderWidth: 1,
     flexDirection: 'row',
     justifyContent: 'center',
   },
-  flameCount: { fontSize: 20, fontWeight: "900" },
-  daysRow: { flexDirection: "row", justifyContent: 'space-between', paddingHorizontal: 6, marginBottom: 6, flexWrap: 'nowrap' },
-  col: { width: COL_PERCENT, alignItems: 'center' },
+  flameCount: { fontSize: 16, fontWeight: "900" },
+  daysRow: { flexDirection: "row", justifyContent: 'space-between', marginBottom: 6 },
+  col: { flex: 1, alignItems: 'center' },
   dayLabel: { fontWeight: "700" },
-  circlesRow: { flexDirection: "row", justifyContent: 'space-between', paddingHorizontal: 6 },
+  circlesRow: { flexDirection: "row", justifyContent: 'space-between' },
   circle: {
     width: SIZE,
     height: SIZE,

@@ -10,6 +10,8 @@ import { PointsProvider } from "@/hooks/points-context";
 import { ThemeProviderCustom, useThemeMode } from "@/hooks/theme-context";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { UserProvider } from "@/hooks/user-context";
+import React from "react";
+import { Platform } from "react-native";
 
 export const unstable_settings = {
   initialRouteName: "(tabs)",
@@ -40,6 +42,12 @@ export default function RootLayout() {
             <ChallengesProvider>
               <FriendsProvider>
                 <RootNavigation />
+                {Platform.OS === 'web' && (
+                  <style>{`
+                    html, body, #root, #__next { -ms-overflow-style: none; scrollbar-width: none; }
+                    html::-webkit-scrollbar, body::-webkit-scrollbar, div::-webkit-scrollbar { display: none; }
+                  `}</style>
+                )}
               </FriendsProvider>
             </ChallengesProvider>
           </ClubProvider>

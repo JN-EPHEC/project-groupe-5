@@ -102,7 +102,7 @@ export default function SocialScreen() {
   if (view === "createClub") {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}> 
-        <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
+        <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
         <TouchableOpacity onPress={() => setView("main")} style={{ marginBottom: 16 }}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
