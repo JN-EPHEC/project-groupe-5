@@ -5,7 +5,7 @@ import { PremiumCard } from "@/components/ui/recompenses/PremiumCard";
 import { RewardCard } from "@/components/ui/recompenses/RewardCard";
 import { usePoints } from "@/hooks/points-context";
 import { useThemeMode } from "@/hooks/theme-context";
-import { FlatList, ScrollView, StyleSheet, Text } from "react-native";
+import { FlatList, ScrollView, StyleSheet, Text, View } from "react-native";
 
 export default function RewardsScreen() {
   const { colors } = useThemeMode();
@@ -23,24 +23,21 @@ export default function RewardsScreen() {
       {/* POINTS -> components/ui/recompenses/PointsCard */}
   <PointsCard points={points} />
 
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>
-        Récompenses disponibles
-      </Text>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>Bons plans éco</Text>
 
-      {/* LISTE RÉCOMPENSES -> components/ui/recompenses/RewardCard */}
+      {/* Grille de partenaires éco -> style inspiré de la maquette */}
       <FlatList
         data={rewardsData}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        renderItem={({ item }) => (
-          <RewardCard
-            item={item}
-            points={points}
-            onObtain={() => spendPoints(item.cost)}
-          />
-        )}
         keyExtractor={(item) => item.id}
+        numColumns={2}
+        columnWrapperStyle={{ justifyContent: 'space-between', marginBottom: 12 }}
+        renderItem={({ item }) => (
+          <View style={{ width: '48%' }}>
+            <RewardCard item={item} />
+          </View>
+        )}
         style={{ marginBottom: 20 }}
+        showsVerticalScrollIndicator={false}
       />
 
       <Text style={[styles.sectionTitle, { color: colors.text }]}>
