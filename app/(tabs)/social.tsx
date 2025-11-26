@@ -80,7 +80,12 @@ export default function SocialScreen() {
   const clubRankingData = useMemo(() => {
     // Merge club members with current user for ranking
     const base = members.map((m) => ({ ...m, isMe: false }));
-    const me = { id: "me", name: user.name, avatar: user.avatar, points, isMe: true } as any;
+    const me = {
+      id: "me",
+      name: user.firstName ?? "Utilisateur",
+      avatar: user.avatar ?? null,
+      isMe: true,
+    } as any;
     const all = [...base, me];
     return all.sort((a, b) => b.points - a.points).map((m, idx) => ({ ...m, rank: idx + 1 }));
   }, [members, points]);
@@ -415,7 +420,7 @@ export default function SocialScreen() {
           </View>
 
           {(() => {
-            const me = { id: "me", name: user.name, points, avatar: user.avatar, online: true } as any;
+            const me = { id: "me", name: user.firstName ?? "Utilisateur", points, avatar: user.avatar ?? null, online: true } as any;
             const sorted = [...friends, me]
               .filter((a) => a.name.toLowerCase().includes(search.toLowerCase()))
               .sort((a, b) => b.points - a.points);
@@ -473,9 +478,9 @@ export default function SocialScreen() {
             renderItem={({ item }) => (
               <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 8, borderRadius: 12, backgroundColor: item.isMe ? colors.accent : 'transparent' }}>
                 <Text style={{ width: 30, textAlign: 'center', color: item.isMe ? '#0F3327' : colors.text, fontWeight: '700' }}>{item.rank}</Text>
-                <Image source={{ uri: item.isMe ? user.avatar : item.avatar }} style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10, borderWidth: 0 }} />
+                <Image source={{ uri: item.isMe ? user.avatar ?? null : item.avatar }} style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10, borderWidth: 0 }} />
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: item.isMe ? '#0F3327' : colors.text, fontWeight: item.isMe ? '700' : '500' }}>{item.isMe ? user.name : item.name}</Text>
+                  <Text style={{ color: item.isMe ? '#0F3327' : colors.text, fontWeight: item.isMe ? '700' : '500' }}>{item.isMe ? user.firstName ?? "Utilisateur" : item.name}</Text>
                   {joinedClub && (
                     <Text style={{ color: item.isMe ? '#0F3327' : colors.mutedText, fontSize: 12 }}>
                       {joinedClub.ownerId === (item.isMe ? 'me' : item.id) ? 'Chef' : (joinedClub.officers || []).includes(item.isMe ? 'me' : item.id) ? 'Adjoint' : 'Membre'}

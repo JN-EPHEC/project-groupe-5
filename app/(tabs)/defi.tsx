@@ -140,7 +140,11 @@ export default function DefiScreen() {
               isOngoing={current?.id === challenge.id}
               status={current?.id === challenge.id ? current?.status : undefined}
               onToggle={toggleOngoing}
-              onValidatePhoto={current?.id === challenge.id && current.status === 'active' ? () => openCamera(challenge.id) : undefined}
+              onValidatePhoto={
+                current && current.id === challenge.id && current.status === "active"
+                  ? () => openCamera(challenge.id)
+                  : undefined
+              }
             />
           ))}
 
