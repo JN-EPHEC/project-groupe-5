@@ -2,7 +2,8 @@ import { GradientButton } from "@/components/ui/common/GradientButton";
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useState } from "react";
+import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { CATEGORY_CONFIG } from "./constants";
 import { Challenge } from "./types";
 
@@ -16,6 +17,7 @@ type Props = {
 
 export function ChallengeCard({ challenge, isOngoing, onToggle, status, onValidatePhoto }: Props) {
   const { colors } = useThemeMode();
+  const [confirmVisible, setConfirmVisible] = useState(false);
   const category = CATEGORY_CONFIG[challenge.category];
   const DIFFICULTY_GRADIENTS: Record<Challenge["difficulty"], [string, string]> = {
     Facile: ["#52D192", "#2BB673"],
@@ -61,12 +63,15 @@ export function ChallengeCard({ challenge, isOngoing, onToggle, status, onValida
         <View style={{ marginTop: 24 }}>
           {status === 'active' && (
             <>
-              <TouchableOpacity style={[styles.primaryButtonActive]} onPress={() => onToggle(challenge.id)}>
-                <Text style={[styles.primaryTextActive]}>Défi en cours</Text>
-                <Ionicons name="checkmark-circle" size={18} color="#7DCAB0" style={{ marginLeft: 8 }} />
+              <TouchableOpacity
+                style={[styles.cancelBtn]}
+                onPress={() => setConfirmVisible(true)}
+              >
+                <Text style={[styles.cancelText]}>Annuler le défi</Text>
+                <Ionicons name="close-circle" size={18} color="#F45B69" style={{ marginLeft: 8 }} />
               </TouchableOpacity>
               {onValidatePhoto && (
-                <TouchableOpacity style={styles.photoBtn} onPress={onValidatePhoto}>
+                <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.accent }]} onPress={onValidatePhoto}>
                   <Ionicons name="camera" size={16} color="#0F3327" style={{ marginRight: 6 }} />
                   <Text style={styles.photoBtnText}>Valider avec photo</Text>
                 </TouchableOpacity>
@@ -91,6 +96,29 @@ export function ChallengeCard({ challenge, isOngoing, onToggle, status, onValida
           <GradientButton label="Relever le défi" onPress={() => onToggle(challenge.id)} />
         </View>
       )}
+      {/* Cancel confirmation modal */}
+      <Modal transparent visible={confirmVisible} animationType="fade" onRequestClose={() => setConfirmVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Annuler le défi</Text>
+            <Text style={{ color: colors.mutedText, marginTop: 6 }}>Êtes-vous sûr d'annuler ce défi ?</Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={[styles.modalBtn, styles.modalCancelBtn]} onPress={() => setConfirmVisible(false)}>
+                <Text style={styles.modalCancelText}>Non</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalConfirmBtn]}
+                onPress={() => {
+                  setConfirmVisible(false);
+                  onToggle(challenge.id);
+                }}
+              >
+                <Text style={styles.modalConfirmText}>Oui</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -111,10 +139,21 @@ const styles = StyleSheet.create({
   metaTextDark: { color: "#0F3327", marginLeft: 6, fontWeight: "700" },
   primaryButtonActive: { marginTop: 24, backgroundColor: "#142822", borderWidth: 1, borderColor: "#7DCAB0", borderRadius: 18, paddingVertical: 12, flexDirection: "row", justifyContent: "center", alignItems: "center" },
   primaryTextActive: { color: "#7DCAB0", fontWeight: "700" },
+  cancelBtn: { marginTop: 24, backgroundColor: "#2A171A", borderWidth: 1, borderColor: "#F45B69", borderRadius: 18, paddingVertical: 12, flexDirection: "row", justifyContent: "center", alignItems: "center" },
+  cancelText: { color: "#F45B69", fontWeight: "700" },
   photoBtn: { marginTop: 12, backgroundColor: "#D4F7E7", borderRadius: 18, paddingVertical: 10, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   photoBtnText: { color: "#0F3327", fontWeight: '700' },
   pendingPill: { backgroundColor: '#142822', borderWidth: 1, borderColor: '#F6D365', borderRadius: 18, paddingVertical: 10, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   pendingText: { color: '#F6D365', fontWeight: '700' },
   validatedPill: { backgroundColor: '#142822', borderWidth: 1, borderColor: '#52D192', borderRadius: 18, paddingVertical: 10, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   validatedText: { color: '#52D192', fontWeight: '700' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  modalCard: { width: '100%', maxWidth: 360, borderRadius: 16, padding: 16 },
+  modalTitle: { fontSize: 18, fontWeight: '700' },
+  modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16, gap: 10 },
+  modalBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 12 },
+  modalCancelBtn: { backgroundColor: '#2A3431' },
+  modalConfirmBtn: { backgroundColor: '#F45B69' },
+  modalCancelText: { color: '#E6FFF5', fontWeight: '700' },
+  modalConfirmText: { color: '#0F3327', fontWeight: '700' },
 });

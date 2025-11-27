@@ -1,14 +1,14 @@
-import { Redirect, useSegments } from "expo-router";
+// Keep this context independent of routing
 import { User as FirebaseUser, onAuthStateChanged } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
 import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
+    createContext,
+    useContext,
+    useEffect,
+    useMemo,
+    useState,
 } from "react";
-import { Text, View } from "react-native";
+// No UI imports; provider shouldn't render screens
 import { auth, db } from "../firebaseConfig";
 
 // 🔥 Full user profile (Option B)
@@ -23,6 +23,9 @@ export type UserProfile = {
   isAdmin: boolean;
   clubId: string | null;
   abonnementId: string | null;
+  username?: string | null;
+  bio?: string | null;
+  photoURL?: string | null;
 };
 
 type UserContextType = {
@@ -33,7 +36,6 @@ type UserContextType = {
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
-  const segments = useSegments(); // 👈 Detect whether we are inside (auth) or (tabs)
 
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -77,6 +79,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             isAdmin: data.isAdmin ?? false,
             clubId: data.clubId ?? null,
             abonnementId: data.abonnementId ?? null,
+            username: data.username ?? null,
+            bio: data.bio ?? null,
+            photoURL: data.photoURL ?? null,
           });
         }
         setLoading(false);
@@ -93,35 +98,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   // Memoized context value
   const value = useMemo(
     () => ({
-      user: userProfile as UserProfile, // 👍 safe because guarded below
+      user: userProfile as UserProfile,
       loading,
     }),
     [userProfile, loading]
   );
-
-  // 3️⃣ Global screen-level guards
-  const inAuthGroup = segments[0] === "(auth)"; // scenes like /login and /register
-
-  // Loading screen (Auth + Firestore)
-  if (loading) {
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <Text>Chargement...</Text>
-      </View>
-    );
-  }
-
-  // Not logged in, trying to access protected routes → redirect to login
-  if (!firebaseUser && !inAuthGroup) {
-    return <Redirect href="/login" />;
-  }
-
-  // Logged in but visiting /login or /register → redirect to /acceuil
-  if (firebaseUser && inAuthGroup) {
-    return <Redirect href="/acceuil" />;
-  }
-
-  // All good → render children
+  // Provide state only; routing handled in app layouts
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 }
 
