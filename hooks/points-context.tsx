@@ -9,7 +9,7 @@ type PointsContextType = {
 const PointsContext = createContext<PointsContextType | undefined>(undefined);
 
 export function PointsProvider({ children }: { children: ReactNode }) {
-  const [points, setPoints] = useState<number>(285); // valeur initiale utilisateur
+  const [points, setPoints] = useState<number>(999999999); // valeur initiale utilisateur
 
   const addPoints = useCallback((value: number) => {
     setPoints((p) => p + Math.max(0, value));
