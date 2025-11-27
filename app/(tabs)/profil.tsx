@@ -45,12 +45,20 @@ export default function ProfilScreen() {
       {/* EN-TÊTE PROFIL -> components/ui/profil/Header */}
       <Header />
 
-      <TouchableOpacity
-        style={{ backgroundColor: colors.surfaceAlt, alignSelf: 'center', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 14, marginBottom: 12 }}
-        onPress={() => setShowQR(true)}
-      >
-        <Text style={{ color: colors.text, fontWeight: '600' }}>📱 Partager mon profil (QR)</Text>
-      </TouchableOpacity>
+      <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: colors.surfaceAlt, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 14 }}
+          onPress={() => router.push("/edit-profile")}
+        >
+          <Text style={{ color: colors.text, fontWeight: '600', textAlign: 'center' }}>✏️ Modifier mon profil</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: colors.surfaceAlt, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 14 }}
+          onPress={() => setShowQR(true)}
+        >
+          <Text style={{ color: colors.text, fontWeight: '600', textAlign: 'center' }}>📱 Partager mon profil (QR)</Text>
+        </TouchableOpacity>
+      </View>
 
   {/* STATS -> components/ui/profil/StatCard */}
       <View style={styles.row}>

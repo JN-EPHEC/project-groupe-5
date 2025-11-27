@@ -6,9 +6,13 @@ import { StyleSheet, Text, View } from "react-native";
 
 export function HeaderProfile() {
   const { colors } = useThemeMode();
-  const { user } = useUser(); // 🔥 get real user from Firestore
+  const { user, loading } = useUser();
 
-  // Build first name safely
+  // Guard against loading or missing profile
+  if (loading || !user) {
+    return null;
+  }
+
   const firstName = user.firstName ?? "Utilisateur";
 
   return (

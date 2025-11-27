@@ -5,11 +5,11 @@ import { CATEGORY_CONFIG } from "./constants";
 import { CategoryKey } from "./types";
 
 type Props = {
-  selected: CategoryKey;
-  onSelect: (key: CategoryKey) => void;
+  selected: CategoryKey[]; // includes "Tous" to represent all
+  onToggle: (key: CategoryKey) => void;
 };
 
-export function CategorySelector({ selected, onSelect }: Props) {
+export function CategorySelector({ selected, onToggle }: Props) {
   const { colors, mode } = useThemeMode();
 
   return (
@@ -21,7 +21,7 @@ export function CategorySelector({ selected, onSelect }: Props) {
     >
       {(Object.keys(CATEGORY_CONFIG) as CategoryKey[]).map((key) => {
         const { icon, label } = CATEGORY_CONFIG[key];
-        const isActive = key === selected;
+        const isActive = selected.includes(key);
 
         return (
           <TouchableOpacity
@@ -36,7 +36,7 @@ export function CategorySelector({ selected, onSelect }: Props) {
                   : colors.pill,
               },
             ]}
-            onPress={() => onSelect(key)}
+            onPress={() => onToggle(key)}
           >
             <Ionicons
               name={icon}

@@ -7,10 +7,11 @@ export type ActiveChallenge = Challenge & { status: 'active' | 'pendingValidatio
 type ChallengesContextType = {
   current: ActiveChallenge | null;
   start: (challenge: Challenge) => void;
-  stop: () => void;
+  stop: (id?: number) => void;
   validateWithPhoto: (photoUri: string) => void; // now only submits photo -> pendingValidation
   approveCurrent: () => void; // admin/validation step
   activities: Record<string, Challenge["category"]>;
+  canceledIds: number[];
 };
 
 const ChallengesContext = createContext<ChallengesContextType | undefined>(undefined);
@@ -18,15 +19,20 @@ const ChallengesContext = createContext<ChallengesContextType | undefined>(undef
 export function ChallengesProvider({ children }: { children: React.ReactNode }) {
   const [current, setCurrent] = useState<ActiveChallenge | null>(null);
   const [activities, setActivities] = useState<Record<string, Challenge["category"]>>({});
+  const [canceledIds, setCanceledIds] = useState<number[]>([]);
   const { addPoints } = usePoints();
 
   const start = useCallback((challenge: Challenge) => {
     setCurrent({ ...challenge, status: 'active' });
   }, []);
 
-  const stop = useCallback(() => {
+  const stop = useCallback((id?: number) => {
     setCurrent(null);
-  }, []);
+    const canceledId = id ?? current?.id;
+    if (typeof canceledId === 'number') {
+      setCanceledIds((prev) => (prev.includes(canceledId) ? prev : [...prev, canceledId]));
+    }
+  }, [current]);
 
   // user submits photo evidence -> move to pendingValidation (no points yet)
   const validateWithPhoto = useCallback((photoUri: string) => {
@@ -45,7 +51,7 @@ export function ChallengesProvider({ children }: { children: React.ReactNode }) 
     }
   }, [current, addPoints]);
 
-  const value = useMemo(() => ({ current, start, stop, validateWithPhoto, approveCurrent, activities }), [current, start, stop, validateWithPhoto, approveCurrent, activities]);
+  const value = useMemo(() => ({ current, start, stop, validateWithPhoto, approveCurrent, activities, canceledIds }), [current, start, stop, validateWithPhoto, approveCurrent, activities, canceledIds]);
   return <ChallengesContext.Provider value={value}>{children}</ChallengesContext.Provider>;
 }
 

@@ -18,8 +18,8 @@ export default function DefiScreen() {
   const { colors } = useThemeMode();
 
   const [activeTab, setActiveTab] = useState<TabKey>("defis");
-  const [selectedCategory, setSelectedCategory] = useState<CategoryKey>("Tous");
-  const { current, start, stop } = useChallenges();
+  const [selectedCategories, setSelectedCategories] = useState<CategoryKey[]>(["Tous"]);
+  const { current, start, stop, canceledIds } = useChallenges();
   const [validationQueue, setValidationQueue] = useState([
     {
       id: 101,
@@ -60,9 +60,17 @@ export default function DefiScreen() {
   ]);
 
   const filteredChallenges = useMemo(() => {
-    if (selectedCategory === "Tous") return CHALLENGES;
-    return CHALLENGES.filter((c) => c.category === selectedCategory);
-  }, [selectedCategory]);
+    if (selectedCategories.includes("Tous") || selectedCategories.length === 0) return CHALLENGES;
+    const set = new Set(selectedCategories.filter((c) => c !== "Tous") as any);
+    return CHALLENGES.filter((c) => set.has(c.category));
+  }, [selectedCategories]);
+
+  // Exclude canceled challenges from display
+  const availableChallenges = useMemo(() => {
+    if (!canceledIds.length) return filteredChallenges;
+    const canceled = new Set(canceledIds);
+    return filteredChallenges.filter((c) => !canceled.has(c.id));
+  }, [filteredChallenges, canceledIds]);
 
   const ongoingChallenges = useMemo(
     () => (current ? [current] : []),
@@ -71,14 +79,14 @@ export default function DefiScreen() {
 
   const challengesToDisplay = useMemo(() => {
     // If we have a current challenge in pendingValidation or validated state, still show only that one
-    return current ? [current] : filteredChallenges;
-  }, [current, filteredChallenges]);
+    return current ? [current] : availableChallenges;
+  }, [current, availableChallenges]);
 
   const toggleOngoing = (id: number) => {
     const challenge = CHALLENGES.find((c) => c.id === id);
     if (!challenge) return;
     if (current && current.id === id) {
-      stop();
+      stop(id);
     } else {
       start(challenge);
     }
@@ -125,8 +133,22 @@ export default function DefiScreen() {
         {activeTab === "defis" && !current && (
           <View style={{ backgroundColor: colors.background }}>
             <CategorySelector
-              selected={selectedCategory}
-              onSelect={setSelectedCategory}
+              selected={selectedCategories}
+              onToggle={(key) => {
+                if (key === "Tous") {
+                  setSelectedCategories(["Tous"]);
+                  return;
+                }
+                setSelectedCategories((prev) => {
+                  // If "Tous" was selected, replace with the key
+                  const withoutTous = prev.filter((k) => k !== "Tous");
+                  const exists = withoutTous.includes(key);
+                  const next = exists
+                    ? withoutTous.filter((k) => k !== key)
+                    : [...withoutTous, key];
+                  return next.length === 0 ? ["Tous"] : (next as CategoryKey[]);
+                });
+              }}
             />
           </View>
         )}
