@@ -77,6 +77,25 @@ export default function ProfilScreen() {
       {/* PARAMÈTRES -> components/ui/profil/SettingsSection (+ SettingSwitch) */}
       <SettingsSection />
 
+      {/* ADMIN PANEL (visible uniquement pour les admins) */}
+      {user.isAdmin && (
+        <TouchableOpacity
+          onPress={() => router.push("../(admin)")}
+          style={{
+            backgroundColor: colors.accent,
+            paddingVertical: 12,
+            paddingHorizontal: 16,
+            borderRadius: 14,
+            marginTop: 20,
+          }}
+        >
+          <Text style={{ color: "#fff", textAlign: "center", fontWeight: "600" }}>
+            🔧 Accéder à l’espace administrateur
+          </Text>
+        </TouchableOpacity>
+      )}
+
+
       <ShareQRModal
         visible={showQR}
         onClose={() => setShowQR(false)}
