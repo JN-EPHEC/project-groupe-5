@@ -9,13 +9,17 @@ export const Header = () => {
   return (
     <View style={styles.header}>
       <View style={styles.avatarContainer}>
-        <Image source={{ uri: user.avatar }} style={{ width: 60, height: 60, borderRadius: 30 }} />
+        {user?.photoURL ? (
+          <Image source={{ uri: user.photoURL }} style={{ width: 60, height: 60, borderRadius: 30 }} />
+        ) : (
+          <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: '#1F2A27' }} />
+        )}
         <View style={styles.badge}>
           <Text style={styles.badgeText}>10</Text>
         </View>
       </View>
-      <Text style={styles.name}>Bonjour {user.name}</Text>
-      {joinedClub && <Text style={styles.club}>{joinedClub.name}</Text>}
+      <Text style={styles.name}>Bonjour {(user?.username ?? `${user?.firstName ?? ''} ${user?.lastName ?? ''}` ).trim() || 'Invité'}</Text>
+      <Text style={styles.club}>{joinedClub?.name ?? (user?.bio || '—')}</Text>
     </View>
   );
 };

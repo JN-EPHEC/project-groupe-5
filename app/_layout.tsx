@@ -5,8 +5,10 @@ import "react-native-reanimated";
 
 import { ChallengesProvider } from "@/hooks/challenges-context";
 import { ClubProvider } from "@/hooks/club-context";
+import { CouponsProvider } from "@/hooks/coupons-context";
 import { FriendsProvider } from "@/hooks/friends-context";
 import { PointsProvider } from "@/hooks/points-context";
+import { SubscriptionsProvider } from "@/hooks/subscriptions-context";
 import { ThemeProviderCustom, useThemeMode } from "@/hooks/theme-context";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { UserProvider } from "@/hooks/user-context";
@@ -38,19 +40,23 @@ export default function RootLayout() {
     <ThemeProviderCustom>
       <UserProvider>
         <PointsProvider>
-          <ClubProvider>
-            <ChallengesProvider>
-              <FriendsProvider>
-                <RootNavigation />
-                {Platform.OS === 'web' && (
-                  <style>{`
-                    html, body, #root, #__next { -ms-overflow-style: none; scrollbar-width: none; }
-                    html::-webkit-scrollbar, body::-webkit-scrollbar, div::-webkit-scrollbar { display: none; }
-                  `}</style>
-                )}
-              </FriendsProvider>
-            </ChallengesProvider>
-          </ClubProvider>
+          <CouponsProvider>
+            <ClubProvider>
+              <ChallengesProvider>
+                <FriendsProvider>
+                  <SubscriptionsProvider>
+                    <RootNavigation />
+                  </SubscriptionsProvider>
+                  {Platform.OS === 'web' && (
+                    <style>{`
+                      html, body, #root, #__next { -ms-overflow-style: none; scrollbar-width: none; }
+                      html::-webkit-scrollbar, body::-webkit-scrollbar, div::-webkit-scrollbar { display: none; }
+                    `}</style>
+                  )}
+                </FriendsProvider>
+              </ChallengesProvider>
+            </ClubProvider>
+          </CouponsProvider>
         </PointsProvider>
       </UserProvider>
     </ThemeProviderCustom>

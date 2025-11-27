@@ -1,4 +1,5 @@
 import { useFriends } from "@/hooks/friends-context";
+import { useSubscriptions } from "@/hooks/subscriptions-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -35,6 +36,7 @@ export default function AmisPlusScreen() {
   const { colors } = useThemeMode();
   const router = useRouter();
   const { addFriend, isFriend } = useFriends();
+  const { follow } = useSubscriptions();
   const [query, setQuery] = useState("");
 
   const results = useMemo(
@@ -84,7 +86,10 @@ export default function AmisPlusScreen() {
               </View>
               <TouchableOpacity
                 disabled={already}
-                onPress={() => addFriend({ id: item.id, name: item.name, points: 400 + Math.floor(Math.random() * 300), online: Math.random() > 0.5, avatar: avatarForSuggestion(item.id) })}
+                onPress={() => {
+                  addFriend({ id: item.id, name: item.name, points: 400 + Math.floor(Math.random() * 300), online: Math.random() > 0.5, avatar: avatarForSuggestion(item.id) });
+                  follow({ id: item.id, name: item.name, avatar: avatarForSuggestion(item.id) });
+                }}
                 style={{
                   paddingHorizontal: 16,
                   paddingVertical: 10,
@@ -94,7 +99,7 @@ export default function AmisPlusScreen() {
                   opacity: already ? 0.6 : 1,
                 }}
               >
-                <Text style={{ color: colors.accent, fontWeight: "700" }}>{already ? "Ajouté" : "Ajouter"}</Text>
+                <Text style={{ color: colors.accent, fontWeight: "700" }}>{already ? "Ajouté" : "S'abonner"}</Text>
               </TouchableOpacity>
             </View>
           );
