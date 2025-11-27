@@ -14,10 +14,11 @@ import { clubsData } from "@/components/ui/social/data";
 import { useClub } from "@/hooks/club-context";
 import { useFriends } from "@/hooks/friends-context";
 import { usePoints } from "@/hooks/points-context";
+import { useSubscriptions } from "@/hooks/subscriptions-context";
 import { useUser } from "@/hooks/user-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect } from "react";
 
 export default function SocialScreen() {
@@ -42,6 +43,8 @@ export default function SocialScreen() {
   const { points } = usePoints();
   const { user } = useUser();
   const params = useLocalSearchParams();
+  const router = useRouter();
+  const { follow } = useSubscriptions();
   const { friends } = useFriends();
 
   useEffect(() => {
@@ -83,7 +86,7 @@ export default function SocialScreen() {
     const me = {
       id: "me",
       name: user.firstName ?? "Utilisateur",
-      avatar: user.avatar ?? null,
+      avatar: user.photoURL ?? null,
       isMe: true,
     } as any;
     const all = [...base, me];
@@ -417,10 +420,13 @@ export default function SocialScreen() {
               placeholderTextColor={colors.mutedText}
               style={[styles.searchInput, { color: colors.text }]}
             />
+            <TouchableOpacity onPress={() => router.push('/amis-plus')} style={{ backgroundColor: colors.accent, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, marginLeft: 8 }}>
+              <Text style={{ color: '#0F3327', fontWeight: '700' }}>Amis +</Text>
+            </TouchableOpacity>
           </View>
 
           {(() => {
-            const me = { id: "me", name: user.firstName ?? "Utilisateur", points, avatar: user.avatar ?? null, online: true } as any;
+            const me = { id: "me", name: user.firstName ?? "Utilisateur", points, avatar: user.photoURL ?? null, online: true } as any;
             const sorted = [...friends, me]
               .filter((a) => a.name.toLowerCase().includes(search.toLowerCase()))
               .sort((a, b) => b.points - a.points);
@@ -435,6 +441,11 @@ export default function SocialScreen() {
                   if (ami.id === "me") return;
                   setSelectedChat({ ...ami, type: "ami" });
                   setView("chat");
+                }}
+                actionLabel={!ami.isMe ? "S'abonner" : undefined}
+                onAction={() => {
+                  if (ami.id === 'me') return;
+                  follow({ id: ami.id, name: ami.name, avatar: ami.avatar });
                 }}
               />
             ));
@@ -478,7 +489,7 @@ export default function SocialScreen() {
             renderItem={({ item }) => (
               <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 8, borderRadius: 12, backgroundColor: item.isMe ? colors.accent : 'transparent' }}>
                 <Text style={{ width: 30, textAlign: 'center', color: item.isMe ? '#0F3327' : colors.text, fontWeight: '700' }}>{item.rank}</Text>
-                <Image source={{ uri: item.isMe ? user.avatar ?? null : item.avatar }} style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10, borderWidth: 0 }} />
+                <Image source={{ uri: item.isMe ? user.photoURL ?? null : item.avatar }} style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10, borderWidth: 0 }} />
                 <View style={{ flex: 1 }}>
                   <Text style={{ color: item.isMe ? '#0F3327' : colors.text, fontWeight: item.isMe ? '700' : '500' }}>{item.isMe ? user.firstName ?? "Utilisateur" : item.name}</Text>
                   {joinedClub && (

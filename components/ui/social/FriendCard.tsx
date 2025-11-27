@@ -15,9 +15,11 @@ interface FriendCardProps {
   rank: number;
   onChat: () => void;
   isMe?: boolean;
+  actionLabel?: string;
+  onAction?: () => void;
 }
 
-export const FriendCard: React.FC<FriendCardProps> = ({ friend, rank, onChat, isMe }) => {
+export const FriendCard: React.FC<FriendCardProps> = ({ friend, rank, onChat, isMe, actionLabel, onAction }) => {
   const { colors } = useThemeMode();
   const rankColor = isMe ? "#0F3327" : colors.accent;
 
@@ -33,9 +35,14 @@ export const FriendCard: React.FC<FriendCardProps> = ({ friend, rank, onChat, is
         <Text style={[styles.name, { color: colors.text }]}>{friend.name}</Text>
         {friend.online && <View style={[styles.dot, { backgroundColor: "#19D07D" }]} />}
       </View>
-      <Text style={[styles.points, { color: colors.text }]}>
-        {friend.points} pts
-      </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Text style={[styles.points, { color: colors.text }]}>{friend.points} pts</Text>
+        {!!actionLabel && !isMe && (
+          <TouchableOpacity onPress={onAction} style={{ backgroundColor: colors.surfaceAlt, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 10 }}>
+            <Text style={{ color: colors.text, fontSize: 12, fontWeight: '600' }}>{actionLabel}</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </TouchableOpacity>
   );
 };

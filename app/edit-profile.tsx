@@ -1,10 +1,10 @@
 import { useThemeMode } from "@/hooks/theme-context";
 import { useUser } from "@/hooks/user-context";
 import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { doc, setDoc } from "firebase/firestore";
 import React, { useMemo, useState } from "react";
-import { Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { auth, db } from "../firebaseConfig";
 
 export default function EditProfileScreen() {
@@ -20,12 +20,17 @@ export default function EditProfileScreen() {
   const canSave = useMemo(() => !saving && !!auth.currentUser, [saving]);
 
   async function pickImage() {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (perm.status !== "granted") return;
-    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
-    if (!res.canceled && res.assets[0]?.uri) {
-      setPhotoURL(res.assets[0].uri);
-    }
+    try {
+      // On web, permission prompt is not required the same way
+      if (Platform.OS !== 'web') {
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (perm.status !== "granted") return;
+      }
+      const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
+      if (!res.canceled && res.assets[0]?.uri) {
+        setPhotoURL(res.assets[0].uri);
+      }
+    } catch {}
   }
 
   async function save() {
@@ -49,6 +54,7 @@ export default function EditProfileScreen() {
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: 40 }}>
+        <Stack.Screen options={{ headerShown: false }} />
         <Text style={[styles.title, { color: colors.text }]}>Modifier mon profil</Text>
 
         <View style={{ alignItems: "center", marginTop: 16 }}>
@@ -59,11 +65,14 @@ export default function EditProfileScreen() {
               <Text style={{ color: colors.mutedText }}>Choisir une photo</Text>
             )}
           </Pressable>
+          <TouchableOpacity onPress={pickImage} style={{ marginTop: 8, backgroundColor: colors.surface, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 }}>
+            <Text style={{ color: colors.text, fontWeight: '700' }}>Modifier la photo</Text>
+          </TouchableOpacity>
         </View>
 
         <Text style={[styles.label, { color: colors.mutedText }]}>Username</Text>
         <TextInput
-          style={[styles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.surface }]}
+          style={[styles.input, { borderColor: colors.surfaceAlt, color: colors.text, backgroundColor: colors.surface }]}
           value={username}
           onChangeText={setUsername}
           placeholder="Nom d'utilisateur"
@@ -72,7 +81,7 @@ export default function EditProfileScreen() {
 
         <Text style={[styles.label, { color: colors.mutedText }]}>Bio</Text>
         <TextInput
-          style={[styles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.surface, height: 100, textAlignVertical: "top" }]}
+          style={[styles.input, { borderColor: colors.surfaceAlt, color: colors.text, backgroundColor: colors.surface, height: 100, textAlignVertical: "top" }]}
           value={bio}
           onChangeText={setBio}
           placeholder="Quelques mots sur vous"
@@ -82,6 +91,9 @@ export default function EditProfileScreen() {
 
         <Pressable onPress={save} disabled={!canSave} style={[styles.saveBtn, { backgroundColor: colors.accent, opacity: canSave ? 1 : 0.6 }]}>
           <Text style={{ color: "#fff", fontWeight: "700", textAlign: "center" }}>{saving ? "..." : "Enregistrer"}</Text>
+        </Pressable>
+        <Pressable onPress={() => router.back()} style={[styles.saveBtn, { backgroundColor: colors.surface, marginTop: 10 }]}>
+          <Text style={{ color: colors.text, fontWeight: "700", textAlign: "center" }}>Quitter sans sauvegarder</Text>
         </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>

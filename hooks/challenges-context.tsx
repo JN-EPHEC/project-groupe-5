@@ -2,7 +2,13 @@ import type { Challenge } from "@/components/ui/defi/types";
 import { usePoints } from "@/hooks/points-context";
 import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
 
-export type ActiveChallenge = Challenge & { status: 'active' | 'pendingValidation' | 'validated'; photoUri?: string };
+export type ActiveChallenge = Challenge & {
+  status: 'active' | 'pendingValidation' | 'validated';
+  photoUri?: string;
+  feedbackRating?: number | null;
+  feedbackComment?: string | null;
+  feedbackSubmitted?: boolean; // une fois l'avis envoyé, on masque la carte du défi
+};
 
 type ChallengesContextType = {
   current: ActiveChallenge | null;
@@ -12,6 +18,10 @@ type ChallengesContextType = {
   approveCurrent: () => void; // admin/validation step
   activities: Record<string, Challenge["category"]>;
   canceledIds: number[];
+  reviewRequiredCount: number;
+  reviewCompleted: number;
+  incrementReview: () => void;
+  setFeedback: (rating: number, comment: string) => void;
 };
 
 const ChallengesContext = createContext<ChallengesContextType | undefined>(undefined);
@@ -20,10 +30,13 @@ export function ChallengesProvider({ children }: { children: React.ReactNode }) 
   const [current, setCurrent] = useState<ActiveChallenge | null>(null);
   const [activities, setActivities] = useState<Record<string, Challenge["category"]>>({});
   const [canceledIds, setCanceledIds] = useState<number[]>([]);
+  const [reviewCompleted, setReviewCompleted] = useState(0);
+  const reviewRequiredCount = 3;
   const { addPoints } = usePoints();
 
   const start = useCallback((challenge: Challenge) => {
     setCurrent({ ...challenge, status: 'active' });
+    setReviewCompleted(0); // reset any previous gating progress
   }, []);
 
   const stop = useCallback((id?: number) => {
@@ -38,6 +51,7 @@ export function ChallengesProvider({ children }: { children: React.ReactNode }) 
   const validateWithPhoto = useCallback((photoUri: string) => {
     if (current && current.status === 'active') {
       setCurrent({ ...current, status: 'pendingValidation', photoUri });
+      setReviewCompleted(0); // begin gating phase
     }
   }, [current]);
 
@@ -48,10 +62,34 @@ export function ChallengesProvider({ children }: { children: React.ReactNode }) 
       addPoints(current.points);
       setActivities((prev) => ({ ...prev, [dateKey]: current.category }));
       setCurrent({ ...current, status: 'validated' });
+      setReviewCompleted(0);
     }
   }, [current, addPoints]);
 
-  const value = useMemo(() => ({ current, start, stop, validateWithPhoto, approveCurrent, activities, canceledIds }), [current, start, stop, validateWithPhoto, approveCurrent, activities, canceledIds]);
+  const incrementReview = useCallback(() => {
+    setReviewCompleted((prev) => (prev >= reviewRequiredCount ? prev : prev + 1));
+  }, [reviewRequiredCount]);
+
+  const setFeedback = useCallback((rating: number, comment: string) => {
+    setCurrent((prev) => (prev ? { ...prev, feedbackRating: rating, feedbackComment: comment, feedbackSubmitted: true } : prev));
+  }, []);
+
+  const value = useMemo(
+    () => ({
+      current,
+      start,
+      stop,
+      validateWithPhoto,
+      approveCurrent,
+      activities,
+      canceledIds,
+      reviewRequiredCount,
+      reviewCompleted,
+      incrementReview,
+      setFeedback,
+    }),
+    [current, start, stop, validateWithPhoto, approveCurrent, activities, canceledIds, reviewRequiredCount, reviewCompleted, incrementReview, setFeedback]
+  );
   return <ChallengesContext.Provider value={value}>{children}</ChallengesContext.Provider>;
 }
 

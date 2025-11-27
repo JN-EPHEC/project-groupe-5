@@ -12,7 +12,7 @@ export function TabSwitcher({ activeTab, onChange }: Props) {
 
   return (
     <View style={[styles.tabSwitcher, { backgroundColor: colors.surfaceAlt }]}>
-      {(["defis", "validations"] as TabKey[]).map((tab) => (
+      {(["perso", "club"] as TabKey[]).map((tab) => (
         <TouchableOpacity
           key={tab}
           style={[
@@ -27,7 +27,7 @@ export function TabSwitcher({ activeTab, onChange }: Props) {
               { color: activeTab === tab ? "#0F3327" : colors.mutedText },
             ]}
           >
-            {tab === "defis" ? "Défis" : "Validations"}
+            {tab === "perso" ? "Perso" : "Club"}
           </Text>
         </TouchableOpacity>
       ))}
