@@ -2,7 +2,7 @@ import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useMemo, useRef, useState } from "react";
-import { Image, NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, Modal, NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export interface Reward {
   id: string;
@@ -32,6 +32,7 @@ export const RewardCard: React.FC<RewardCardProps> = ({ item, onRedeem, redeemed
   const midIndex = item.images.length; // start around middle
   const scRef = useRef<ScrollView>(null);
   const [active, setActive] = useState(0);
+  const [confirmVisible, setConfirmVisible] = useState(false);
 
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const x = e.nativeEvent.contentOffset.x;
@@ -72,7 +73,7 @@ export const RewardCard: React.FC<RewardCardProps> = ({ item, onRedeem, redeemed
       <Text style={[styles.desc, { color: colors.mutedText }]} numberOfLines={2}>{item.description}</Text>
       <View style={styles.metaRow}>
         <Ionicons name="pricetag-outline" size={14} color={colors.accent} />
-        <Text style={[styles.metaText, { color: colors.mutedText }]}>Bon: {item.voucherAmountEuro}€ • Code: {item.promoCode}</Text>
+        <Text style={[styles.metaText, { color: colors.mutedText }]}>Bon: {item.voucherAmountEuro}€</Text>
       </View>
       <View style={styles.metaRow}>
         <Ionicons name="time-outline" size={14} color={colors.accent} />
@@ -84,8 +85,10 @@ export const RewardCard: React.FC<RewardCardProps> = ({ item, onRedeem, redeemed
       </View>
       {onRedeem && (
         <TouchableOpacity
-          disabled={!canAfford || redeemed}
-          onPress={() => onRedeem(item.id, item.pointsCost)}
+          onPress={() => {
+            if (redeemed) return;
+            setConfirmVisible(true);
+          }}
           style={{
             marginTop: 10,
             paddingVertical: 10,
@@ -99,6 +102,39 @@ export const RewardCard: React.FC<RewardCardProps> = ({ item, onRedeem, redeemed
           </Text>
         </TouchableOpacity>
       )}
+
+      {/* Confirm exchange modal */}
+      <Modal transparent visible={confirmVisible} animationType="fade" onRequestClose={() => setConfirmVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Confirmer l'échange</Text>
+            <Text style={{ color: colors.mutedText, marginTop: 6 }}>
+              {canAfford ? `Échanger ${item.pointsCost} pts contre ${item.voucherAmountEuro}€ chez ${item.name} ?` : `Points insuffisants: il faut ${item.pointsCost} pts.`}
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={[styles.modalBtn, styles.modalCancelBtn]} onPress={() => setConfirmVisible(false)}>
+                <Text style={styles.modalCancelText}>Non</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalConfirmBtn, { opacity: canAfford ? 1 : 0.6 }]}
+                disabled={!canAfford}
+                onPress={() => {
+                  setConfirmVisible(false);
+                  onRedeem?.(item.id, item.pointsCost);
+                }}
+              >
+                <Text style={styles.modalConfirmText}>Oui</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      <TouchableOpacity
+        onPress={() => router.push({ pathname: `/reward/${item.id}` })}
+        style={{ marginTop: 8, paddingVertical: 8, borderRadius: 10, alignItems: 'center', backgroundColor: colors.surfaceAlt }}
+      >
+        <Text style={{ color: colors.text, fontWeight: '600', fontSize: 12 }}>En savoir plus</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -114,4 +150,14 @@ const styles = StyleSheet.create({
   desc: { fontSize: 11, lineHeight: 14, marginBottom: 6 },
   metaRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   metaText: { marginLeft: 6, fontSize: 11, fontWeight: '600' },
+  // Modal styles aligned with defi cards
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  modalCard: { width: '100%', maxWidth: 360, borderRadius: 16, padding: 16 },
+  modalTitle: { fontSize: 18, fontWeight: '700' },
+  modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16, gap: 10 },
+  modalBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 12 },
+  modalCancelBtn: { backgroundColor: '#2A3431' },
+  modalConfirmBtn: { backgroundColor: '#7DCAB0' },
+  modalCancelText: { color: '#E6FFF5', fontWeight: '700' },
+  modalConfirmText: { color: '#0F3327', fontWeight: '700' },
 });

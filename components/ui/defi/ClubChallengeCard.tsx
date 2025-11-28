@@ -1,6 +1,7 @@
+import { useChallenges } from "@/hooks/challenges-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { CATEGORY_CONFIG } from "./constants";
 import type { ClubChallenge } from "./types";
@@ -16,8 +17,44 @@ export function ClubChallengeCard({ challenge, participating, onParticipate, onC
   const { colors } = useThemeMode();
   const category = CATEGORY_CONFIG[challenge.category];
   const [confirmVisible, setConfirmVisible] = useState(false);
+  const { current, reviewCompleted, reviewRequiredCount } = useChallenges();
+
+  // Hide cards of other picked challenges once 3 validations are reached
+  const shouldHide = useMemo(() => {
+    if (!participating) return false;
+    if (reviewCompleted >= reviewRequiredCount) {
+      // If this is not the current validated challenge, hide it
+      if (current && current.id !== challenge.id) return true;
+    }
+    return false;
+  }, [participating, reviewCompleted, reviewRequiredCount, current, challenge.id]);
+
+  // Countdown until end of day once participating
+  const [remainingMs, setRemainingMs] = useState<number>(0);
+  useEffect(() => {
+    if (!participating) return;
+    const computeEndOfDay = () => {
+      const now = new Date();
+      const end = new Date(now);
+      end.setHours(23, 59, 59, 999);
+      const diff = end.getTime() - now.getTime();
+      setRemainingMs(Math.max(0, diff));
+    };
+    computeEndOfDay();
+    const timer = setInterval(computeEndOfDay, 1000);
+    return () => clearInterval(timer);
+  }, [participating]);
+
+  const formatTime = (ms: number) => {
+    const totalSeconds = Math.floor(ms / 1000);
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
 
   return (
+    shouldHide ? null : (
     <View style={[styles.card, { backgroundColor: colors.surface }]}>
       <View style={styles.header}>
         <View style={[styles.categoryPill, { backgroundColor: colors.surfaceAlt }]}>
@@ -39,6 +76,13 @@ export function ClubChallengeCard({ challenge, participating, onParticipate, onC
           {challenge.participants}/{challenge.goalParticipants} participants
         </Text>
       </View>
+
+      {participating && (
+        <View style={[styles.timerPill, { borderColor: colors.accent }]}> 
+          <Ionicons name="time-outline" size={16} color={colors.accent} />
+          <Text style={[styles.timerText, { color: colors.text }]}>Temps restant aujourd'hui: {formatTime(remainingMs)}</Text>
+        </View>
+      )}
 
       <View style={{ marginTop: 16 }}>
         {participating ? (
@@ -83,6 +127,7 @@ export function ClubChallengeCard({ challenge, participating, onParticipate, onC
         </View>
       </Modal>
     </View>
+    )
   );
 }
 
@@ -102,6 +147,8 @@ const styles = StyleSheet.create({
   ongoingPill: { backgroundColor: '#142822', borderWidth: 1, borderColor: '#7DCAB0', borderRadius: 18, paddingVertical: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   cancelBtn: { backgroundColor: '#2A171A', borderWidth: 1, borderColor: '#F45B69', borderRadius: 18, paddingVertical: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   cancelText: { color: '#F45B69', fontWeight: '700' },
+  timerPill: { marginTop: 12, borderWidth: 1, borderRadius: 16, paddingVertical: 8, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  timerText: { fontWeight: '700' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center', padding: 24 },
   modalCard: { width: '100%', maxWidth: 360, borderRadius: 16, padding: 16 },
   modalTitle: { fontSize: 18, fontWeight: '700' },

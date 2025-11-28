@@ -13,7 +13,7 @@ export const PointsCard: React.FC<PointsCardProps> = ({ points }) => {
   return (
     <View style={[styles.card, { backgroundColor: colors.surface }]}>
       <Ionicons name="leaf" size={22} color={colors.accent} />
-      <Text style={[styles.label, { color: colors.mutedText }]}>Mes points</Text>
+      <Text style={[styles.label, { color: colors.mutedText }]}>Points disponibles</Text>
       <Text style={[styles.value, { color: colors.accent }]}>{points}</Text>
     </View>
   );

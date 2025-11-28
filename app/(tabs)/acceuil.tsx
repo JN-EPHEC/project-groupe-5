@@ -14,38 +14,39 @@ import { Image, ScrollView as RNScrollView, ScrollView, StyleSheet, Text, Toucha
 
 export default function AcceuilScreen() {
   const { colors } = useThemeMode();
-  const { points } = usePoints();
-  const { user, loading } = useUser();
+  const { totalEarned } = usePoints();
+  const { user } = useUser();
   const router = useRouter();
   const { joinedClub, members } = useClub();
   const { current } = useChallenges();
   const { friends } = useFriends();
 
-  const defisFaient = 2;
-  const defisTotal = 5;
+  const defisFaient = 2; // TODO: derive from real data
+  const defisTotal = 5;  // TODO: derive from real data
 
-  // Calcul classement entre amis (user + amisData)
-  const friendPoints = [...friends.map(a => a.points), points];
-  const sorted = [...friendPoints].sort((a,b) => b - a); // desc
-  const position = sorted.indexOf(points) + 1;
+  // Classement entre amis basé sur totalEarned
+  const friendPoints = [...friends.map(a => a.points), totalEarned];
+  const sorted = [...friendPoints].sort((a,b) => b - a);
+  const position = sorted.indexOf(totalEarned) + 1;
   const totalFriends = sorted.length;
   const positionLabel = position === 1 ? "1er" : position + "e";
 
-  // Classement Club (si club rejoint)
-  const clubAllPoints = joinedClub ? [...members.map(m => m.points), points] : [];
+  // Classement Club
+  const clubAllPoints = joinedClub ? [...members.map(m => m.points), totalEarned] : [];
   const clubSorted = joinedClub ? [...clubAllPoints].sort((a,b) => b - a) : [];
-  const clubPosition = joinedClub ? clubSorted.indexOf(points) + 1 : 0;
+  const clubPosition = joinedClub ? clubSorted.indexOf(totalEarned) + 1 : 0;
   const clubTotal = joinedClub ? clubSorted.length : 0;
   const clubLabel = clubPosition === 1 ? "1er" : clubPosition + "e";
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: 100 }}>
+      <Text style={[styles.bigTitle, { color: colors.text }]}>Green{"\n"}Up</Text>
       {/* Section: Profil -> components/ui/acceuil/HeaderProfile */}
       <HeaderProfile />
 
       {/* Section: Points (simple bloc inline ici; si besoin, on l’extrait plus tard) */}
       <View style={[styles.pointsBox, { backgroundColor: colors.surface }]}>
-        <Text style={[styles.pointsNumber, { color: colors.accent }]}>{points}</Text>
+        <Text style={[styles.pointsNumber, { color: colors.accent }]}>{totalEarned}</Text>
         <Text style={[styles.pointsLabel, { color: colors.mutedText }]}>Points</Text>
       </View>
 
@@ -69,10 +70,9 @@ export default function AcceuilScreen() {
       </View>
 
       {/* Barre "Moi" supprimée à la demande */}
-
       {/* Avatars des amis (en ligne: cercle vert) - sans l'utilisateur */}
       <RNScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 10 }}>
-            {friends.map((a: any) => (
+        {friends.map((a: any) => (
           <Image
             key={a.id}
             source={{ uri: a.avatar }}
@@ -92,7 +92,7 @@ export default function AcceuilScreen() {
       <StreakCalendar />
 
       {/* Section: Progression -> components/ui/acceuil/ProgressionCard + components/ProgressCircle */}
-      <ProgressionCard done={defisFaient} total={defisTotal} pointsText="50 Points gagnés" streakText="2 jours de suite 🔥" />
+        <ProgressionCard done={defisFaient} total={defisTotal} pointsText="50 Points gagnés" streakText="2 jours de suite 🔥" />
 
       {/* Section: Défi en cours (seulement si status active) */}
       {current && current.status === 'active' && (
@@ -109,6 +109,7 @@ export default function AcceuilScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16 },
+  bigTitle: { fontSize: 34, fontWeight: '700', lineHeight: 36, marginBottom: 12 },
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   pointsBox: { padding: 14, borderRadius: 14, alignItems: "center", marginBottom: 20 },
   pointsNumber: { fontWeight: "700", fontSize: 24 },

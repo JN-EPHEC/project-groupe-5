@@ -12,7 +12,7 @@ export function CouponCard({ coupon }: { coupon: Coupon }) {
       <View style={[styles.card, { backgroundColor: colors.surface }]}> 
         <View style={styles.row}> 
           <View style={{ flex: 1 }}>
-            <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>{coupon.name}</Text>
+            <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>{coupon.name} • {coupon.voucherAmountEuro}€</Text>
             <Text style={[styles.code, { color: colors.accent }]}>Code: {coupon.code}</Text>
             <Text style={[styles.expiry, { color: colors.mutedText }]}>Expire: {coupon.expiresAt}</Text>
           </View>

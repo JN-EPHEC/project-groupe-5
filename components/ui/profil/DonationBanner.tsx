@@ -2,7 +2,7 @@ import { useThemeMode } from "@/hooks/theme-context";
 import { useState } from "react";
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
-const PRESETS = [5,10,20];
+// Removed preset quick buttons per request
 
 export default function DonationBanner() {
   const { colors } = useThemeMode();
@@ -19,20 +19,7 @@ export default function DonationBanner() {
   return (
     <View style={[styles.card, { backgroundColor: colors.surface }]}> 
       <Text style={[styles.title, { color: colors.text }]}>Soutenir des projets écologiques</Text>
-      <Text style={[styles.subtitle, { color: colors.mutedText }]}>CHAQUE DON FINANCE DIRECTEMENT LES ACTIONS DES ASSOCIATIONS LOCALES PARTENAIRES.</Text>
-
-      <View style={styles.presetsRow}>
-        {PRESETS.map(p => (
-          <TouchableOpacity
-            key={p}
-            onPress={() => setAmount(p)}
-            style={[styles.pill, { backgroundColor: amount === p ? colors.accent : 'transparent', borderColor: colors.accent }]}
-            activeOpacity={0.85}
-          >
-            <Text style={{ color: amount === p ? '#0F3327' : colors.text, fontWeight: '700' }}>{p}€</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <Text style={[styles.subtitle, { color: colors.mutedText }]}>Chaque don finance directement les actions locales partenaires.</Text>
 
       <View style={styles.adjustRow}> 
         <TouchableOpacity style={[styles.circleBtn, { borderColor: colors.surfaceAlt }]} onPress={() => cycle(-step)}>
@@ -65,18 +52,16 @@ export default function DonationBanner() {
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: 16, padding: 12, marginTop: 16 },
-  title: { fontSize: 14, fontWeight: '800', marginBottom: 8, textAlign: 'center' },
-  subtitle: { fontSize: 10, fontWeight: '600', letterSpacing: 0.3, lineHeight: 14, marginBottom: 12, textAlign: 'center' },
-  presetsRow: { flexDirection: 'row', alignItems: 'stretch', flexWrap: 'wrap', marginBottom: 12 },
-  pill: { flexBasis: '22%', margin: 4, paddingVertical: 8, borderRadius: 16, borderWidth: 1, alignItems: 'center' },
+  card: { borderRadius: 16, padding: 12, marginTop: 12 },
+  title: { fontSize: 18, fontWeight: '800', marginBottom: 6, textAlign: 'center' },
+  subtitle: { fontSize: 12, fontWeight: '600', letterSpacing: 0.2, lineHeight: 16, marginBottom: 10, textAlign: 'center' },
   customBox: { display: 'none' },
   customInput: { display: 'none' },
-  adjustRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  circleBtn: { width: 42, height: 42, borderRadius: 21, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  circleText: { fontSize: 22, fontWeight: '700' },
-  amountText: { fontSize: 24, fontWeight: '800' },
-  amountInput: { fontSize: 24, fontWeight: '800', minWidth: 80, textAlign: 'center' },
-  donateBtn: { borderRadius: 20, paddingVertical: 12, alignItems: 'center' },
-  donateText: { fontSize: 15, fontWeight: '800', color: '#0F3327' },
+  adjustRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  circleBtn: { width: 38, height: 38, borderRadius: 19, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  circleText: { fontSize: 20, fontWeight: '700' },
+  amountText: { fontSize: 26, fontWeight: '800' },
+  amountInput: { fontSize: 26, fontWeight: '800', minWidth: 80, textAlign: 'center' },
+  donateBtn: { borderRadius: 18, paddingVertical: 10, alignItems: 'center' },
+  donateText: { fontSize: 16, fontWeight: '800', color: '#0F3327' },
 });

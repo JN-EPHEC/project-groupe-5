@@ -5,7 +5,7 @@ import { useThemeMode } from '@/hooks/theme-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useMemo, useRef, useState } from 'react';
-import { Alert, Image, NativeScrollEvent, NativeSyntheticEvent, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function RewardDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -69,7 +69,7 @@ export default function RewardDetailScreen() {
       </View>
 
       <Text style={[styles.title, { color: colors.text }]}>{reward.name}</Text>
-      <Text style={[styles.cost, { color: colors.mutedText }]}>Bon d'achat: {reward.voucherAmountEuro}€ • Code: {reward.promoCode}</Text>
+      <Text style={[styles.cost, { color: colors.mutedText }]}>Bon d'achat: {reward.voucherAmountEuro}€</Text>
       <Text style={{ color: colors.mutedText, marginBottom: 12 }}>Expire le {reward.expiresAt}</Text>
 
       <View style={[styles.section, { backgroundColor: colors.surface }]}> 
@@ -98,20 +98,12 @@ export default function RewardDetailScreen() {
             return;
           }
           const msg = `Êtes-vous sûr de vouloir échanger ${reward.pointsCost} points contre ${reward.voucherAmountEuro}€ de bon d'achat chez ${reward.name} ?`;
-          if (Platform.OS === 'web') {
-            // @ts-ignore
-            const okConfirm = window.confirm(msg);
-            if (!okConfirm) return;
-            const ok = spendPoints(reward.pointsCost, `Échange: ${reward.name}`);
-            if (ok) { setRedeemed(true); addCoupon(reward.id); }
-            return;
-          }
           Alert.alert(
             "Confirmer l'échange",
             msg,
             [
-              { text: 'Annuler', style: 'cancel' },
-              { text: 'Confirmer', onPress: () => {
+              { text: 'Non', style: 'cancel', onPress: () => router.back() },
+              { text: 'Oui', onPress: () => {
                   const ok = spendPoints(reward.pointsCost, `Échange: ${reward.name}`);
                   if (ok) { setRedeemed(true); addCoupon(reward.id); }
                 }

@@ -10,6 +10,17 @@ export type ActiveChallenge = Challenge & {
   feedbackSubmitted?: boolean; // une fois l'avis envoyé, on masque la carte du défi
 };
 
+export type ChallengeHistoryEntry = {
+  id: string; // unique id for history entry
+  challengeId: number;
+  title: string;
+  description?: string;
+  category: Challenge["category"];
+  points: number;
+  photoUri?: string;
+  validatedAt: string; // ISO timestamp
+};
+
 type ChallengesContextType = {
   current: ActiveChallenge | null;
   start: (challenge: Challenge) => void;
@@ -22,6 +33,7 @@ type ChallengesContextType = {
   reviewCompleted: number;
   incrementReview: () => void;
   setFeedback: (rating: number, comment: string) => void;
+  history: ChallengeHistoryEntry[];
 };
 
 const ChallengesContext = createContext<ChallengesContextType | undefined>(undefined);
@@ -33,6 +45,7 @@ export function ChallengesProvider({ children }: { children: React.ReactNode }) 
   const [reviewCompleted, setReviewCompleted] = useState(0);
   const reviewRequiredCount = 3;
   const { addPoints } = usePoints();
+  const [history, setHistory] = useState<ChallengeHistoryEntry[]>([]);
 
   const start = useCallback((challenge: Challenge) => {
     setCurrent({ ...challenge, status: 'active' });
@@ -61,6 +74,22 @@ export function ChallengesProvider({ children }: { children: React.ReactNode }) 
       const dateKey = new Date().toISOString().slice(0, 10);
       addPoints(current.points);
       setActivities((prev) => ({ ...prev, [dateKey]: current.category }));
+      // Push into history
+      setHistory((prev) => {
+        const already = prev.find((h) => h.challengeId === current.id);
+        if (already) return prev; // avoid duplicates
+        const entry: ChallengeHistoryEntry = {
+          id: `${current.id}-${Date.now()}`,
+          challengeId: current.id,
+          title: current.title,
+          description: current.description,
+          category: current.category,
+          points: current.points,
+          photoUri: current.photoUri,
+          validatedAt: new Date().toISOString(),
+        };
+        return [entry, ...prev];
+      });
       setCurrent({ ...current, status: 'validated' });
       setReviewCompleted(0);
     }
@@ -87,8 +116,9 @@ export function ChallengesProvider({ children }: { children: React.ReactNode }) 
       reviewCompleted,
       incrementReview,
       setFeedback,
+      history,
     }),
-    [current, start, stop, validateWithPhoto, approveCurrent, activities, canceledIds, reviewRequiredCount, reviewCompleted, incrementReview, setFeedback]
+    [current, start, stop, validateWithPhoto, approveCurrent, activities, canceledIds, reviewRequiredCount, reviewCompleted, incrementReview, setFeedback, history]
   );
   return <ChallengesContext.Provider value={value}>{children}</ChallengesContext.Provider>;
 }

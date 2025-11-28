@@ -12,6 +12,7 @@ type ClubContextType = {
   leaveClub: () => void;
   promoteToOfficer: (memberId: string) => void;
   demoteOfficer: (memberId: string) => void;
+  updateClub: (patch: Partial<Omit<ClubInfo, 'id' | 'participants'>>) => void;
 };
 
 const ClubContext = createContext<ClubContextType | undefined>(undefined);
@@ -82,7 +83,11 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const value = useMemo(() => ({ joinedClub, members, joinClub, leaveClub, createClub, promoteToOfficer, demoteOfficer }), [joinedClub, members, joinClub, leaveClub, createClub, promoteToOfficer, demoteOfficer]);
+  const updateClub = useCallback((patch: Partial<Omit<ClubInfo, 'id' | 'participants'>>) => {
+    setJoinedClub((c) => (c ? { ...c, ...patch } : c));
+  }, []);
+
+  const value = useMemo(() => ({ joinedClub, members, joinClub, leaveClub, createClub, promoteToOfficer, demoteOfficer, updateClub }), [joinedClub, members, joinClub, leaveClub, createClub, promoteToOfficer, demoteOfficer, updateClub]);
   return <ClubContext.Provider value={value}>{children}</ClubContext.Provider>;
 }
 
