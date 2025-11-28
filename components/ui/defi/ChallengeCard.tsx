@@ -1,8 +1,9 @@
 import { GradientButton } from "@/components/ui/common/GradientButton";
+import { useChallenges } from "@/hooks/challenges-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { CATEGORY_CONFIG } from "./constants";
 import { Challenge } from "./types";
@@ -19,13 +20,48 @@ export function ChallengeCard({ challenge, isOngoing, onToggle, status, onValida
   const { colors } = useThemeMode();
   const [confirmVisible, setConfirmVisible] = useState(false);
   const category = CATEGORY_CONFIG[challenge.category];
+  const { current, reviewCompleted, reviewRequiredCount } = useChallenges();
   const DIFFICULTY_GRADIENTS: Record<Challenge["difficulty"], [string, string]> = {
     Facile: ["#52D192", "#2BB673"],
     Moyen: ["#F6D365", "#F4C95D"],
     Difficile: ["#F9748F", "#F45B69"],
   };
 
+  // Hide other picked challenges once 3 validations completed
+  const shouldHide = useMemo(() => {
+    if (!isOngoing) return false;
+    if (reviewCompleted >= reviewRequiredCount) {
+      if (current && current.id !== challenge.id) return true;
+    }
+    return false;
+  }, [isOngoing, reviewCompleted, reviewRequiredCount, current, challenge.id]);
+
+  // Countdown until end of day for personal challenges
+  const [remainingMs, setRemainingMs] = useState<number>(0);
+  useEffect(() => {
+    if (!isOngoing) return;
+    const computeEndOfDay = () => {
+      const now = new Date();
+      const end = new Date(now);
+      end.setHours(23, 59, 59, 999);
+      const diff = end.getTime() - now.getTime();
+      setRemainingMs(Math.max(0, diff));
+    };
+    computeEndOfDay();
+    const timer = setInterval(computeEndOfDay, 1000);
+    return () => clearInterval(timer);
+  }, [isOngoing]);
+
+  const formatTime = (ms: number) => {
+    const totalSeconds = Math.floor(ms / 1000);
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
   return (
+    shouldHide ? null : (
     <View style={[styles.card, { backgroundColor: colors.surface }]}>
       <View style={styles.header}>
         <View style={[styles.categoryPill, { backgroundColor: colors.surfaceAlt }]}>
@@ -59,8 +95,15 @@ export function ChallengeCard({ challenge, isOngoing, onToggle, status, onValida
         </View>
       </View>
 
+      {(status === 'active' || status === 'pendingValidation') && (
+        <View style={[styles.timerPill]}> 
+          <Ionicons name="time-outline" size={16} color={colors.accent} />
+          <Text style={[styles.timerText, { color: colors.text }]}>Temps restant aujourd'hui: {formatTime(remainingMs)}</Text>
+        </View>
+      )}
+
       {isOngoing ? (
-        <View style={{ marginTop: 24 }}>
+        <View style={{ marginTop: 20 }}>
           {status === 'active' && (
             <>
               <TouchableOpacity
@@ -120,6 +163,7 @@ export function ChallengeCard({ challenge, isOngoing, onToggle, status, onValida
         </View>
       </Modal>
     </View>
+    )
   );
 }
 
@@ -139,8 +183,10 @@ const styles = StyleSheet.create({
   metaTextDark: { color: "#0F3327", marginLeft: 6, fontWeight: "700" },
   primaryButtonActive: { marginTop: 24, backgroundColor: "#142822", borderWidth: 1, borderColor: "#7DCAB0", borderRadius: 18, paddingVertical: 12, flexDirection: "row", justifyContent: "center", alignItems: "center" },
   primaryTextActive: { color: "#7DCAB0", fontWeight: "700" },
-  cancelBtn: { marginTop: 24, backgroundColor: "#2A171A", borderWidth: 1, borderColor: "#F45B69", borderRadius: 18, paddingVertical: 12, flexDirection: "row", justifyContent: "center", alignItems: "center" },
+  cancelBtn: { marginTop: 16, backgroundColor: "#2A171A", borderWidth: 1, borderColor: "#F45B69", borderRadius: 18, paddingVertical: 12, flexDirection: "row", justifyContent: "center", alignItems: "center" },
   cancelText: { color: "#F45B69", fontWeight: "700" },
+  timerPill: { marginTop: 12, borderWidth: 1, borderColor: '#7DCAB0', borderRadius: 16, paddingVertical: 8, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  timerText: { fontWeight: '700' },
   photoBtn: { marginTop: 12, backgroundColor: "#D4F7E7", borderRadius: 18, paddingVertical: 10, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   photoBtnText: { color: "#0F3327", fontWeight: '700' },
   pendingPill: { backgroundColor: '#142822', borderWidth: 1, borderColor: '#F6D365', borderRadius: 18, paddingVertical: 10, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },

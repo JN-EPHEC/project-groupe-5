@@ -8,11 +8,11 @@ import { useCoupons } from "@/hooks/coupons-context";
 import { usePoints } from "@/hooks/points-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import React, { useState } from 'react';
-import { Alert, FlatList, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { FlatList, ScrollView, StyleSheet, Text, View } from "react-native";
 
 export default function RewardsScreen() {
   const { colors } = useThemeMode();
-  const { points, addPoints, spendPoints } = usePoints();
+  const { points, availablePoints, totalEarned, addPoints, spendPoints } = usePoints();
   const { coupons, addCoupon, hasCoupon } = useCoupons();
   const [activeTab, setActiveTab] = useState<'eco'|'coupons'>('eco');
 
@@ -23,7 +23,7 @@ export default function RewardsScreen() {
       showsVerticalScrollIndicator={false}
     >
       {/* TITRE ÉCRAN -> texte inline ; composants: PointsCard / RewardCard / ActionButton */}
-      <Text style={[styles.header, { color: colors.text }]}>🎁 Récompenses</Text>
+      <Text style={[styles.screenTitle, { color: colors.text }]}>Récompenses</Text>
 
       {/* POINTS -> components/ui/recompenses/PointsCard */}
   <PointsCard points={points} />
@@ -53,25 +53,10 @@ export default function RewardsScreen() {
                   canAfford={points >= item.pointsCost}
                   onRedeem={(id, cost) => {
                     if (hasCoupon(id)) return;
-                    const msg = `Êtes-vous sûr de vouloir échanger ${item.pointsCost} points contre ${item.voucherAmountEuro}€ de bon d'achat chez ${item.name} ?`;
-                    if (Platform.OS === 'web') {
-                      // @ts-ignore
-                      const okConfirm = window.confirm(msg);
-                      if (!okConfirm) return;
-                      const ok = spendPoints(cost, `Échange: ${item.name}`);
-                      if (ok) { addCoupon(id); setActiveTab('coupons'); }
-                    } else {
-                      Alert.alert(
-                        'Confirmer l\'échange',
-                        msg,
-                        [
-                          { text: 'Annuler', style: 'cancel' },
-                          { text: 'Confirmer', style: 'default', onPress: () => {
-                            const ok = spendPoints(cost, `Échange: ${item.name}`);
-                            if (ok) { addCoupon(id); setActiveTab('coupons'); }
-                          }}
-                        ]
-                      );
+                    const ok = spendPoints(cost, `Échange: ${item.name}`);
+                    if (ok) {
+                      addCoupon(id);
+                      setActiveTab('coupons');
                     }
                   }}
                 />
@@ -119,12 +104,7 @@ export default function RewardsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16 },
-  header: {
-    fontSize: 22,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 20,
-  },
+  screenTitle: { fontSize: 28, fontWeight: '700', textAlign: 'left', marginBottom: 20 },
   sectionTitle: { fontSize: 18, fontWeight: "600", marginBottom: 12 },
   tabsRow: { marginBottom: 20 },
   tabsBg: { position: 'absolute', top: 0, left: 0, right: 0, height: 56, borderRadius: 28 },

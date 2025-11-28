@@ -1,3 +1,4 @@
+import { ChallengeHistoryList } from "@/components/ui/profil/ChallengeHistoryList";
 import DonationBanner from "@/components/ui/profil/DonationBanner";
 import { Header } from "@/components/ui/profil/Header";
 import { SettingsSection } from "@/components/ui/profil/SettingsSection";
@@ -43,7 +44,8 @@ export default function ProfilScreen() {
   const followingCount = following.length;
 
   return (
-  <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: 140 }}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: 140 }}>
+      <Text style={{ fontSize: 28, fontWeight: '700', color: colors.text, marginTop: 16 }}>Profil</Text>
       {/* EN-TÊTE PROFIL -> components/ui/profil/Header */}
       <Header />
 
@@ -87,7 +89,7 @@ export default function ProfilScreen() {
       <View style={{ backgroundColor: colors.surface, padding: 16, borderRadius: 16, marginVertical: 10 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>Historique des points</Text>
-          <Text style={{ color: colors.mutedText, fontWeight: '600' }}>{points} pts</Text>
+          <Text style={{ color: colors.mutedText, fontWeight: '600' }}>{totalEarned} pts</Text>
         </View>
         {transactions.length === 0 ? (
           <Text style={{ color: colors.mutedText }}>Aucune transaction pour le moment.</Text>
@@ -108,6 +110,9 @@ export default function ProfilScreen() {
           <Text style={{ color: colors.accent, fontWeight: '600' }}>Voir tout l'historique</Text>
         </TouchableOpacity>
       </View>
+
+      {/* HISTORIQUE DES DEFIS (placé juste après les points) */}
+      <ChallengeHistoryList />
 
       {/* BANNIÈRE DON */}
       <DonationBanner />

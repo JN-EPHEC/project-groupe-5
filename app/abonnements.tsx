@@ -7,7 +7,7 @@ import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'rea
 export default function AbonnementsScreen() {
   const { colors } = useThemeMode();
   const { followers, following, unfollow, removeFollower } = useSubscriptions();
-  const [tab, setTab] = useState<'followers'|'following'>('followers');
+  const [tab, setTab] = useState<'followers'|'following'>('following');
   const router = useRouter();
 
   const list = tab === 'followers' ? followers : following;
@@ -18,7 +18,7 @@ export default function AbonnementsScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
         <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 8 }}>
-          <Text style={{ color: colors.accent, fontWeight: '700' }}>{'←'}</Text>
+          <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 34 }}>{'←'}</Text>
         </TouchableOpacity>
         <Text style={{ color: colors.text, fontSize: 22, fontWeight: '700' }}>Abonnements</Text>
       </View>

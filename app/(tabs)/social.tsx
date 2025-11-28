@@ -6,7 +6,6 @@ import { Alert, FlatList, Image, ScrollView, StyleSheet, Text, TextInput, Toucha
 import { ChatView } from "@/components/ui/social/ChatView";
 import { ClubCard } from "@/components/ui/social/ClubCard";
 import { FriendCard } from "@/components/ui/social/FriendCard";
-import { TabsSwitcher } from "@/components/ui/social/TabsSwitcher";
 
 // Données statiques
 import { ShareQRModal } from "@/components/ui/qr/ShareQRModal";
@@ -23,8 +22,9 @@ import { useEffect } from "react";
 
 export default function SocialScreen() {
   const { colors } = useThemeMode();
-  const [selectedTab, setSelectedTab] = useState<"clubs" | "amis">("clubs");
+  const [selectedTab, setSelectedTab] = useState<"clubs" | "amis">("amis");
   const [view, setView] = useState<"main" | "chat" | "clubRanking" | "createClub">("main");
+  const [editingClub, setEditingClub] = useState(false);
   const [selectedChat, setSelectedChat] = useState<any>(null);
   const [input, setInput] = useState(""); // chat input
   // Nouveau club form states
@@ -39,13 +39,15 @@ export default function SocialScreen() {
   const [search, setSearch] = useState("");
   const [clubSearch, setClubSearch] = useState("");
   const [clubs, setClubs] = useState(clubsData);
-  const { joinedClub, joinClub, leaveClub, members, createClub, promoteToOfficer, demoteOfficer } = useClub();
+  const { joinedClub, joinClub, leaveClub, members, createClub, promoteToOfficer, demoteOfficer, updateClub } = useClub();
   const { points } = usePoints();
   const { user } = useUser();
   const params = useLocalSearchParams();
   const router = useRouter();
   const { follow } = useSubscriptions();
   const { friends } = useFriends();
+  // Modal de confirmation pour quitter le club
+  const [leaveConfirmVisible, setLeaveConfirmVisible] = useState(false);
 
   useEffect(() => {
     const tabParam = (params?.tab as string) || "";
@@ -76,6 +78,7 @@ export default function SocialScreen() {
     setInput("");
   };
 
+          
   const handleSendImage = (uri: string) => {
     setMessages((prev) => [...prev, { id: Date.now().toString(), imageUri: uri, type: 'image', sender: 'me' }]);
   };
@@ -85,13 +88,14 @@ export default function SocialScreen() {
     const base = members.map((m) => ({ ...m, isMe: false }));
     const me = {
       id: "me",
-      name: user.firstName ?? "Utilisateur",
-      avatar: user.photoURL ?? null,
+      name: user?.firstName ?? "Utilisateur",
+      avatar: user?.photoURL ?? null,
       isMe: true,
+      points: points || 0,
     } as any;
     const all = [...base, me];
-    return all.sort((a, b) => b.points - a.points).map((m, idx) => ({ ...m, rank: idx + 1 }));
-  }, [members, points]);
+    return all.sort((a, b) => (b.points || 0) - (a.points || 0)).map((m, idx) => ({ ...m, rank: idx + 1 }));
+  }, [members, points, user]);
 
   const clanTotalPoints = useMemo(() => {
     const membersSum = members.reduce((s, m) => s + (m.points || 0), 0);
@@ -114,7 +118,7 @@ export default function SocialScreen() {
         <TouchableOpacity onPress={() => setView("main")} style={{ marginBottom: 16 }}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={{ color: colors.text, fontSize: 22, fontWeight: "700", marginBottom: 6 }}>Créer un club</Text>
+        <Text style={{ color: colors.text, fontSize: 22, fontWeight: "700", marginBottom: 6 }}>{editingClub ? 'Modifier le club' : 'Créer un club'}</Text>
           {/* Avatar preview */}
         <View style={{ alignItems: 'center', marginBottom: 12 }}>
           {newClubPhoto ? (
@@ -273,9 +277,15 @@ export default function SocialScreen() {
             disabled={!(newClubName.trim() && newClubCity.trim())}
             onPress={() => {
               if (!(newClubName.trim() && newClubCity.trim())) return;
-              const created = createClub({ name: newClubName.trim(), desc: newClubDesc.trim(), visibility: newClubVisibility, photoUri: newClubPhoto || undefined, city: newClubCity.trim() });
-              setClubs([{ id: created.id, name: created.name, desc: created.desc || "", participants: 1, joined: true, city: (created as any).city, emoji: (created as any).emoji, photoUri: (created as any).photoUri } as any, ...clubs as any]);
+              if (editingClub && joinedClub) {
+                updateClub({ name: newClubName.trim(), desc: newClubDesc.trim(), visibility: newClubVisibility, photoUri: newClubPhoto || undefined, city: newClubCity.trim() });
+                setClubs((prev: any) => prev.map((c: any) => c.id === joinedClub.id ? { ...c, name: newClubName.trim(), desc: newClubDesc.trim(), city: newClubCity.trim(), photoUri: newClubPhoto || c.photoUri } : c));
+              } else {
+                const created = createClub({ name: newClubName.trim(), desc: newClubDesc.trim(), visibility: newClubVisibility, photoUri: newClubPhoto || undefined, city: newClubCity.trim() });
+                setClubs([{ id: created.id, name: created.name, desc: created.desc || "", participants: 1, joined: true, city: (created as any).city, emoji: (created as any).emoji, photoUri: (created as any).photoUri } as any, ...clubs as any]);
+              }
               // reset form
+              setEditingClub(false);
               setNewClubName("");
               setNewClubDesc("");
               setNewClubVisibility("public");
@@ -284,7 +294,7 @@ export default function SocialScreen() {
               setView("main");
             }}
           >
-            <Text style={{ fontWeight: "700", color: newClubName.trim() ? "#0F3327" : colors.mutedText }}>Créer le club</Text>
+            <Text style={{ fontWeight: "700", color: newClubName.trim() ? "#0F3327" : colors.mutedText }}>{editingClub ? 'Enregistrer' : 'Créer le club'}</Text>
           </TouchableOpacity>
         </View>
         </ScrollView>
@@ -298,8 +308,21 @@ export default function SocialScreen() {
       { backgroundColor: colors.background },
       selectedTab === 'clubs' && joinedClub ? { paddingBottom: 0 } : null,
     ]}> 
-      {/* ONGLETS -> components/ui/social/TabsSwitcher */}
-      <TabsSwitcher selectedTab={selectedTab} onChange={setSelectedTab} />
+      <Text style={[styles.title, { color: colors.text }]}>Social</Text>
+      <View style={[styles.tabSwitcher, { backgroundColor: colors.surfaceAlt }]}>
+        <TouchableOpacity
+          style={[styles.switcherButton, selectedTab==='clubs' && { backgroundColor: colors.accent }]}
+          onPress={() => setSelectedTab('clubs')}
+        >
+          <Text style={[styles.switcherText, { color: selectedTab==='clubs' ? '#0F3327' : colors.mutedText }]}>Club</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.switcherButton, selectedTab==='amis' && { backgroundColor: colors.accent }]}
+          onPress={() => setSelectedTab('amis')}
+        >
+          <Text style={[styles.switcherText, { color: selectedTab==='amis' ? '#0F3327' : colors.mutedText }]}>Amis</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* CLUBS */}
       {selectedTab === "clubs" && (
@@ -307,7 +330,7 @@ export default function SocialScreen() {
           <View style={{ flex: 1 }}>
             <TouchableOpacity
               onPress={() => setView("clubRanking")}
-              style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: 14, padding: 12, marginBottom: 10 }}
+              style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: 14, padding: 12, marginBottom: 10, marginTop: 18 }}
             >
               {joinedClub?.photoUri ? (
                 <Image source={{ uri: joinedClub.photoUri }} style={{ width: 30, height: 30, borderRadius: 15 }} />
@@ -317,6 +340,9 @@ export default function SocialScreen() {
                 </View>
               )}
               <Text style={{ color: colors.text, fontWeight: '700', marginLeft: 8, flex: 1 }}>{joinedClub.name}</Text>
+              <TouchableOpacity onPress={() => setShowClubQR(true)} style={{ marginRight: 10 }}>
+                <Ionicons name="share-social-outline" size={18} color={colors.accent} />
+              </TouchableOpacity>
               <Ionicons name="leaf-outline" size={16} color={colors.accent} />
               <Text style={{ color: colors.accent, fontWeight: '700', marginLeft: 6 }}>{clanTotalPoints} pts</Text>
             </TouchableOpacity>
@@ -340,7 +366,7 @@ export default function SocialScreen() {
           </View>
         ) : (
           <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
-            <View style={[styles.searchContainer, { backgroundColor: colors.surfaceAlt }]}> 
+            <View style={[styles.searchContainer, { backgroundColor: colors.surfaceAlt, marginTop: 18 }]}> 
               <Ionicons name="search" size={18} color={colors.mutedText} />
               <TextInput
                 value={clubSearch}
@@ -412,21 +438,22 @@ export default function SocialScreen() {
       {/* LISTE AMIS + RECHERCHE -> components/ui/social/FriendCard */}
       {selectedTab === "amis" && (
         <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
-          <View style={[styles.searchContainer, { backgroundColor: colors.surfaceAlt }]}> 
+          <View style={[styles.searchContainer, { backgroundColor: colors.surfaceAlt, marginTop: 18 }]}> 
             <TextInput
               value={search}
               onChangeText={setSearch}
-              placeholder="Rechercher un utilisateur..."
+              placeholder="Rechercher un ami..."
               placeholderTextColor={colors.mutedText}
               style={[styles.searchInput, { color: colors.text }]}
             />
-            <TouchableOpacity onPress={() => router.push('/amis-plus')} style={{ backgroundColor: colors.accent, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, marginLeft: 8 }}>
-              <Text style={{ color: '#0F3327', fontWeight: '700' }}>Amis +</Text>
+            <TouchableOpacity onPress={() => router.push('/amis-plus')} style={{ backgroundColor: colors.accent, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, marginLeft: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="person-add-outline" size={16} color="#0F3327" />
+              <Text style={{ color: '#0F3327', fontWeight: '700' }}>Ajouter</Text>
             </TouchableOpacity>
           </View>
 
           {(() => {
-            const me = { id: "me", name: user.firstName ?? "Utilisateur", points, avatar: user.photoURL ?? null, online: true } as any;
+            const me = { id: "me", name: user?.firstName ?? "Utilisateur", points, avatar: user?.photoURL ?? null, online: true } as any;
             const sorted = [...friends, me]
               .filter((a) => a.name.toLowerCase().includes(search.toLowerCase()))
               .sort((a, b) => b.points - a.points);
@@ -441,11 +468,6 @@ export default function SocialScreen() {
                   if (ami.id === "me") return;
                   setSelectedChat({ ...ami, type: "ami" });
                   setView("chat");
-                }}
-                actionLabel={!ami.isMe ? "S'abonner" : undefined}
-                onAction={() => {
-                  if (ami.id === 'me') return;
-                  follow({ id: ami.id, name: ami.name, avatar: ami.avatar });
                 }}
               />
             ));
@@ -479,7 +501,24 @@ export default function SocialScreen() {
               </View>
             )}
             <Text style={{ color: colors.text, fontSize: 18, fontWeight: '700', flex: 1 }}>{joinedClub?.name ?? ''}</Text>
-            <TouchableOpacity onPress={handleLeaveClub} style={{ backgroundColor: '#D93636', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10 }}>
+            <TouchableOpacity onPress={() => setShowClubQR(true)} style={{ backgroundColor: colors.surfaceAlt, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, marginRight: 8 }}>
+              <Text style={{ color: colors.text, fontWeight: '700' }}>Partager</Text>
+            </TouchableOpacity>
+            {joinedClub?.ownerId === 'me' && (
+              <TouchableOpacity onPress={() => {
+                if (!joinedClub) return;
+                setEditingClub(true);
+                setNewClubName(joinedClub.name || '');
+                setNewClubDesc(joinedClub.desc || '');
+                setNewClubVisibility((joinedClub.visibility as any) || 'public');
+                setNewClubPhoto(joinedClub.photoUri || '');
+                setNewClubCity(joinedClub.city || '');
+                setView('createClub');
+              }} style={{ backgroundColor: colors.surfaceAlt, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, marginRight: 8 }}>
+                <Text style={{ color: colors.text, fontWeight: '700' }}>Modifier</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity onPress={() => setLeaveConfirmVisible(true)} style={{ backgroundColor: '#D93636', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10 }}>
               <Text style={{ color: '#fff', fontWeight: '700' }}>Quitter</Text>
             </TouchableOpacity>
           </View>
@@ -489,9 +528,9 @@ export default function SocialScreen() {
             renderItem={({ item }) => (
               <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 8, borderRadius: 12, backgroundColor: item.isMe ? colors.accent : 'transparent' }}>
                 <Text style={{ width: 30, textAlign: 'center', color: item.isMe ? '#0F3327' : colors.text, fontWeight: '700' }}>{item.rank}</Text>
-                <Image source={{ uri: item.isMe ? user.photoURL ?? null : item.avatar }} style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10, borderWidth: 0 }} />
+                <Image source={{ uri: item.isMe ? (user?.photoURL ?? undefined) : item.avatar }} style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10, borderWidth: 0 }} />
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: item.isMe ? '#0F3327' : colors.text, fontWeight: item.isMe ? '700' : '500' }}>{item.isMe ? user.firstName ?? "Utilisateur" : item.name}</Text>
+                  <Text style={{ color: item.isMe ? '#0F3327' : colors.text, fontWeight: item.isMe ? '700' : '500' }}>{item.isMe ? (user?.firstName ?? "Utilisateur") : item.name}</Text>
                   {joinedClub && (
                     <Text style={{ color: item.isMe ? '#0F3327' : colors.mutedText, fontSize: 12 }}>
                       {joinedClub.ownerId === (item.isMe ? 'me' : item.id) ? 'Chef' : (joinedClub.officers || []).includes(item.isMe ? 'me' : item.id) ? 'Adjoint' : 'Membre'}
@@ -518,12 +557,38 @@ export default function SocialScreen() {
           />
         </View>
       )}
+      {leaveConfirmVisible && (
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Quitter le club</Text>
+            <Text style={{ color: colors.mutedText, marginTop: 6 }}>Êtes-vous sûr de quitter le club ?</Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={[styles.modalBtn, { backgroundColor: colors.accent }]} onPress={() => setLeaveConfirmVisible(false)}>
+                <Text style={{ color: '#0F3327', fontWeight: '700' }}>Rester</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, { backgroundColor: '#D93636' }]}
+                onPress={() => {
+                  setLeaveConfirmVisible(false);
+                  handleLeaveClub();
+                }}
+              >
+                <Text style={{ color: '#fff', fontWeight: '700' }}>Quitter</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16 },
+  container: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
+  title: { fontSize: 28, fontWeight: '700' },
+  tabSwitcher: { flexDirection: 'row', borderRadius: 24, padding: 4, marginTop: 20 },
+  switcherButton: { flex: 1, borderRadius: 20, paddingVertical: 10, alignItems: 'center' },
+  switcherText: { fontWeight: '600' },
   searchContainer: {
     flexDirection: "row",
     borderRadius: 20,
@@ -532,6 +597,11 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   searchInput: { marginLeft: 8, flex: 1 },
+  modalOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  modalCard: { width: '100%', maxWidth: 360, borderRadius: 16, padding: 16 },
+  modalTitle: { fontSize: 18, fontWeight: '700' },
+  modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16, gap: 10 },
+  modalBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 12 },
 });
 
 // QR modal instance for club sharing is rendered at root of this screen

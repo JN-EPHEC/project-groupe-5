@@ -9,8 +9,13 @@ export type PointsTransaction = {
 };
 
 type PointsContextType = {
+  /** Points disponibles (diminuent lors des dépenses) */
   points: number;
+  /** Alias explicite pour les points disponibles */
+  availablePoints: number;
+  /** Total cumulé gagné (ne diminue jamais) */
   totalEarned: number;
+  /** Total dépensé (pour stats) */
   totalSpent: number;
   transactions: PointsTransaction[];
   addPoints: (value: number, source?: string) => void;
@@ -53,7 +58,7 @@ export function PointsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <PointsContext.Provider value={{ points, totalEarned, totalSpent, transactions, addPoints, spendPoints }}>
+    <PointsContext.Provider value={{ points, availablePoints: points, totalEarned, totalSpent, transactions, addPoints, spendPoints }}>
       {children}
     </PointsContext.Provider>
   );
