@@ -1,3 +1,4 @@
+import { AdminNav } from "@/components/ui/(admin)/AdminNav";
 import { useThemeMode } from "@/hooks/theme-context";
 import { useRouter } from "expo-router";
 import { Text, TouchableOpacity, View } from "react-native";
@@ -29,6 +30,10 @@ export default function AdminHome() {
       >
         <Text style={{ color: colors.text, fontWeight: "600" }}>Voir les défis</Text>
       </TouchableOpacity>
+
+      {/* 🟦 BOTTOM NAVBAR ADMIN */}
+      <AdminNav />
+      
     </View>
   );
 }
