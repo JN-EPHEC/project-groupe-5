@@ -2,7 +2,6 @@ import { ActionButton } from "@/components/ui/recompenses/ActionButton";
 import { CouponCard } from "@/components/ui/recompenses/CouponCard";
 import { rewardsData } from "@/components/ui/recompenses/data";
 import { PointsCard } from "@/components/ui/recompenses/PointsCard";
-import { PremiumCard } from "@/components/ui/recompenses/PremiumCard";
 import { RewardCard } from "@/components/ui/recompenses/RewardCard";
 import { useCoupons } from "@/hooks/coupons-context";
 import { usePoints } from "@/hooks/points-context";
@@ -96,8 +95,7 @@ export default function RewardsScreen() {
         onPress={() => addPoints(50, "Partage de l'application")}
       />
 
-      {/* PREMIUM CARD */}
-      <PremiumCard onSubscribe={() => { /* TODO: subscription flow */ }} />
+      {/* PREMIUM CARD moved to Profil & Accueil */}
     </ScrollView>
   );
 }

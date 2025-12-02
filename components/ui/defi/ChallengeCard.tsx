@@ -3,7 +3,7 @@ import { useChallenges } from "@/hooks/challenges-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useMemo, useState } from "react";
-import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Challenge } from "./types";
 
 type Props = {
@@ -46,22 +46,30 @@ export function ChallengeCard({
     return false;
   }, [isOngoing, reviewCompleted, reviewRequiredCount, current, challenge.id]);
 
-  // Countdown until end of day for personal challenges
+  // Countdown until next noon (12:00)
   const [remainingMs, setRemainingMs] = useState<number>(0);
 
   useEffect(() => {
     if (!isOngoing) return;
 
-    const computeEndOfDay = () => {
+    const computeNextNoon = () => {
       const now = new Date();
-      const end = new Date(now);
-      end.setHours(23, 59, 59, 999);
-      const diff = end.getTime() - now.getTime();
+      const noonToday = new Date(now);
+      noonToday.setHours(12, 0, 0, 0);
+
+      let target = noonToday;
+      if (now.getTime() >= noonToday.getTime()) {
+        const noonTomorrow = new Date(now);
+        noonTomorrow.setDate(noonTomorrow.getDate() + 1);
+        noonTomorrow.setHours(12, 0, 0, 0);
+        target = noonTomorrow;
+      }
+      const diff = target.getTime() - now.getTime();
       setRemainingMs(Math.max(0, diff));
     };
 
-    computeEndOfDay();
-    const timer = setInterval(computeEndOfDay, 1000);
+    computeNextNoon();
+    const timer = setInterval(computeNextNoon, 1000);
     return () => clearInterval(timer);
   }, [isOngoing]);
 
@@ -153,7 +161,7 @@ export function ChallengeCard({
         <View style={styles.timerPill}>
           <Ionicons name="time-outline" size={16} color={colors.accent} />
           <Text style={[styles.timerText, { color: colors.text }]}>
-            Temps restant aujourd&apos;hui : {formatTime(remainingMs)}
+            Temps restant jusqu&apos;à midi : {formatTime(remainingMs)}
           </Text>
         </View>
       )}
@@ -190,6 +198,16 @@ export function ChallengeCard({
                 </TouchableOpacity>
               )}
             </>
+          )}
+
+          {/* Proof preview + comment above pending status */}
+          {status === "pendingValidation" && current?.id === challenge.id && current?.photoUri && (
+            <View style={{ marginTop: 12 }}>
+              <Image source={{ uri: current.photoUri }} style={{ height: 150, width: '100%', borderRadius: 16 }} />
+              {current.photoComment ? (
+                <Text style={{ color: colors.text, marginTop: 8 }}>{current.photoComment}</Text>
+              ) : null}
+            </View>
           )}
 
           {status === "pendingValidation" && (
