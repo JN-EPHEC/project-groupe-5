@@ -15,6 +15,7 @@ export type ValidationItem = {
   timeLeft: string;
   userName: string;
   photoUrl: string;
+  comment?: string;
 };
 
 type Props = {
@@ -73,6 +74,11 @@ export function ValidationCard({ item, onValidate, onReject }: Props) {
         </View>
       ) : (
         <Image source={{ uri: item.photoUrl }} style={styles.photo} />
+      )}
+
+      {/* Commentaire de l'auteur (s'il existe) */}
+      {item.comment && !hiddenProof && (
+        <Text style={{ color: colors.text, marginTop: 10 }}>{item.comment}</Text>
       )}
 
       {/* ACTIONS */}

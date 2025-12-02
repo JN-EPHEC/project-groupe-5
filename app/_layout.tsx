@@ -29,6 +29,8 @@ function RootNavigation() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="amis-plus" options={{ headerShown: false }} />
         <Stack.Screen name="calendar" options={{ headerShown: false }} />
+        <Stack.Screen name="camera" options={{ headerShown: false }} />
+        <Stack.Screen name="commentaire" options={{ headerShown: false }} />
       </Stack>
       <StatusBar style={mode === "dark" ? "light" : "dark"} />
     </>

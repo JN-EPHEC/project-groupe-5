@@ -5,6 +5,7 @@ import React, { createContext, useCallback, useContext, useMemo, useState } from
 export type ActiveChallenge = Challenge & {
   status: 'active' | 'pendingValidation' | 'validated';
   photoUri?: string;
+  photoComment?: string;
   feedbackRating?: number | null;
   feedbackComment?: string | null;
   feedbackSubmitted?: boolean; // une fois l'avis envoyé, on masque la carte du défi
@@ -25,7 +26,7 @@ type ChallengesContextType = {
   current: ActiveChallenge | null;
   start: (challenge: Challenge) => void;
   stop: (id?: number) => void;
-  validateWithPhoto: (photoUri: string) => void; // now only submits photo -> pendingValidation
+  validateWithPhoto: (photoUri: string, comment?: string) => void; // submits photo (+ optional comment) -> pendingValidation
   approveCurrent: () => void; // admin/validation step
   activities: Record<string, Challenge["category"]>;
   canceledIds: number[];
@@ -34,6 +35,7 @@ type ChallengesContextType = {
   incrementReview: () => void;
   setFeedback: (rating: number, comment: string) => void;
   history: ChallengeHistoryEntry[];
+  setPhotoComment: (comment: string) => void;
 };
 
 const ChallengesContext = createContext<ChallengesContextType | undefined>(undefined);
@@ -61,9 +63,9 @@ export function ChallengesProvider({ children }: { children: React.ReactNode }) 
   }, [current]);
 
   // user submits photo evidence -> move to pendingValidation (no points yet)
-  const validateWithPhoto = useCallback((photoUri: string) => {
+  const validateWithPhoto = useCallback((photoUri: string, comment?: string) => {
     if (current && current.status === 'active') {
-      setCurrent({ ...current, status: 'pendingValidation', photoUri });
+      setCurrent({ ...current, status: 'pendingValidation', photoUri, photoComment: comment });
       setReviewCompleted(0); // begin gating phase
     }
   }, [current]);
@@ -103,6 +105,10 @@ export function ChallengesProvider({ children }: { children: React.ReactNode }) 
     setCurrent((prev) => (prev ? { ...prev, feedbackRating: rating, feedbackComment: comment, feedbackSubmitted: true } : prev));
   }, []);
 
+  const setPhotoComment = useCallback((comment: string) => {
+    setCurrent((prev) => (prev ? { ...prev, photoComment: comment } : prev));
+  }, []);
+
   const value = useMemo(
     () => ({
       current,
@@ -117,8 +123,9 @@ export function ChallengesProvider({ children }: { children: React.ReactNode }) 
       incrementReview,
       setFeedback,
       history,
+      setPhotoComment,
     }),
-    [current, start, stop, validateWithPhoto, approveCurrent, activities, canceledIds, reviewRequiredCount, reviewCompleted, incrementReview, setFeedback, history]
+    [current, start, stop, validateWithPhoto, approveCurrent, activities, canceledIds, reviewRequiredCount, reviewCompleted, incrementReview, setFeedback, history, setPhotoComment]
   );
   return <ChallengesContext.Provider value={value}>{children}</ChallengesContext.Provider>;
 }

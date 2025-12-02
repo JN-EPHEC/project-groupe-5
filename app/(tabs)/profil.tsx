@@ -4,6 +4,7 @@ import { Header } from "@/components/ui/profil/Header";
 import { SettingsSection } from "@/components/ui/profil/SettingsSection";
 import { StatCard } from "@/components/ui/profil/StatCard";
 import { ShareQRModal } from "@/components/ui/qr/ShareQRModal";
+import PremiumCard from "@/components/ui/recompenses/PremiumCard";
 import { useClub } from "@/hooks/club-context";
 import { useFriends } from "@/hooks/friends-context";
 import { usePoints } from "@/hooks/points-context";
@@ -113,6 +114,9 @@ export default function ProfilScreen() {
 
       {/* HISTORIQUE DES DEFIS (placé juste après les points) */}
       <ChallengeHistoryList />
+
+      {/* PREMIUM: juste au-dessus de la bannière Don */}
+      <PremiumCard onSubscribe={() => { /* TODO: subscription flow */ }} />
 
       {/* BANNIÈRE DON */}
       <DonationBanner />

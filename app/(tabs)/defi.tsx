@@ -52,6 +52,7 @@ export default function DefiScreen() {
 
   const [feedbackRating, setFeedbackRating] = useState<number>(0);
   const [feedbackComment, setFeedbackComment] = useState<string>("");
+  
 
   const [rotatingChallenges, setRotatingChallenges] = useState<Challenge[]>([]);
   const [validationQueue, setValidationQueue] = useState([
@@ -216,6 +217,9 @@ export default function DefiScreen() {
         {/* PERSO TAB */}
         {activeTab === "perso" && (
           <>
+            {/* Votre preuve: retiré de cette étape. Pendant la phase "valider 3 défis",
+                on n'affiche plus la preuve ici. Elle réapparaîtra intégrée dans la carte du défi
+                (au-dessus de "En attente de validation") après cette étape. */}
             {/* Gating message */}
             {gatingActive && (
               <View
@@ -376,7 +380,7 @@ export default function DefiScreen() {
                     style={{
                       marginTop: 12,
                       borderWidth: 1,
-                      borderColor: colors.border ?? "#2A3431",
+                      borderColor: "#2A3431",
                       backgroundColor: colors.surfaceAlt,
                       color: colors.text,
                       borderRadius: 12,

@@ -10,7 +10,7 @@ export function PremiumCard({ onSubscribe }: Props) {
   return (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.surfaceAlt }]}> 
       <Text style={[styles.title, { color: colors.text }]}>Premium Green+</Text>
-      <Text style={[styles.subtitle, { color: colors.mutedText }]}>Masque les publicités, reroll tes défis quotidiens et gagne +10% de points sur les validations collectives.</Text>
+      <Text style={[styles.subtitle, { color: colors.mutedText }]}>Masque les publicités et reroll tes défis quotidiens </Text>
 
       <Text style={[styles.price, { color: colors.accent }]}>4,90€ / mois</Text>
       <Text style={[styles.caption, { color: colors.mutedText }]}>Annulable à tout moment</Text>

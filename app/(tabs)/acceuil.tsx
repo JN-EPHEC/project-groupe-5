@@ -3,6 +3,7 @@ import { HeaderProfile } from "@/components/ui/acceuil/HeaderProfile";
 import { ProgressionCard } from "@/components/ui/acceuil/ProgressionCard";
 import { RankCard } from "@/components/ui/acceuil/RankCard";
 import StreakCalendar from "@/components/ui/acceuil/StreakCalendar";
+import PremiumCard from "@/components/ui/recompenses/PremiumCard";
 import { useChallenges } from "@/hooks/challenges-context";
 import { useClub } from "@/hooks/club-context";
 import { useFriends } from "@/hooks/friends-context";
@@ -93,6 +94,9 @@ export default function AcceuilScreen() {
 
       {/* Section: Progression -> components/ui/acceuil/ProgressionCard + components/ProgressCircle */}
         <ProgressionCard done={defisFaient} total={defisTotal} pointsText="50 Points gagnés" streakText="2 jours de suite 🔥" />
+
+      {/* PREMIUM sous la progression */}
+      <PremiumCard onSubscribe={() => { /* TODO: subscription flow */ }} />
 
       {/* Section: Défi en cours (seulement si status active) */}
       {current && current.status === 'active' && (
