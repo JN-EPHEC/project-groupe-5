@@ -6,6 +6,8 @@ export type ActiveChallenge = Challenge & {
   status: 'active' | 'pendingValidation' | 'validated';
   photoUri?: string;
   photoComment?: string;
+  proofId?: string;
+  proofSubmitted?: boolean;
   feedbackRating?: number | null;
   feedbackComment?: string | null;
   feedbackSubmitted?: boolean; // une fois l'avis envoyé, on masque la carte du défi
@@ -65,8 +67,18 @@ export function ChallengesProvider({ children }: { children: React.ReactNode }) 
   // user submits photo evidence -> move to pendingValidation (no points yet)
   const validateWithPhoto = useCallback((photoUri: string, comment?: string) => {
     if (current && current.status === 'active') {
-      setCurrent({ ...current, status: 'pendingValidation', photoUri, photoComment: comment });
+      setCurrent({ ...current, status: 'pendingValidation', photoUri, photoComment: comment, proofSubmitted: false });
       setReviewCompleted(0); // begin gating phase
+      // Submit to Firestore/Storage in background with empty comment for now
+      import("@/services/proofs").then(async ({ submitProof }) => {
+        try {
+          const { id } = await submitProof(String(current.id), photoUri, comment ?? "");
+          setCurrent((prev) => (prev ? { ...prev, proofId: id, proofSubmitted: true } : prev));
+        } catch (e) {
+          // keep UI state; validators list will be empty until retry
+          // Optional: surface error elsewhere
+        }
+      });
     }
   }, [current]);
 
@@ -107,7 +119,12 @@ export function ChallengesProvider({ children }: { children: React.ReactNode }) 
 
   const setPhotoComment = useCallback((comment: string) => {
     setCurrent((prev) => (prev ? { ...prev, photoComment: comment } : prev));
-  }, []);
+    // If a proof already exists, update its comment in Firestore
+    import("@/services/proofs").then(({ updateProofComment }) => {
+      const id = current?.proofId;
+      if (id) updateProofComment(id, comment).catch(() => {});
+    });
+  }, [current?.proofId]);
 
   const value = useMemo(
     () => ({

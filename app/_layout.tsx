@@ -32,6 +32,7 @@ function RootNavigation() {
         <Stack.Screen name="camera" options={{ headerShown: false }} />
         <Stack.Screen name="commentaire" options={{ headerShown: false }} />
         <Stack.Screen name="premium" options={{ headerShown: false }} />
+        <Stack.Screen name="validation" options={{ headerShown: false }} />
       </Stack>
       <StatusBar style={mode === "dark" ? "light" : "dark"} />
     </>
