@@ -4,13 +4,16 @@ import { ProgressionCard } from "@/components/ui/acceuil/ProgressionCard";
 import { RankCard } from "@/components/ui/acceuil/RankCard";
 import StreakCalendar from "@/components/ui/acceuil/StreakCalendar";
 import PremiumCard from "@/components/ui/recompenses/PremiumCard";
+import { auth, db } from "@/firebaseConfig";
 import { useChallenges } from "@/hooks/challenges-context";
 import { useClub } from "@/hooks/club-context";
 import { useFriends } from "@/hooks/friends-context";
 import { usePoints } from "@/hooks/points-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { useUser } from "@/hooks/user-context";
+import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
+import { addDoc, collection, onSnapshot } from "firebase/firestore";
 import { Image, ScrollView as RNScrollView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function AcceuilScreen() {
@@ -21,6 +24,36 @@ export default function AcceuilScreen() {
   const { joinedClub, members } = useClub();
   const { current } = useChallenges();
   const { friends } = useFriends();
+  const startSubscription = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      alert("Tu dois être connecté.");
+      return;
+    }
+    try {
+      const sessionRef = await addDoc(
+        collection(db, "customers", user.uid, "checkout_sessions"),
+        {
+          price: "price_1SZwHCCh6MpiIMZkbiSw63ty",
+          mode: "subscription",
+          success_url: "https://example.com/success",
+          cancel_url: "https://example.com/cancel",
+        }
+      );
+      onSnapshot(sessionRef, (snap) => {
+        const data = snap.data();
+        if (!data) return;
+        if (data.error) {
+          alert(data.error.message);
+        }
+        if (data.url) {
+          Linking.openURL(data.url);
+        }
+      });
+    } catch (e: any) {
+      alert(e?.message || "Une erreur est survenue.");
+    }
+  };
 
   const defisFaient = 2; // TODO: derive from real data
   const defisTotal = 5;  // TODO: derive from real data
@@ -96,7 +129,7 @@ export default function AcceuilScreen() {
         <ProgressionCard done={defisFaient} total={defisTotal} pointsText="50 Points gagnés" streakText="2 jours de suite 🔥" />
 
       {/* PREMIUM sous la progression */}
-      <PremiumCard onSubscribe={() => { /* TODO: subscription flow */ }} />
+      <PremiumCard onSubscribe={startSubscription} />
 
       {/* Section: Défi en cours (seulement si status active) */}
       {current && current.status === 'active' && (

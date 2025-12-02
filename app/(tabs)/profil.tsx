@@ -5,13 +5,16 @@ import { SettingsSection } from "@/components/ui/profil/SettingsSection";
 import { StatCard } from "@/components/ui/profil/StatCard";
 import { ShareQRModal } from "@/components/ui/qr/ShareQRModal";
 import PremiumCard from "@/components/ui/recompenses/PremiumCard";
+import { auth, db } from "@/firebaseConfig";
 import { useClub } from "@/hooks/club-context";
 import { useFriends } from "@/hooks/friends-context";
 import { usePoints } from "@/hooks/points-context";
 import { useSubscriptions } from "@/hooks/subscriptions-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { useUser } from "@/hooks/user-context";
+import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
+import { addDoc, collection, onSnapshot } from "firebase/firestore";
 import { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
@@ -25,6 +28,36 @@ export default function ProfilScreen() {
   const { friends } = useFriends();
   const { followers, following } = useSubscriptions();
   const router = useRouter();
+  const startSubscription = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      alert("Tu dois être connecté.");
+      return;
+    }
+    try {
+      const sessionRef = await addDoc(
+        collection(db, "customers", user.uid, "checkout_sessions"),
+        {
+          price: "price_1SZwHCCh6MpiIMZkbiSw63ty",
+          mode: "subscription",
+          success_url: "https://example.com/success",
+          cancel_url: "https://example.com/cancel",
+        }
+      );
+      onSnapshot(sessionRef, (snap) => {
+        const data = snap.data();
+        if (!data) return;
+        if (data.error) {
+          alert(data.error.message);
+        }
+        if (data.url) {
+          Linking.openURL(data.url);
+        }
+      });
+    } catch (e: any) {
+      alert(e?.message || "Une erreur est survenue.");
+    }
+  };
 
   // Classement entre amis
   const friendRankLabel = useMemo(() => {
@@ -116,7 +149,7 @@ export default function ProfilScreen() {
       <ChallengeHistoryList />
 
       {/* PREMIUM: juste au-dessus de la bannière Don */}
-      <PremiumCard onSubscribe={() => { /* TODO: subscription flow */ }} />
+      <PremiumCard onSubscribe={startSubscription} />
 
       {/* BANNIÈRE DON */}
       <DonationBanner />
