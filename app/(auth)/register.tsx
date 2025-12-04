@@ -4,9 +4,11 @@ import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import React, { useMemo, useState } from "react";
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -81,86 +83,150 @@ export default function Register() {
       style={{ flex: 1 }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <View style={styles.container}>
-        <Text style={styles.title}>Créer un compte</Text>
-
-        <TextInput
-          style={styles.input}
-          placeholder="Prénom"
-          value={firstName}
-          onChangeText={setFirstName}
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Nom"
-          value={lastName}
-          onChangeText={setLastName}
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Code postal"
-          keyboardType="numeric"
-          value={postalCode}
-          onChangeText={setPostalCode}
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Date de naissance (JJ/MM/AAAA)"
-          value={birthDate}
-          onChangeText={setBirthDate}
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          autoCapitalize="none"
-          keyboardType="email-address"
-          value={email}
-          onChangeText={setEmail}
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Mot de passe (min. 6 caractères)"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
-
-        <Pressable
-          style={[styles.btn, !canSubmit && { opacity: 0.5 }]}
-          onPress={handleRegister}
-          disabled={!canSubmit}
+      <View style={styles.root}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.btnText}>Créer un compte</Text>
-        </Pressable>
+          <View style={styles.logoRow}>
+            <Image
+              source={require("../../assets/images/greenup-logo.png")}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          </View>
 
-        <Pressable onPress={() => router.push("/login")}>
-          <Text style={styles.link}>Déjà un compte ? Se connecter</Text>
-        </Pressable>
+          <View style={styles.card}>
+            <Text style={styles.title}>Créer un compte</Text>
+
+            <TextInput
+              style={styles.input}
+              placeholder="Prénom"
+              placeholderTextColor={palette.placeholder}
+              value={firstName}
+              onChangeText={setFirstName}
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Nom"
+              placeholderTextColor={palette.placeholder}
+              value={lastName}
+              onChangeText={setLastName}
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Code postal"
+              placeholderTextColor={palette.placeholder}
+              keyboardType="numeric"
+              value={postalCode}
+              onChangeText={setPostalCode}
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Date de naissance (JJ/MM/AAAA)"
+              placeholderTextColor={palette.placeholder}
+              value={birthDate}
+              onChangeText={setBirthDate}
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              placeholderTextColor={palette.placeholder}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              value={email}
+              onChangeText={setEmail}
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Mot de passe (min. 6 caractères)"
+              placeholderTextColor={palette.placeholder}
+              secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+            />
+
+            <Pressable
+              style={[styles.btn, !canSubmit && styles.btnDisabled]}
+              onPress={handleRegister}
+              disabled={!canSubmit}
+            >
+              <Text style={styles.btnText}>Créer un compte</Text>
+            </Pressable>
+
+            <Pressable onPress={() => router.push("/login")}> 
+              <Text style={styles.link}>Déjà un compte ? Se connecter</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
       </View>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, justifyContent: "center", gap: 12 },
-  title: { fontSize: 22, fontWeight: "700", marginBottom: 6 },
-  input: {
+  root: {
+    flex: 1,
+    backgroundColor: "#000000",
+  },
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingBottom: 48,
+    paddingTop: 70,
+  },
+  logoRow: {
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  logo: {
+    width: 340,
+    height: 152,
+  },
+  card: {
+    backgroundColor: "#121212",
+    borderRadius: 28,
+    paddingHorizontal: 24,
+    paddingVertical: 32,
     borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 12,
-    padding: 12,
+    borderColor: "#1F1F1F",
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  input: {
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: "#101010",
+    borderWidth: 1,
+    borderColor: "#181818",
+    color: "#FFFFFF",
+    fontWeight: "600",
+    marginBottom: 16,
   },
   btn: {
-    backgroundColor: "#111",
-    padding: 14,
-    borderRadius: 12,
+    backgroundColor: "#58D38C",
+    paddingVertical: 16,
+    borderRadius: 24,
     alignItems: "center",
+    marginTop: 8,
   },
-  btnText: { color: "white", fontWeight: "600" },
-  link: { marginTop: 10, color: "#333", textAlign: "center" },
+  btnDisabled: {
+    opacity: 0.5,
+  },
+  btnText: { color: "#00231A", fontWeight: "700", fontSize: 16 },
+  link: { marginTop: 18, color: "#58D38C", textAlign: "center", fontWeight: "600" },
 });
+
+const palette = {
+  placeholder: "#616161",
+};

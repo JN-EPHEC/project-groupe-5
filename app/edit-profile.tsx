@@ -1,5 +1,6 @@
 import { useThemeMode } from "@/hooks/theme-context";
 import { useUser } from "@/hooks/user-context";
+import { uploadProfilePhoto } from "@/services/profile";
 import * as ImagePicker from "expo-image-picker";
 import { Stack, useRouter } from "expo-router";
 import { doc, setDoc } from "firebase/firestore";
@@ -33,13 +34,30 @@ export default function EditProfileScreen() {
     } catch {}
   }
 
+  const isRemoteUri = (uri: string | null) => Boolean(uri && /^https?:\/\//i.test(uri));
+
   async function save() {
     if (!canSave || !auth.currentUser) return;
     setSaving(true);
     try {
       const ref = doc(db, "users", auth.currentUser.uid);
-      // Merge fields; if doc doesn't exist yet, create it
-      await setDoc(ref, { username: username || null, bio: bio || null, photoURL: photoURL || null }, { merge: true });
+      let nextPhotoURL: string | null = photoURL ?? null;
+
+      if (photoURL && !isRemoteUri(photoURL)) {
+        nextPhotoURL = await uploadProfilePhoto(photoURL);
+        setPhotoURL(nextPhotoURL);
+      }
+
+      const payload: Record<string, any> = {
+        username: username || null,
+        bio: bio || null,
+      };
+
+      if ((nextPhotoURL ?? null) !== (user?.photoURL ?? null)) {
+        payload.photoURL = nextPhotoURL ?? null;
+      }
+
+      await setDoc(ref, payload, { merge: true });
       Alert.alert("Profil mis à jour");
       router.back();
     } catch (e: any) {

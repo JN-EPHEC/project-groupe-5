@@ -4,6 +4,7 @@ import {
     arrayRemove,
     arrayUnion,
     collection,
+    deleteDoc,
     doc,
     getDoc,
     serverTimestamp,
@@ -102,6 +103,34 @@ export async function leaveClub(clubId: string) {
 }
 
 // -------------------------------------------------------------
+// 🗑️ Supprimer un club (dernier membre / propriétaire uniquement)
+// -------------------------------------------------------------
+export async function deleteClub(clubId: string) {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error("Non connecté.");
+
+  const clubRef = doc(db, "clubs", clubId);
+  const snapshot = await getDoc(clubRef);
+  if (!snapshot.exists()) {
+    await updateDoc(doc(db, "users", uid), { clubId: null });
+    return;
+  }
+
+  const data = snapshot.data() as any;
+  if (data.ownerId !== uid) {
+    throw new Error("Seul le chef peut supprimer le club.");
+  }
+
+  const members = Array.isArray(data.members) ? data.members : [];
+  if (members.length > 1) {
+    throw new Error("Impossible de supprimer un club qui compte encore des membres.");
+  }
+
+  await deleteDoc(clubRef);
+  await updateDoc(doc(db, "users", uid), { clubId: null });
+}
+
+// -------------------------------------------------------------
 // GET CLUB DATA
 // -------------------------------------------------------------
 export async function getClub(clubId: string) {
@@ -128,4 +157,24 @@ export async function promoteOfficer(clubId: string, uid: string) {
 
 export async function demoteOfficer(clubId: string, uid: string) {
   await updateDoc(doc(db, "clubs", clubId), { officers: arrayRemove(uid) });
+}
+
+export async function transferOwnership(clubId: string, newOwnerId: string) {
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error("Non connecté.");
+
+  const clubRef = doc(db, "clubs", clubId);
+  const snapshot = await getDoc(clubRef);
+  if (!snapshot.exists()) throw new Error("Club introuvable.");
+
+  const data = snapshot.data() as any;
+  if (data.ownerId !== currentUser.uid) {
+    throw new Error("Seul le chef peut transférer le club.");
+  }
+
+  await updateDoc(clubRef, {
+    ownerId: newOwnerId,
+    members: arrayUnion(newOwnerId),
+    officers: arrayRemove(newOwnerId),
+  });
 }
