@@ -11,7 +11,8 @@ export type ChallengeCategory = Exclude<CategoryKey, "Tous">;
 export type TabKey = "perso" | "club";
 
 export type Challenge = {
-  id: number;
+  id: number;                     // UI ID
+  firestoreId?: string;           // REAL Firestore ID (optional)
   title: string;
   description: string;
   category: ChallengeCategory;
@@ -19,15 +20,4 @@ export type Challenge = {
   points: number;
   audience: string;
   timeLeft: string;
-};
-
-export type ClubChallenge = {
-  id: number;
-  title: string;
-  description: string;
-  category: ChallengeCategory;
-  difficulty: "Facile" | "Moyen" | "Difficile";
-  points: number;
-  goalParticipants: number; // e.g., 46
-  participants: number; // current count
 };

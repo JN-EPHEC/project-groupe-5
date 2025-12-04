@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
 
 export type ClubVisibility = "public" | "private";
-export type ClubInfo = { id: string; name: string; participants: number; desc?: string; visibility?: ClubVisibility; emoji?: string; photoUri?: string; city?: string; ownerId?: string; officers?: string[] };
+export type ClubInfo = { id: string; name: string; participants: number; desc?: string; visibility?: ClubVisibility; emoji?: string; photoUri?: string; city?: string; ownerId?: string; officers?: string[]; logo?: string };
 export type ClubMember = { id: string; name: string; avatar: string; points: number };
 
 type ClubContextType = {
