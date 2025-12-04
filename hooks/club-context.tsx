@@ -15,84 +15,126 @@ type ClubContextType = {
   updateClub: (patch: Partial<Omit<ClubInfo, 'id' | 'participants'>>) => void;
 };
 
-const ClubContext = createContext<ClubContextType | undefined>(undefined);
+interface ClubContextType {
+  joinedClub: any;
+  members: any[];
+  createClub: (c: any) => Promise<any>;
+  joinClub: (c: any) => Promise<void>;
+  leaveClub: () => Promise<void>;
+  updateClub: (data: any) => Promise<void>;
+  promoteToOfficer: (uid: string) => Promise<void>;
+  demoteOfficer: (uid: string) => Promise<void>;
+}
 
-export function ClubProvider({ children }: { children: React.ReactNode }) {
-  const [joinedClub, setJoinedClub] = useState<ClubInfo | null>(null);
-  const [members, setMembers] = useState<ClubMember[]>([]);
+const ClubContext = createContext<ClubContextType>({
+  joinedClub: null,
+  members: [],
+  createClub: async () => {},
+  joinClub: async () => {},
+  leaveClub: async () => {},
+  updateClub: async () => {},
+  promoteToOfficer: async () => {},
+  demoteOfficer: async () => {},
+});
 
-  const joinClub = useCallback((club: ClubInfo) => {
-    // if already in a different club, refuse
-    if (joinedClub && joinedClub.id !== club.id) {
-      return false;
-    }
-    // if not in a club, set and hydrate members from amisData as placeholder
-    if (!joinedClub) {
-      setJoinedClub({ id: club.id, name: club.name, participants: club.participants, desc: club.desc, visibility: club.visibility, emoji: club.emoji, photoUri: club.photoUri, city: club.city, ownerId: club.ownerId ?? club.ownerId ?? undefined, officers: club.officers ?? [] });
-      // generate club members (excluding current user). We'll create N-1 generic members
-      const total = Math.max(1, club.participants);
-      const generated: ClubMember[] = Array.from({ length: Math.max(0, total - 1) }).map((_, idx) => {
-        const id = String(idx + 1);
-        const gender = idx % 2 === 0 ? "men" : "women";
-        const avatar = `https://randomuser.me/api/portraits/${gender}/${(idx % 80) + 1}.jpg`;
-        const name = gender === "men" ? `Alex ${idx + 1}` : `Lina ${idx + 1}`;
-        const points = 200 + ((idx * 37) % 500); // pseudo-random stable points
-        return { id, name, avatar, points };
+export const ClubProvider = ({ children }: any) => {
+  const [joinedClub, setJoinedClub] = useState<any>(null);
+  const [members, setMembers] = useState<any[]>([]);
+
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+
+    const userRef = doc(db, "users", uid);
+
+    const unsub = onSnapshot(userRef, (snap) => {
+      const data = snap.data();
+      if (data?.clubId) {
+        subscribeToClub(data.clubId);
+      } else {
+        setJoinedClub(null);
+        setMembers([]);
+      }
+    });
+
+    return () => unsub();
+  }, []);
+
+  const subscribeToClub = (clubId: string) => {
+    const clubRef = doc(db, "clubs", clubId);
+    return onSnapshot(clubRef, (snap) => {
+      const data: any = snap.data();
+      if (!data) {
+        setJoinedClub(null);
+        setMembers([]);
+        return;
+      }
+
+      setJoinedClub({
+        id: clubId,
+        name: data.name,
+        desc: data.description ?? data.desc,
+        city: data.city,
+        photoUri: data.photoUrl,
+        ownerId: data.ownerId,
+        visibility: data.visibility,
+        officers: data.officers || [],
       });
-      setMembers(generated);
-    }
-    return true;
-  }, [joinedClub]);
 
-  const leaveClub = useCallback(() => {
-    setJoinedClub(null);
-    setMembers([]);
-  }, []);
+      const memberList = (data.members || []).map((uid: string) => ({
+        id: uid,
+        points: 0,
+        name: uid,
+        avatar: null,
+      }));
 
-  const createClub = useCallback((data: { name: string; desc: string; visibility: ClubVisibility; emoji?: string; photoUri?: string; city: string }) => {
-    const newClub: ClubInfo = {
-      id: Date.now().toString(),
-      name: data.name,
-      participants: 1,
-      desc: data.desc,
-      visibility: data.visibility,
-      emoji: data.emoji,
-      photoUri: data.photoUri,
-      city: data.city,
-      ownerId: 'me',
-      officers: [],
-    };
-    // auto-join creator
-    joinClub(newClub);
-    return newClub;
-  }, [joinClub]);
-
-  const promoteToOfficer = useCallback((memberId: string) => {
-    setJoinedClub((c) => {
-      if (!c) return c;
-      const officers = Array.from(new Set([...(c.officers || []), memberId]));
-      return { ...c, officers };
+      setMembers(memberList);
     });
-  }, []);
+  };
 
-  const demoteOfficer = useCallback((memberId: string) => {
-    setJoinedClub((c) => {
-      if (!c) return c;
-      const officers = (c.officers || []).filter((id) => id !== memberId);
-      return { ...c, officers };
-    });
-  }, []);
+  return (
+    <ClubContext.Provider
+      value={{
+        joinedClub,
+        members,
 
-  const updateClub = useCallback((patch: Partial<Omit<ClubInfo, 'id' | 'participants'>>) => {
-    setJoinedClub((c) => (c ? { ...c, ...patch } : c));
-  }, []);
+        createClub: async (c) => {
+          return await createClubService(c.name, c.city, c.desc, c.photoUri);
+        },
 
-  const value = useMemo(() => ({ joinedClub, members, joinClub, leaveClub, createClub, promoteToOfficer, demoteOfficer, updateClub }), [joinedClub, members, joinClub, leaveClub, createClub, promoteToOfficer, demoteOfficer, updateClub]);
-  return <ClubContext.Provider value={value}>{children}</ClubContext.Provider>;
-}
+        joinClub: async (c) => {
+          await joinClubService(c.id);
+        },
 
-export function useClub() {
-  const ctx = useContext(ClubContext);
-  if (!ctx) throw new Error("useClub must be used within a ClubProvider");
-  return ctx;
-}
+        leaveClub: async () => {
+          if (!joinedClub?.id) return;
+          await leaveClubService(joinedClub.id);
+        },
+
+        updateClub: async (data) => {
+          if (!joinedClub?.id) return;
+          await updateClubFirebase(joinedClub.id, {
+            name: data.name,
+            description: data.desc,
+            city: data.city,
+            photoUri: data.photoUri,
+          });
+        },
+
+        promoteToOfficer: async (uid) => {
+          if (!joinedClub?.id) return;
+          await promoteOfficerService(joinedClub.id, uid);
+        },
+
+        demoteOfficer: async (uid) => {
+          if (!joinedClub?.id) return;
+          await demoteOfficerService(joinedClub.id, uid);
+        },
+      }}
+    >
+      {children}
+    </ClubContext.Provider>
+  );
+};
+
+export const useClub = () => useContext(ClubContext);

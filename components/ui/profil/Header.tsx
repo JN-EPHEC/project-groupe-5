@@ -10,9 +10,9 @@ export const Header = () => {
     <View style={styles.header}>
       <View style={styles.avatarContainer}>
         {user?.photoURL ? (
-          <Image source={{ uri: user.photoURL }} style={{ width: 60, height: 60, borderRadius: 30 }} />
+          <Image source={{ uri: user.photoURL }} style={styles.avatarImage} />
         ) : (
-          <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: '#1F2A27' }} />
+          <View style={styles.avatarPlaceholder} />
         )}
         <View style={styles.badge}>
           <Text style={styles.badgeText}>10</Text>
@@ -26,7 +26,9 @@ export const Header = () => {
 
 const styles = StyleSheet.create({
   header: { alignItems: "center", marginTop: 40, marginBottom: 20 },
-  avatarContainer: { backgroundColor: "#EF4444", borderRadius: 60, padding: 25, position: "relative" },
+  avatarContainer: { position: "relative", alignItems: 'center', justifyContent: 'center' },
+  avatarImage: { width: 80, height: 80, borderRadius: 40 },
+  avatarPlaceholder: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#1F2A27' },
   badge: { position: "absolute", bottom: 5, right: 0, backgroundColor: "#10B981", borderRadius: 15, paddingHorizontal: 8, paddingVertical: 2 },
   badgeText: { color: "#fff", fontWeight: "bold" },
   name: { color: "#fff", fontSize: 22, fontWeight: "bold", marginTop: 10 },

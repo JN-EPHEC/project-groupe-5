@@ -1,42 +1,6 @@
 // components/ui/social/data.ts
 
-export const clubsData = [
-  {
-    id: "1",
-    name: "Les Jardiniers Urbains",
-    desc: "Cultive des potagers partagés en ville 🌱",
-    participants: 42,
-    joined: false,
-  },
-  {
-    id: "2",
-    name: "Cyclistes Solidaires",
-    desc: "Promouvoir la mobilité douce 🚲",
-    participants: 18,
-    joined: false,
-  },
-  {
-    id: "3",
-    name: "Zéro Déchet",
-    desc: "Réduire les emballages à usage unique ♻️",
-    participants: 25,
-    joined: false,
-  },
-  {
-    id: "4",
-    name: "Marche Verte",
-    desc: "Organisation de marches écologiques 🌍",
-    participants: 60,
-    joined: false,
-  },
-  {
-    id: "5",
-    name: "Les Abeilles Libres",
-    desc: "Protection des pollinisateurs 🐝",
-    participants: 34,
-    joined: false,
-  },
-];
+
 
 export const defisData = [
   {

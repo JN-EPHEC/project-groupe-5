@@ -1,0 +1,94 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- CLUBS ---
+    match /clubs/{clubId} {
+
+      // Lire les clubs → autorisé à tous les utilisateurs connectés
+      allow read: if request.auth != null;
+
+      // Créer un club → autorisé si l’utilisateur est connecté
+      allow create: if request.auth != null;
+
+      // Mettre à jour un club :
+      // - le propriétaire peut modifier
+      // - un membre peut mettre à jour
+      // - tout utilisateur connecté peut modifier uniquement le champ 'members' (pour rejoindre/quitter)
+      allow update: if request.auth != null && (
+        request.auth.uid == resource.data.ownerId ||
+        request.auth.uid in resource.data.members ||
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(['members'])
+      );
+
+      allow delete: if false;
+    }
+
+    // ----------------------------------------------------
+    // PREUVES
+    // ----------------------------------------------------
+    match /preuves/{preuveId} {
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.userId;
+
+      allow read, update: if request.auth != null
+        && (
+          request.auth.uid == resource.data.userId ||
+          resource.data.assignedValidators.hasAny([request.auth.uid])
+        );
+
+      allow delete: if false;
+    }
+
+    // ----------------------------------------------------
+    // USERS + FRIEND SYSTEM
+    // ----------------------------------------------------
+    match /users/{userId} {
+
+      // 🔎 Tous les utilisateurs connectés peuvent lire les profils
+      allow read: if request.auth != null;
+
+      // ✏️ Seul le propriétaire peut modifier SON doc user
+      allow write: if request.auth != null && request.auth.uid == userId;
+
+      // ---------------------------
+      // FRIEND REQUESTS SUBCOLLECTION
+      // users/{targetId}/friendRequests/{requestId}
+      // ---------------------------
+      match /friendRequests/{requestId} {
+
+        // 📌 Lecture : uniquement le destinataire
+        allow read: if request.auth != null && request.auth.uid == userId;
+
+        // ✉️ Création par l'expéditeur : le champ 'from' doit correspondre à l'UID authentifié
+        allow create: if request.auth != null && request.resource.data.from == request.auth.uid && request.resource.data.status == 'pending';
+
+        // ☑️ Accepter / Refuser → uniquement par le destinataire
+        allow update: if request.auth != null && request.auth.uid == userId;
+
+        // ❌ Suppression uniquement par le destinataire (pour nettoyer après rejet)
+        allow delete: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // ---------------------------
+      // FRIENDS SUBCOLLECTION
+      // users/{uid}/friends/{friendId}
+      // ---------------------------
+      match /friends/{friendId} {
+        // Owner can read their friends
+        allow read: if request.auth != null && request.auth.uid == userId;
+        // Allow creation by either owner or the counterpart friend (to write symmetric relation)
+        allow create: if request.auth != null && (request.auth.uid == userId || request.auth.uid == friendId);
+        // Updates/deletes restricted to owner
+        allow update, delete: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // ----------------------------------------------------
+    // DEFIS
+    // ----------------------------------------------------
+    match /defis/{defiId} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
