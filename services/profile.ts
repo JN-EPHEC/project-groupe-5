@@ -1,7 +1,7 @@
 import { auth, db, storage } from "@/firebaseConfig";
+import * as FileSystem from "expo-file-system";
 import { doc, updateDoc } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import * as FileSystem from "expo-file-system";
 import { Platform } from "react-native";
 
 const PROFILE_STORAGE_SEGMENT = "photoDeProfilUser";
