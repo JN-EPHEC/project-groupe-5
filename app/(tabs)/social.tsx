@@ -1,8 +1,9 @@
 import { useThemeMode } from "@/hooks/theme-context";
 import { useMemo, useRef, useState } from "react";
-import { Alert, Button, FlatList, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, FlatList, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
   
 // Composants UI
+import { GradientButton } from "@/components/ui/common/GradientButton";
 import { ChatView } from "@/components/ui/social/ChatView";
 import { ClubCard } from "@/components/ui/social/ClubCard";
 import { FriendCard } from "@/components/ui/social/FriendCard";
@@ -11,12 +12,13 @@ import { FriendCard } from "@/components/ui/social/FriendCard";
 import { ShareQRModal } from "@/components/ui/qr/ShareQRModal";
 // clubsData removed; clubs list now comes from Firestore
 import { auth, db } from "@/firebaseConfig";
+import type { ClubInfo } from "@/hooks/club-context";
 import { useClub } from "@/hooks/club-context";
 import { useFriends } from "@/hooks/friends-context";
 import { usePoints } from "@/hooks/points-context";
 import { useSubscriptions } from "@/hooks/subscriptions-context";
 import { useUser } from "@/hooks/user-context";
-import { acceptFriendRequest, rejectFriendRequest, searchUsers, sendFriendRequest } from "@/services/friends";
+import { acceptFriendRequest, rejectFriendRequest, removeFriend, searchUsers, sendFriendRequest } from "@/services/friends";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -39,15 +41,15 @@ export default function SocialScreen() {
   const [showClubQR, setShowClubQR] = useState(false);
   const [messages, setMessages] = useState<any[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
   const [friendSearchText, setFriendSearchText] = useState("");
   const [friendSearchResults, setFriendSearchResults] = useState<any[]>([]);
   const [friendRequests, setFriendRequests] = useState<any[]>([]);
   const [friendsLive, setFriendsLive] = useState<any[]>([]);
   const [friendProfiles, setFriendProfiles] = useState<Record<string, any>>({});
+  const [sentRequestIds, setSentRequestIds] = useState<string[]>([]);
   const [clubSearch, setClubSearch] = useState("");
   const [clubs, setClubs] = useState<any[]>([]);
-  const { joinedClub, joinClub, leaveClub, members, createClub, promoteToOfficer, demoteOfficer, updateClub } = useClub();
+  const { joinedClub, joinClub, leaveClub, members, createClub, promoteToOfficer, demoteOfficer, updateClub, transferOwnership, deleteClub } = useClub();
   const { points } = usePoints();
   const { user } = useUser();
   const params = useLocalSearchParams();
@@ -56,6 +58,10 @@ export default function SocialScreen() {
   const { friends } = useFriends();
   // Modal de confirmation pour quitter le club
   const [leaveConfirmVisible, setLeaveConfirmVisible] = useState(false);
+  const [requireOwnerTransfer, setRequireOwnerTransfer] = useState(false);
+  const [newOwnerId, setNewOwnerId] = useState<string | null>(null);
+  const [pendingLeaveClub, setPendingLeaveClub] = useState<ClubInfo | null>(null);
+  const [deleteOnLeave, setDeleteOnLeave] = useState(false);
 
   const initFromParams = useRef(false);
   useEffect(() => {
@@ -81,6 +87,8 @@ export default function SocialScreen() {
           emoji: "🌿",
           participants: (d.members || []).length,
           joined: (d.members || []).includes(auth.currentUser?.uid || ""),
+          ownerId: d.ownerId,
+          officers: d.officers || [],
         };
       });
       setClubs(firebaseClubs);
@@ -116,31 +124,151 @@ export default function SocialScreen() {
     setMessages((prev) => [...prev, { id: Date.now().toString(), imageUri: uri, type: 'image', sender: 'me' }]);
   };
 
+  const handleRemoveFriend = (friendId: string, friendName: string) => {
+    Alert.alert(
+      "Supprimer cet ami ?",
+      `Tu ne verras plus ${friendName} dans ta liste d'amis.`,
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Supprimer",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await removeFriend(friendId);
+              setFriendsLive((prev) => prev.filter((entry) => entry.id !== friendId));
+              setFriendProfiles((prev) => {
+                if (!(friendId in prev)) return prev;
+                const next = { ...prev };
+                delete next[friendId];
+                return next;
+              });
+            } catch (error) {
+              Alert.alert("Erreur", "Impossible de supprimer cet ami pour le moment.");
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleAcceptRequest = async (request: any) => {
+    if (!currentUid) return;
+    try {
+      await acceptFriendRequest(currentUid, request.id, request.from);
+    } catch (error) {
+      console.warn("acceptFriendRequest error", error);
+      Alert.alert("Erreur", "Impossible d'accepter la demande pour le moment.");
+    }
+  };
+
+  const handleRejectRequest = async (request: any) => {
+    if (!currentUid) return;
+    try {
+      await rejectFriendRequest(currentUid, request.id);
+    } catch (error) {
+      console.warn("rejectFriendRequest error", error);
+      Alert.alert("Erreur", "Impossible de refuser la demande pour le moment.");
+    }
+  };
+
+  const currentUid = auth.currentUser?.uid;
+
+  const promptLeaveClub = (target?: Partial<ClubInfo> & { id: string }) => {
+    const referenceClub = joinedClub ?? (target ? ({
+      id: target.id,
+      participants: target.participants ?? 0,
+      name: target.name ?? "",
+      desc: target.desc,
+      visibility: target.visibility,
+      emoji: target.emoji,
+      photoUri: target.photoUri,
+      city: target.city,
+      ownerId: target.ownerId,
+      officers: target.officers,
+      logo: target.logo,
+    } as ClubInfo) : null);
+
+    if (!referenceClub) return;
+
+    setPendingLeaveClub(referenceClub);
+    setNewOwnerId(null);
+
+    const ownerId = referenceClub.ownerId ?? joinedClub?.ownerId ?? null;
+
+    let requiresTransfer = false;
+    let shouldDelete = false;
+
+    if (ownerId && ownerId === currentUid) {
+      const candidates = members.filter((member) => member.id !== currentUid);
+      if (candidates.length > 0) {
+        requiresTransfer = true;
+      } else {
+        shouldDelete = true;
+      }
+    }
+
+    setRequireOwnerTransfer(requiresTransfer);
+    setDeleteOnLeave(shouldDelete);
+    setLeaveConfirmVisible(true);
+  };
+
   const clubRankingData = useMemo(() => {
-    const base = members.map((m) => ({ ...m, isMe: false }));
-    const me = {
-      id: auth.currentUser?.uid || "me",
-      name: user?.firstName ?? "Utilisateur",
-      avatar: user?.photoURL ?? null,
-      isMe: true,
-      points: points || 0,
-    } as any;
-    const all = [...base, me];
-    return all
+    const roster = members.map((member) => ({
+      ...member,
+      isMe: member.id === currentUid,
+    }));
+
+    if (currentUid && !roster.some((m) => m.id === currentUid)) {
+      roster.push({
+        id: currentUid,
+        name: user?.firstName ?? "Utilisateur",
+        avatar: user?.photoURL ?? null,
+        points: points || 0,
+        isMe: true,
+      } as any);
+    }
+
+    return roster
       .sort((a, b) => (b.points || 0) - (a.points || 0))
       .map((m, idx) => ({ ...m, rank: idx + 1 }));
-  }, [members, points, user]);
+  }, [members, points, user, currentUid]);
 
   const clanTotalPoints = useMemo(() => {
-    const membersSum = members.reduce((s, m) => s + (m.points || 0), 0);
-    return membersSum + (points || 0);
-  }, [members, points]);
+    const total = members.reduce((sum, member) => sum + (member.points || 0), 0);
+    if (currentUid && members.some((member) => member.id === currentUid)) {
+      return total;
+    }
+    return total + (points || 0);
+  }, [members, points, currentUid]);
 
   // no early return; keep tabs visible in all views
 
   const handleLeaveClub = async () => {
-    await leaveClub();
-    setView("main");
+    if (requireOwnerTransfer && !newOwnerId) {
+      Alert.alert("Sélection requise", "Choisis un nouveau chef avant de quitter.");
+      return;
+    }
+
+    setLeaveConfirmVisible(false);
+    try {
+      if (deleteOnLeave) {
+        await deleteClub(pendingLeaveClub?.id);
+      } else {
+        if (requireOwnerTransfer && newOwnerId) {
+          await transferOwnership(newOwnerId, pendingLeaveClub?.id);
+        }
+        await leaveClub(pendingLeaveClub?.id);
+      }
+      setView("main");
+    } catch (error) {
+      Alert.alert("Erreur", deleteOnLeave ? "Impossible de supprimer le club pour le moment." : "Impossible de quitter le club pour le moment.");
+    } finally {
+      setRequireOwnerTransfer(false);
+      setDeleteOnLeave(false);
+      setNewOwnerId(null);
+      setPendingLeaveClub(null);
+    }
   };
 
   // removed early return to keep hooks order stable
@@ -160,10 +288,40 @@ export default function SocialScreen() {
     return () => { unsubReq(); unsubFriends(); };
   }, []);
 
+  useEffect(() => {
+    if (!sentRequestIds.length) return;
+    setSentRequestIds((prev) => {
+      const filtered = prev.filter((id) => {
+        const isFriend = friendsLive.some((f) => f.id === id) || friends.some((f) => f.id === id);
+        const hasIncoming = friendRequests.some((req) => req.from === id);
+        return !isFriend && !hasIncoming;
+      });
+      return filtered.length === prev.length ? prev : filtered;
+    });
+  }, [friendsLive, friends, friendRequests]);
+
   // Load friend profile display info (usernameLowercase/username/firstName)
   useEffect(() => {
-    const list = (friendsLive.length ? friendsLive : friends) as any[];
-    const ids = Array.from(new Set(list.map((f) => f?.id).filter(Boolean)));
+    const baseList = (friendsLive.length ? friendsLive : friends) as any[];
+    const relevantIds = new Set<string>();
+    baseList.forEach((entry) => {
+      if (entry?.id) relevantIds.add(entry.id);
+    });
+    friendRequests.forEach((req) => {
+      if (req?.from) relevantIds.add(req.from);
+    });
+
+    setFriendProfiles((prev) => {
+      const next = { ...prev };
+      Object.keys(next).forEach((key) => {
+        if (!relevantIds.has(key)) {
+          delete next[key];
+        }
+      });
+      return next;
+    });
+
+    const ids = Array.from(relevantIds);
     if (!ids.length) return;
     const unsubs = ids.map((fid) =>
       onSnapshot(doc(db, "users", fid), (snap) => {
@@ -172,7 +330,7 @@ export default function SocialScreen() {
       })
     );
     return () => { unsubs.forEach((u) => u()); };
-  }, [friendsLive, friends]);
+  }, [friendsLive, friends, friendRequests]);
 
   async function onFriendSearch(text: string) {
     setFriendSearchText(text);
@@ -186,11 +344,31 @@ export default function SocialScreen() {
   }
 
   async function onAddFriend(userId: string) {
+    const alreadyFriend = friendsLive.some((f) => f.id === userId) || friends.some((f) => f.id === userId);
+    if (alreadyFriend) {
+      Alert.alert("Information", "Vous êtes déjà amis.");
+      return;
+    }
+
+    if (sentRequestIds.includes(userId)) {
+      Alert.alert("Demande envoyée", "En attente de réponse.");
+      return;
+    }
+
+    const pendingIncoming = friendRequests.find((req) => req.from === userId);
+    if (pendingIncoming) {
+      Alert.alert("Demande reçue", "Cette personne t'a déjà envoyé une demande.");
+      return;
+    }
+
+    setSentRequestIds((prev) => (prev.includes(userId) ? prev : [...prev, userId]));
     try {
       await sendFriendRequest(userId);
       Alert.alert("Demande envoyée !");
-    } catch (e) {
-      Alert.alert("Erreur", "Impossible d'envoyer la demande");
+    } catch (e: any) {
+      setSentRequestIds((prev) => prev.filter((id) => id !== userId));
+      const message = typeof e?.message === "string" && e.message.length ? e.message : "Impossible d'envoyer la demande";
+      Alert.alert("Erreur", message);
     }
   }
 
@@ -288,11 +466,11 @@ export default function SocialScreen() {
                   club={club}
                   onJoin={async () => {
                     if (!club.joined) {
-                      await joinClub({ id: club.id });
+                      await joinClub(club.id);
                       setSelectedChat({ ...club, type: "club" });
                       setView("members");
                     } else {
-                      await leaveClub();
+                      promptLeaveClub(club);
                     }
                   }}
                   onMembers={() => {
@@ -327,14 +505,86 @@ export default function SocialScreen() {
           </View>
 
           {/* Search results with add friend */}
-          {friendSearchResults.map((u) => (
-            <View key={u.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 }}>
-              <Text style={{ color: colors.text }}>{u.username || u.id}</Text>
-              <TouchableOpacity onPress={() => onAddFriend(u.id)}>
-                <Text style={{ color: colors.accent, fontWeight: '700' }}>Ajouter</Text>
-              </TouchableOpacity>
+          {friendSearchResults.length > 0 && (
+            <View style={{ marginTop: 12 }}>
+              <Text style={{ color: colors.text, fontWeight: '700', marginBottom: 8 }}>Résultats</Text>
+              {friendSearchResults.map((u) => {
+                const profileName =
+                  [u.firstName, u.lastName].filter(Boolean).join(" ") ||
+                  u.username ||
+                  u.usernameLowercase ||
+                  u.id;
+
+                const usernameTag = u.usernameLowercase || u.username || null;
+                const avatarUri =
+                  (typeof u.photoURL === "string" && u.photoURL.length > 0 && u.photoURL) ||
+                  (typeof u.avatar === "string" && u.avatar.length > 0 && u.avatar) ||
+                  (typeof u.photoUri === "string" && u.photoUri.length > 0 && u.photoUri) ||
+                  null;
+
+                const initial = profileName.charAt(0).toUpperCase();
+                const isFriend = friendsLive.some((f) => f.id === u.id) || friends.some((f) => f.id === u.id);
+                const incomingRequest = friendRequests.find((req) => req.from === u.id);
+                const hasSentRequest = sentRequestIds.includes(u.id);
+
+                let actionNode: JSX.Element | null = null;
+
+                if (isFriend) {
+                  actionNode = (
+                    <View style={[styles.statusBadge, { backgroundColor: colors.surfaceAlt }]}> 
+                      <Ionicons name="checkmark-circle" size={16} color={colors.accent} />
+                      <Text style={[styles.statusText, { color: colors.text }]}>Ami</Text>
+                    </View>
+                  );
+                } else if (incomingRequest) {
+                  actionNode = (
+                    <GradientButton
+                      label="Accepter"
+                      onPress={() => handleAcceptRequest(incomingRequest)}
+                      style={{ minWidth: 120, flexShrink: 0 }}
+                    />
+                  );
+                } else if (hasSentRequest) {
+                  actionNode = (
+                    <View style={[styles.statusBadge, { backgroundColor: colors.surfaceAlt }]}> 
+                      <Ionicons name="hourglass" size={16} color={colors.mutedText} />
+                      <Text style={[styles.statusText, { color: colors.mutedText }]}>Demandé</Text>
+                    </View>
+                  );
+                } else {
+                  actionNode = (
+                    <GradientButton
+                      label="Ajouter"
+                      onPress={() => onAddFriend(u.id)}
+                      style={{ minWidth: 120, flexShrink: 0 }}
+                    />
+                  );
+                }
+
+                return (
+                  <View key={u.id} style={[styles.searchResultCard, { backgroundColor: colors.surface }]}> 
+                    {avatarUri ? (
+                      <Image source={{ uri: avatarUri }} style={styles.searchAvatar} />
+                    ) : (
+                      <View style={[styles.searchAvatar, styles.searchAvatarFallback]}> 
+                        <Text style={styles.searchInitial}>{initial}</Text>
+                      </View>
+                    )}
+                    <View style={styles.searchNames}>
+                      <Text style={{ color: colors.text, fontWeight: "700" }}>{profileName}</Text>
+                      {usernameTag ? (
+                        <Text style={[styles.searchUsername, { color: colors.mutedText }]}>@{usernameTag}</Text>
+                      ) : null}
+                    </View>
+                    {actionNode}
+                  </View>
+                );
+              })}
             </View>
-          ))}
+          )}
+          {friendSearchText.length >= 2 && friendSearchResults.length === 0 && (
+            <Text style={{ color: colors.mutedText, marginTop: 12 }}>Aucun résultat pour cette recherche.</Text>
+          )}
 
           {/* Pending friend requests */}
           <View style={{ marginTop: 12 }}>
@@ -342,48 +592,129 @@ export default function SocialScreen() {
             {friendRequests.length === 0 ? (
               <Text style={{ color: colors.mutedText }}>Aucune demande</Text>
             ) : (
-              friendRequests.map((r) => (
-                <View key={r.id} style={{ gap: 6, paddingVertical: 6 }}>
-                  <Text style={{ color: colors.text }}>Demande de {r.fromUsername || r.from}</Text>
-                  <View style={{ flexDirection: 'row', gap: 12 }}>
-                    <Button title="Accepter" onPress={() => acceptFriendRequest(auth.currentUser!.uid, r.id, r.from)} />
-                    <Button title="Refuser" onPress={() => rejectFriendRequest(auth.currentUser!.uid, r.id)} />
+              friendRequests.map((r) => {
+                const senderProfile = r.from ? friendProfiles[r.from] : undefined;
+                const displayName =
+                  r.fromName ||
+                  [senderProfile?.firstName, senderProfile?.lastName].filter(Boolean).join(" ") ||
+                  senderProfile?.username ||
+                  senderProfile?.usernameLowercase ||
+                  r.from;
+
+                const avatarUri =
+                  r.fromAvatar ||
+                  senderProfile?.photoURL ||
+                  senderProfile?.avatar ||
+                  senderProfile?.photoUri ||
+                  null;
+
+                const initials = displayName ? displayName.charAt(0).toUpperCase() : "?";
+
+                return (
+                  <View key={r.id} style={[styles.requestCard, { backgroundColor: colors.surface }]}> 
+                    <View style={styles.requestInfo}>
+                      {avatarUri ? (
+                        <Image source={{ uri: avatarUri }} style={styles.requestAvatar} />
+                      ) : (
+                        <View style={[styles.requestAvatar, { backgroundColor: colors.pill }]}> 
+                          <Text style={[styles.requestInitial, { color: colors.text }]}>{initials}</Text>
+                        </View>
+                      )}
+                      <View>
+                        <Text style={[styles.requestName, { color: colors.text }]}>{displayName}</Text>
+                        <Text style={[styles.requestMeta, { color: colors.mutedText }]}>souhaite devenir ton ami</Text>
+                      </View>
+                    </View>
+                    <View style={styles.requestActions}>
+                      <GradientButton
+                        label="Accepter"
+                        onPress={() => handleAcceptRequest(r)}
+                        style={{ flex: 1 }}
+                      />
+                      <TouchableOpacity
+                        onPress={() => handleRejectRequest(r)}
+                        style={[styles.rejectBtn, { borderColor: "#F06262", backgroundColor: "transparent" }]}
+                      >
+                        <Text style={[styles.rejectText, { color: "#F06262" }]}>Refuser</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                </View>
-              ))
+                );
+              })
             )}
           </View>
 
           {(() => {
-            const combinedFriends = (friendsLive.length ? friendsLive : friends) as any[];
-            const toName = (a: any) => {
-              const prof = friendProfiles[a?.id as string];
-              const base = a?.name || prof?.usernameLowercase || prof?.username || prof?.firstName || a?.id || "";
-              return String(base).toLowerCase();
-            };
-            const safePoints = (a: any) => (typeof a?.points === 'number' ? a.points : 0);
-            const filtered = combinedFriends.filter((a) => toName(a).toLowerCase().includes((search || "").toLowerCase()));
-            const sorted = filtered.sort((a, b) => safePoints(b) - safePoints(a));
-
-            return sorted.map((ami, index) => {
-              const friendForCard = {
-                ...ami,
-                name: toName(ami),
-                points: safePoints(ami),
-              };
-              return (
-                <FriendCard
-                  key={`${friendForCard.id}-${index}`}
-                  friend={friendForCard}
-                  rank={index + 1}
-                  isMe={false}
-                  onChat={() => {
-                    setSelectedChat({ ...friendForCard, type: "ami" });
-                    setView("chat");
-                  }}
-                />
-              );
+            const primaryList = (friendsLive.length ? friendsLive : friends) as any[];
+            const idSet = new Set<string>();
+            primaryList.forEach((entry) => {
+              if (entry?.id) idSet.add(entry.id);
             });
+            Object.keys(friendProfiles).forEach((id) => idSet.add(id));
+
+            const items = Array.from(idSet).map((id) => {
+              const profile = friendProfiles[id] as any;
+              const fallback =
+                primaryList.find((item: any) => item?.id === id) ||
+                (friends as any[]).find((item: any) => item?.id === id) ||
+                {};
+
+              const displayName =
+                profile?.firstName ||
+                profile?.username ||
+                profile?.usernameLowercase ||
+                fallback?.name ||
+                id;
+
+              const pointsValue =
+                typeof profile?.points === 'number'
+                  ? profile.points
+                  : typeof fallback?.points === 'number'
+                  ? fallback.points
+                  : 0;
+
+              const photoURL =
+                typeof profile?.photoURL === 'string' && profile.photoURL.length > 0
+                  ? profile.photoURL
+                  : typeof fallback?.photoURL === 'string' && fallback.photoURL.length > 0
+                  ? fallback.photoURL
+                  : typeof fallback?.avatar === 'string' && fallback.avatar.length > 0
+                  ? fallback.avatar
+                  : '';
+
+              const isOnline = Boolean(
+                profile?.online !== undefined ? profile.online : fallback?.online
+              );
+
+              return {
+                id,
+                name: String(displayName),
+                points: pointsValue,
+                avatar: photoURL || null,
+                online: isOnline,
+              };
+            });
+
+            const filtered = items.filter((friend) =>
+              friend.name.toLowerCase().includes(friendSearchText.trim().toLowerCase())
+            );
+
+            const sorted = filtered.sort((a, b) => (b.points || 0) - (a.points || 0));
+
+            return sorted.map((friend, index) => (
+              <FriendCard
+                key={`${friend.id}-${index}`}
+                friend={friend}
+                rank={index + 1}
+                isMe={friend.id === currentUid}
+                onChat={() => {
+                  setSelectedChat({ ...friend, type: "ami" });
+                  setView("chat");
+                }}
+                actionLabel="Supprimer"
+                onAction={() => handleRemoveFriend(friend.id, friend.name)}
+              />
+            ));
           })()}
         </ScrollView>
       )}
@@ -563,7 +894,15 @@ export default function SocialScreen() {
             renderItem={({ item }) => (
               <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 8, borderRadius: 12 }}>
                 <Text style={{ width: 30, textAlign: 'center', color: colors.mutedText }}>{' '}</Text>
-                <Image source={{ uri: item.avatar || undefined }} style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10 }} />
+                {item.avatar ? (
+                  <Image source={{ uri: item.avatar }} style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10 }} />
+                ) : (
+                  <View style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.pill }}>
+                    <Text style={{ color: colors.text, fontWeight: '700' }}>
+                      {(item.name || item.id || '?').toString().charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                )}
                 <View style={{ flex: 1 }}>
                   <Text style={{ color: colors.text, fontWeight: '600' }}>{item.name || item.id}</Text>
                 </View>
@@ -608,7 +947,10 @@ export default function SocialScreen() {
                 <Text style={{ color: colors.text, fontWeight: '700' }}>Modifier</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity onPress={() => setLeaveConfirmVisible(true)} style={{ backgroundColor: '#D93636', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10 }}>
+            <TouchableOpacity
+              onPress={() => promptLeaveClub(joinedClub ?? undefined)}
+              style={{ backgroundColor: '#D93636', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10 }}
+            >
               <Text style={{ color: '#fff', fontWeight: '700' }}>Quitter</Text>
             </TouchableOpacity>
           </View>
@@ -618,7 +960,23 @@ export default function SocialScreen() {
             renderItem={({ item }) => (
               <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 8, borderRadius: 12, backgroundColor: item.isMe ? colors.accent : 'transparent' }}>
                 <Text style={{ width: 30, textAlign: 'center', color: item.isMe ? '#0F3327' : colors.text, fontWeight: '700' }}>{item.rank}</Text>
-                <Image source={{ uri: item.isMe ? (user?.photoURL ?? undefined) : item.avatar }} style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10, borderWidth: 0 }} />
+                {(() => {
+                  const avatarUri = item.isMe ? (user?.photoURL ?? null) : (item.avatar ?? null);
+                  const displayLabel = item.isMe
+                    ? (user?.firstName || user?.username || auth.currentUser?.email || "Moi")
+                    : item.name || item.id;
+                  const initials = displayLabel ? String(displayLabel).charAt(0).toUpperCase() : "?";
+                  if (avatarUri) {
+                    return (
+                      <Image source={{ uri: avatarUri }} style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10 }} />
+                    );
+                  }
+                  return (
+                    <View style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.pill }}>
+                      <Text style={{ color: item.isMe ? '#0F3327' : colors.text, fontWeight: '700' }}>{initials}</Text>
+                    </View>
+                  );
+                })()}
                 <View style={{ flex: 1 }}>
                   <Text style={{ color: item.isMe ? '#0F3327' : colors.text, fontWeight: item.isMe ? '700' : '500' }}>{item.isMe ? (user?.firstName ?? "Utilisateur") : item.name}</Text>
                   {joinedClub && (
@@ -654,20 +1012,64 @@ export default function SocialScreen() {
       {leaveConfirmVisible && (
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Quitter le club</Text>
-            <Text style={{ color: colors.mutedText, marginTop: 6 }}>Êtes-vous sûr de quitter le club ?</Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              {requireOwnerTransfer ? "Nommer un nouveau chef" : deleteOnLeave ? "Supprimer le club ?" : "Quitter le club"}
+            </Text>
+            {requireOwnerTransfer ? (
+              <View style={{ marginTop: 12 }}>
+                <Text style={{ color: colors.mutedText, marginBottom: 10 }}>
+                  Choisis le membre qui deviendra chef avant ton départ.
+                </Text>
+                {members
+                  .filter((member) => member.id !== currentUid)
+                  .map((member) => {
+                    const selected = newOwnerId === member.id;
+                    return (
+                      <TouchableOpacity
+                        key={member.id}
+                        onPress={() => setNewOwnerId(member.id)}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: 12,
+                          borderRadius: 12,
+                          marginBottom: 8,
+                          backgroundColor: selected ? colors.accent : colors.surfaceAlt,
+                        }}
+                      >
+                        <Text style={{ color: selected ? '#0F3327' : colors.text, fontWeight: '600' }}>{member.name}</Text>
+                        <Text style={{ color: selected ? '#0F3327' : colors.mutedText }}>{member.points || 0} pts</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+              </View>
+            ) : (
+              <Text style={{ color: colors.mutedText, marginTop: 6 }}>
+                {deleteOnLeave
+                  ? "Êtes-vous sûr de quitter ce club ? Cela entraînera sa suppression définitive."
+                  : "Êtes-vous sûr de quitter le club ?"}
+              </Text>
+            )}
             <View style={styles.modalButtons}>
-              <TouchableOpacity style={[styles.modalBtn, { backgroundColor: colors.accent }]} onPress={() => setLeaveConfirmVisible(false)}>
+              <TouchableOpacity
+                style={[styles.modalBtn, { backgroundColor: colors.accent }]}
+                onPress={() => {
+                  setLeaveConfirmVisible(false);
+                  setRequireOwnerTransfer(false);
+                  setDeleteOnLeave(false);
+                  setNewOwnerId(null);
+                  setPendingLeaveClub(null);
+                }}
+              >
                 <Text style={{ color: '#0F3327', fontWeight: '700' }}>Rester</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalBtn, { backgroundColor: '#D93636' }]}
-                onPress={() => {
-                  setLeaveConfirmVisible(false);
-                  handleLeaveClub();
-                }}
+                disabled={requireOwnerTransfer && !newOwnerId}
+                onPress={handleLeaveClub}
               >
-                <Text style={{ color: '#fff', fontWeight: '700' }}>Quitter</Text>
+                <Text style={{ color: '#fff', fontWeight: '700', opacity: requireOwnerTransfer && !newOwnerId ? 0.5 : 1 }}>Quitter</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -691,6 +1093,23 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   searchInput: { marginLeft: 8, flex: 1 },
+  requestCard: { borderRadius: 20, padding: 16, marginBottom: 12 },
+  requestInfo: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
+  requestAvatar: { width: 44, height: 44, borderRadius: 22, marginRight: 12, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  requestInitial: { fontSize: 18, fontWeight: "700" },
+  requestName: { fontSize: 16, fontWeight: "700" },
+  requestMeta: { fontSize: 12, marginTop: 2 },
+  requestActions: { flexDirection: "row", alignItems: "center", gap: 10 },
+  rejectBtn: { borderRadius: 18, paddingVertical: 12, paddingHorizontal: 18, borderWidth: 1 },
+  rejectText: { fontWeight: "700" },
+  searchResultCard: { flexDirection: "row", alignItems: "center", padding: 12, borderRadius: 18, marginBottom: 10 },
+  searchAvatar: { width: 42, height: 42, borderRadius: 21, marginRight: 12, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  searchAvatarFallback: { backgroundColor: "#23332D" },
+  searchInitial: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  searchNames: { flex: 1 },
+  searchUsername: { fontSize: 12 },
+  statusBadge: { borderRadius: 18, paddingVertical: 8, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 0 },
+  statusText: { fontWeight: "700" },
   modalOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center', padding: 24 },
   modalCard: { width: '100%', maxWidth: 360, borderRadius: 16, padding: 16 },
   modalTitle: { fontSize: 18, fontWeight: '700' },

@@ -1,4 +1,3 @@
-import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { signInWithEmailAndPassword } from "firebase/auth";
@@ -9,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -37,7 +37,6 @@ if (DEV_MODE) {
 
 export default function Login() {
   const router = useRouter();
-  const { colors } = useThemeMode();
 
   // ✅ Autofill only in DEV, only if local file exists
   const [email, setEmail] = useState(DEV_MODE ? DEV_EMAIL : "");
@@ -69,37 +68,50 @@ export default function Login() {
       style={{ flex: 1 }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <View style={[styles.root, { backgroundColor: colors.background }]}> 
-        {/* Top branding section */}
-        <View style={[styles.brandTop, { backgroundColor: colors.mode === 'dark' ? '#111F1B' : '#ECECEC' }]}> 
-          <Image source={require("../../assets/images/icon.png")} style={styles.logo} />
-          <Text style={[styles.appName, { color: colors.text }]}>GREEN UP</Text>
-        </View>
-
-        {/* Card */}
-        <View style={[styles.card, { backgroundColor: colors.surface }]}> 
-          {/* Email */}
-          <View style={[styles.inputRow, { backgroundColor: colors.surfaceAlt }]}> 
-            <Ionicons name="person-outline" size={18} color={colors.text} style={{ marginRight: 8 }} />
-            <TextInput
-              style={[styles.inputField, { color: colors.text }]}
-              placeholder="Email"
-              placeholderTextColor={colors.mutedText}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              value={email}
-              onChangeText={setEmail}
-              editable={!loading}
+      <View style={styles.root}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.logoRow}>
+            <Image
+              source={require("../../assets/images/greenup-logo.png")}
+              style={styles.logo}
+              resizeMode="contain"
             />
           </View>
 
-          {/* Password */}
-            <View style={[styles.inputRow, { backgroundColor: colors.surfaceAlt }]}> 
-              <Ionicons name="lock-closed-outline" size={18} color={colors.text} style={{ marginRight: 8 }} />
+          <View style={styles.card}>
+            <View style={styles.inputRow}>
+              <Ionicons
+                name="person-outline"
+                size={18}
+                color={themes.icon}
+                style={{ marginRight: 10 }}
+              />
               <TextInput
-                style={[styles.inputField, { color: colors.text }]}
+                style={styles.inputField}
+                placeholder="Email"
+                placeholderTextColor={themes.placeholder}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                value={email}
+                onChangeText={setEmail}
+                editable={!loading}
+              />
+            </View>
+
+            <View style={styles.inputRow}>
+              <Ionicons
+                name="lock-closed-outline"
+                size={18}
+                color={themes.icon}
+                style={{ marginRight: 10 }}
+              />
+              <TextInput
+                style={styles.inputField}
                 placeholder="Mot de passe"
-                placeholderTextColor={colors.mutedText}
+                placeholderTextColor={themes.placeholder}
                 secureTextEntry
                 value={password}
                 onChangeText={setPassword}
@@ -107,60 +119,155 @@ export default function Login() {
               />
             </View>
 
-          {/* Row: remember + forgot password */}
-          <View style={styles.rowBetween}> 
-            <TouchableOpacity onPress={() => setRememberMe((r) => !r)} style={styles.checkboxRow}>
-              <View style={[styles.checkboxBox, { borderColor: colors.mutedText, backgroundColor: rememberMe ? colors.accent : 'transparent' }]}>
-                {rememberMe && <Ionicons name="checkmark" size={14} color="#0F3327" />}
-              </View>
-              <Text style={[styles.checkboxLabel, { color: colors.mutedText }]}>Se souvenir de moi</Text>
-            </TouchableOpacity>
-            <Pressable onPress={() => { /* TODO: route to reset */ }}>
-              <Text style={{ color: colors.mutedText, fontSize: 12, fontWeight: '600' }}>Mot de passe oublié ?</Text>
+            <View style={styles.rowBetween}>
+              <TouchableOpacity
+                onPress={() => setRememberMe((r) => !r)}
+                style={styles.checkboxRow}
+              >
+                <View
+                  style={[
+                    styles.checkboxBox,
+                    rememberMe && { backgroundColor: themes.accent, borderColor: themes.accent },
+                  ]}
+                >
+                  {rememberMe && <Ionicons name="checkmark" size={14} color="#00231A" />}
+                </View>
+                <Text style={styles.checkboxLabel}>Se souvenir de moi</Text>
+              </TouchableOpacity>
+              <Pressable onPress={() => {}}>
+                <Text style={styles.linkMuted}>Mot de passe oublié ?</Text>
+              </Pressable>
+            </View>
+
+            <Pressable
+              style={[styles.primaryBtn, (!canSubmit || loading) && styles.primaryBtnDisabled]}
+              onPress={handleLogin}
+              disabled={!canSubmit || loading}
+            >
+              <Text style={styles.primaryBtnText}>{loading ? "..." : "Se connecter"}</Text>
             </Pressable>
+
+            <View style={styles.footerRow}>
+              <Text style={styles.footerText}>Vous n'avez pas encore de compte ? </Text>
+              <Pressable onPress={() => router.push("/register")}>
+                <Text style={styles.footerLink}>Créer un compte</Text>
+              </Pressable>
+            </View>
           </View>
-
-          {/* Login button */}
-          <Pressable
-            style={[styles.primaryBtn, { backgroundColor: colors.text }, (!canSubmit || loading) && { opacity: 0.5 } ]}
-            onPress={handleLogin}
-            disabled={!canSubmit || loading}
-          >
-            <Text style={[styles.primaryBtnText, { color: colors.background }]}>{loading ? '...' : 'Se connecter'}</Text>
-          </Pressable>
-
-          {/* Google button (UI only) */}
-          <TouchableOpacity style={[styles.googleBtn, { backgroundColor: colors.surfaceAlt }]} disabled={loading}> 
-            <Image source={require('../../assets/images/favicon.png')} style={{ width: 16, height: 16, marginRight: 8 }} />
-            <Text style={{ color: colors.text, fontWeight: '600', fontSize: 13 }}>Continuez avec Google</Text>
-          </TouchableOpacity>
-
-          {/* Footer */}
-          <View style={{ marginTop: 14, flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Text style={{ color: colors.mutedText, fontSize: 12 }}>Vous n'avez pas encore de compte ? </Text>
-            <Pressable onPress={() => router.push('/register')}>
-              <Text style={{ color: colors.accent, fontSize: 12, fontWeight: '700' }}>Créer un compte</Text>
-            </Pressable>
-          </View>
-        </View>
+        </ScrollView>
       </View>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
-  brandTop: { width: '100%', paddingTop: 100, alignItems: 'center', paddingBottom: 40 },
-  logo: { width: 120, height: 120, resizeMode: 'contain', marginBottom: 12 },
-  appName: { fontSize: 32, fontWeight: '700', letterSpacing: 1 },
-  card: { marginHorizontal: 16, marginTop: -40, borderRadius: 24, padding: 24, elevation: 8, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, gap: 16 },
-  inputRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 12 },
-  inputField: { flex: 1, fontWeight: '600' },
-  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  checkboxRow: { flexDirection: 'row', alignItems: 'center' },
-  checkboxBox: { width: 18, height: 18, borderRadius: 6, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginRight: 6 },
-  checkboxLabel: { fontSize: 12, fontWeight: '600' },
-  primaryBtn: { borderRadius: 24, paddingVertical: 16, alignItems: 'center' },
-  primaryBtnText: { fontSize: 16, fontWeight: '700' },
-  googleBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 18, paddingVertical: 12 },
+  root: {
+    flex: 1,
+    backgroundColor: "#000000",
+  },
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingBottom: 48,
+    paddingTop: 110,
+  },
+  logoRow: {
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  logo: {
+    width: 390,
+    height: 174,
+  },
+  card: {
+    backgroundColor: "#121212",
+    borderRadius: 28,
+    paddingHorizontal: 24,
+    paddingVertical: 32,
+    borderWidth: 1,
+    borderColor: "#1F1F1F",
+  },
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: "#101010",
+    borderWidth: 1,
+    borderColor: "#181818",
+    marginBottom: 16,
+  },
+  inputField: {
+    flex: 1,
+    color: "#FFFFFF",
+    fontWeight: "600",
+  },
+  rowBetween: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
+    gap: 16,
+  },
+  checkboxRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  checkboxBox: {
+    width: 18,
+    height: 18,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#3A3A3A",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+    backgroundColor: "transparent",
+  },
+  checkboxLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#9B9B9B",
+  },
+  linkMuted: {
+    color: "#8A8A8A",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  primaryBtn: {
+    borderRadius: 24,
+    paddingVertical: 16,
+    alignItems: "center",
+    backgroundColor: "#58D38C",
+    marginBottom: 24,
+  },
+  primaryBtnDisabled: {
+    opacity: 0.5,
+  },
+  primaryBtnText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#00231A",
+  },
+  footerRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    marginTop: 12,
+  },
+  footerText: {
+    color: "#6E6E6E",
+    fontSize: 12,
+  },
+  footerLink: {
+    color: "#58D38C",
+    fontSize: 12,
+    fontWeight: "700",
+  },
 });
+
+const themes = {
+  accent: "#58D38C",
+  icon: "#6ADCA0",
+  placeholder: "#616161",
+};

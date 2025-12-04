@@ -21,7 +21,7 @@ service cloud.firestore {
         request.resource.data.diff(resource.data).changedKeys().hasOnly(['members'])
       );
 
-      allow delete: if false;
+      allow delete: if request.auth != null && request.auth.uid == resource.data.ownerId;
     }
 
     // ----------------------------------------------------
@@ -79,8 +79,9 @@ service cloud.firestore {
         allow read: if request.auth != null && request.auth.uid == userId;
         // Allow creation by either owner or the counterpart friend (to write symmetric relation)
         allow create: if request.auth != null && (request.auth.uid == userId || request.auth.uid == friendId);
-        // Updates/deletes restricted to owner
-        allow update, delete: if request.auth != null && request.auth.uid == userId;
+        // Allow updates from owner or counterpart; deletes remain owner-only
+        allow update: if request.auth != null && (request.auth.uid == userId || request.auth.uid == friendId);
+        allow delete: if request.auth != null && request.auth.uid == userId;
       }
     }
 

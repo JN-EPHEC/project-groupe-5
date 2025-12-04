@@ -3,18 +3,22 @@ import React, {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 
-import { auth, db } from "@/firebaseConfig";
+import { db } from "@/firebaseConfig";
 import { doc, onSnapshot } from "firebase/firestore";
 
+import { useUser } from "@/hooks/user-context";
 import {
   createClub,
+  deleteClub as deleteClubService,
   demoteOfficer,
   joinClub,
-  leaveClub,
+  leaveClub as leaveClubService,
   promoteOfficer,
+  transferOwnership as transferOwnershipService,
   updateClubFirebase,
 } from "@/services/clubs";
 
@@ -59,8 +63,8 @@ interface ClubContextType {
     city: string;
   }) => Promise<ClubInfo | void>;
 
-  joinClub: (c: ClubInfo) => Promise<void>;
-  leaveClub: () => Promise<void>;
+  joinClub: (clubId: string) => Promise<void>;
+  leaveClub: (clubId?: string) => Promise<void>;
 
   updateClub: (
     data: Partial<Omit<ClubInfo, "id" | "participants">>
@@ -68,6 +72,8 @@ interface ClubContextType {
 
   promoteToOfficer: (uid: string) => Promise<void>;
   demoteOfficer: (uid: string) => Promise<void>;
+  transferOwnership: (uid: string, clubId?: string) => Promise<void>;
+  deleteClub: (clubId?: string) => Promise<void>;
 }
 
 // -------------------------------------------------------------
@@ -82,6 +88,8 @@ const ClubContext = createContext<ClubContextType>({
   updateClub: async () => {},
   promoteToOfficer: async () => {},
   demoteOfficer: async () => {},
+  transferOwnership: async () => {},
+  deleteClub: async () => {},
 });
 
 // -------------------------------------------------------------
@@ -90,40 +98,129 @@ const ClubContext = createContext<ClubContextType>({
 export const ClubProvider = ({ children }: { children: React.ReactNode }) => {
   const [joinedClub, setJoinedClub] = useState<ClubInfo | null>(null);
   const [members, setMembers] = useState<ClubMember[]>([]);
+  const { user } = useUser();
+  const memberUnsubs = useRef<Record<string, () => void>>({});
 
-  // Subscribe to the current user's club
-  useEffect(() => {
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
+  const cleanupMemberListeners = () => {
+    Object.values(memberUnsubs.current).forEach((unsub) => unsub());
+    memberUnsubs.current = {};
+    setMembers([]);
+  };
 
-    const userRef = doc(db, "users", uid);
+  const detachMember = (uid: string) => {
+    if (memberUnsubs.current[uid]) {
+      memberUnsubs.current[uid]!();
+      delete memberUnsubs.current[uid];
+    }
+    setMembers((prev) => prev.filter((member) => member.id !== uid));
+  };
 
-    // listen to user doc → clubId change
-    const unsubUser = onSnapshot(userRef, (snap) => {
+  const attachMember = (uid: string) => {
+    if (memberUnsubs.current[uid]) return;
+
+    // placeholder entry to keep ordering while profile loads
+    setMembers((prev) => {
+      if (prev.some((m) => m.id === uid)) return prev;
+      const placeholder: ClubMember = {
+        id: uid,
+        name: "Membre",
+        avatar: null,
+        points: 0,
+      };
+      const next = [...prev, placeholder];
+      next.sort((a, b) => (b.points || 0) - (a.points || 0));
+      return next;
+    });
+
+    const memberRef = doc(db, "users", uid);
+    memberUnsubs.current[uid] = onSnapshot(memberRef, (snap) => {
       const data = snap.data();
-      if (data?.clubId) {
-        subscribeToClub(data.clubId);
-      } else {
-        setJoinedClub(null);
-        setMembers([]);
+      if (!data) {
+        detachMember(uid);
+        return;
+      }
+
+      const displayName =
+        data.firstName ||
+        data.username ||
+        data.usernameLowercase ||
+        data.displayName ||
+        uid;
+
+      const avatarUri =
+        typeof data.photoURL === "string" && data.photoURL.length > 0
+          ? data.photoURL
+          : typeof data.avatar === "string" && data.avatar.length > 0
+          ? data.avatar
+          : null;
+
+      const nextMember: ClubMember = {
+        id: uid,
+        name: String(displayName),
+        avatar: avatarUri,
+        points: typeof data.points === "number" ? data.points : 0,
+      };
+
+      setMembers((prev) => {
+        const others = prev.filter((m) => m.id !== uid);
+        const next = [...others, nextMember];
+        next.sort((a, b) => (b.points || 0) - (a.points || 0));
+        return next;
+      });
+    });
+  };
+
+  const syncClubMembers = (ids: string[]) => {
+    const uniqueIds = Array.from(new Set(ids.filter((id) => typeof id === "string" && id.length > 0)));
+
+    Object.keys(memberUnsubs.current).forEach((trackedId) => {
+      if (!uniqueIds.includes(trackedId)) {
+        detachMember(trackedId);
       }
     });
 
+    uniqueIds.forEach((uid) => {
+      attachMember(uid);
+    });
+  };
+
+  // Subscribe to the current user's club (via user context to ensure reactivity)
+  useEffect(() => {
+    if (!user?.uid) {
+      setJoinedClub(null);
+      cleanupMemberListeners();
+      return;
+    }
+
+    let unsubscribeClub: (() => void) | undefined;
+
+    if (user.clubId) {
+      unsubscribeClub = subscribeToClub(user.clubId);
+    } else {
+      setJoinedClub(null);
+      cleanupMemberListeners();
+    }
+
     return () => {
-      unsubUser();
+      if (unsubscribeClub) unsubscribeClub();
+      cleanupMemberListeners();
     };
-  }, []);
+  }, [user?.uid, user?.clubId]);
 
   // subscribe to club doc itself
   const subscribeToClub = (clubId: string) => {
     const clubRef = doc(db, "clubs", clubId);
-    return onSnapshot(clubRef, (snap) => {
+    const unsubscribe = onSnapshot(clubRef, (snap) => {
       const data: any = snap.data();
       if (!data) {
         setJoinedClub(null);
-        setMembers([]);
+        cleanupMemberListeners();
         return;
       }
+
+      const memberIds: string[] = Array.isArray(data.members)
+        ? data.members
+        : [];
 
       setJoinedClub({
         id: clubId,
@@ -134,21 +231,16 @@ export const ClubProvider = ({ children }: { children: React.ReactNode }) => {
         ownerId: data.ownerId,
         visibility: data.visibility,
         officers: data.officers || [],
-        participants: (data.members || []).length,
+        participants: memberIds.length,
         logo: data.logo,
       });
 
-      const memberList: ClubMember[] = (data.members || []).map(
-        (uid: string) => ({
-          id: uid,
-          points: 0, // you can later plug real points here
-          name: uid, // TODO: resolve to display name if needed
-          avatar: null,
-        })
-      );
-
-      setMembers(memberList);
+      syncClubMembers(memberIds);
     });
+    return () => {
+      unsubscribe();
+      cleanupMemberListeners();
+    };
   };
 
   // -----------------------------------------------------------
@@ -174,13 +266,14 @@ export const ClubProvider = ({ children }: { children: React.ReactNode }) => {
 
     },
 
-    joinClub: async (c) => {
-      await joinClub(c.id);
+    joinClub: async (clubId) => {
+      await joinClub(clubId);
     },
 
-    leaveClub: async () => {
-      if (!joinedClub?.id) return;
-      await leaveClub(joinedClub.id);
+    leaveClub: async (clubId) => {
+      const targetId = clubId ?? joinedClub?.id;
+      if (!targetId) return;
+      await leaveClubService(targetId);
     },
 
     updateClub: async (data) => {
@@ -202,6 +295,18 @@ export const ClubProvider = ({ children }: { children: React.ReactNode }) => {
     demoteOfficer: async (uid) => {
       if (!joinedClub?.id) return;
       await demoteOfficer(joinedClub.id, uid);
+    },
+
+    transferOwnership: async (uid, clubId) => {
+      const targetId = clubId ?? joinedClub?.id;
+      if (!targetId) return;
+      await transferOwnershipService(targetId, uid);
+    },
+
+    deleteClub: async (clubId) => {
+      const targetId = clubId ?? joinedClub?.id;
+      if (!targetId) return;
+      await deleteClubService(targetId);
     },
   };
 

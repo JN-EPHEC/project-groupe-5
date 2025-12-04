@@ -13,6 +13,8 @@ export interface Club {
   city?: string;
   emoji?: string;
   photoUri?: string;
+  ownerId?: string;
+  officers?: string[];
 }
 
 interface ClubCardProps {

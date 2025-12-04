@@ -1,12 +1,14 @@
+import { usePoints } from "@/hooks/points-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { useUser } from "@/hooks/user-context";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, Text, View } from "react-native";
 
 export function HeaderProfile() {
   const { colors } = useThemeMode();
   const { user, loading } = useUser();
+  const { points } = usePoints();
 
   // Guard against loading or missing profile
   if (loading || !user) {
@@ -14,18 +16,24 @@ export function HeaderProfile() {
   }
 
   const firstName = user.firstName ?? "Utilisateur";
+  const avatarUri = user.photoURL || null;
+  const displayPoints = typeof points === "number" ? points : user.points ?? 0;
 
   return (
     <View style={styles.center}>
-      {/* Avatar placeholder */}
-      <View style={styles.avatar}>
-        <Ionicons name="walk-outline" size={40} color="#fff" />
-      </View>
+      <View style={styles.avatarContainer}>
+        {avatarUri ? (
+          <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+        ) : (
+          <View style={[styles.avatarImage, styles.avatarFallback]}>
+            <Ionicons name="walk-outline" size={40} color="#fff" />
+          </View>
+        )}
 
-      {/* Points badge (you can connect this later) */}
-      <View style={[styles.badge, { backgroundColor: colors.accent }]}>
-        <Ionicons name="leaf-outline" size={14} color="#fff" />
-        <Text style={styles.badgeText}>{user.points ?? 0}</Text>
+        <View style={[styles.badge, { backgroundColor: colors.accent }]}>
+          <Ionicons name="leaf-outline" size={14} color="#0F3327" />
+          <Text style={styles.badgeText}>{displayPoints}</Text>
+        </View>
       </View>
 
       {/* 🔥 Replace “Bonjour Marie” with Firestore data */}
@@ -43,14 +51,16 @@ export function HeaderProfile() {
 
 const styles = StyleSheet.create({
   center: { alignItems: "center", marginVertical: 10 },
-  avatar: {
+  avatarContainer: { position: "relative" },
+  avatarImage: {
     width: 85,
     height: 85,
     borderRadius: 50,
-    backgroundColor: "#E45353",
+    backgroundColor: "#1F2A27",
     alignItems: "center",
     justifyContent: "center",
   },
+  avatarFallback: { backgroundColor: "#E45353" },
   badge: {
     paddingHorizontal: 10,
     paddingVertical: 2,
@@ -58,10 +68,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     position: "absolute",
-    top: 75,
-    right: 120,
+    bottom: -6,
+    right: -6,
+    borderWidth: 2,
+    borderColor: "#0F3327",
   },
-  badgeText: { color: "#fff", marginLeft: 4, fontWeight: "600" },
+  badgeText: { color: "#0F3327", marginLeft: 4, fontWeight: "700" },
   username: { fontSize: 22, fontWeight: "700", marginTop: 12 },
   team: { marginBottom: 14 },
 });

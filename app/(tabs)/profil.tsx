@@ -19,7 +19,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-nati
 
 export default function ProfilScreen() {
   const { colors } = useThemeMode();
-  const { points, totalEarned, totalSpent, transactions } = usePoints();
+  const { points } = usePoints();
   const { user } = useUser();
   const fullName = `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim();
   const { joinedClub, members } = useClub();
@@ -28,7 +28,6 @@ export default function ProfilScreen() {
   const { followers, following } = useSubscriptions();
   const router = useRouter();
   const [friendRequests, setFriendRequests] = useState<any[]>([]);
-  const [friendsCount, setFriendsCount] = useState<number>(0);
   const startSubscription = async () => {
     const user = auth.currentUser;
     if (!user) {
@@ -70,29 +69,23 @@ export default function ProfilScreen() {
     });
   }, []);
 
-  // Live friends count for stats
-  useEffect(() => {
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
-    return onSnapshot(collection(db, 'users', uid, 'friends'), (snap) => {
-      setFriendsCount(snap.size);
-    });
-  }, []);
+  const myPoints = useMemo(() => (typeof points === "number" ? points : user?.points ?? 0), [points, user?.points]);
 
   // Classement entre amis
   const friendRankLabel = useMemo(() => {
-    const all = [...friends.map(a => a.points), points].sort((a,b) => b - a);
-    const position = all.indexOf(points) + 1;
-    return `#${position}`;
-  }, [friends, points]);
+    const source = [...friends.map((friend) => friend.points || 0), myPoints];
+    const sorted = source.sort((a, b) => b - a);
+    const position = sorted.findIndex((value) => value === myPoints) + 1;
+    return `#${position || 1}`;
+  }, [friends, myPoints]);
 
   // Classement club (si club)
   const clubRankLabel = useMemo(() => {
     if (!joinedClub) return null;
-    const arr = [...members.map(m => m.points), points].sort((a,b) => b - a);
-    const pos = arr.indexOf(points) + 1;
-    return `#${pos}`;
-  }, [joinedClub, members, points]);
+    const arr = [...members.map((member) => member.points || 0), myPoints].sort((a, b) => b - a);
+    const pos = arr.findIndex((value) => value === myPoints) + 1;
+    return `#${pos || 1}`;
+  }, [joinedClub, members, myPoints]);
 
   const pendingCount = friendRequests.filter(r => r.status === 'pending').length;
 
@@ -120,7 +113,7 @@ export default function ProfilScreen() {
   {/* STATS -> components/ui/profil/StatCard */}
       <View style={styles.row}>
         <TouchableOpacity style={{ flex: 1 }} activeOpacity={0.8} onPress={() => router.push('/social?tab=amis')}>
-          <StatCard icon="people-outline" value={String(friendsCount)} label="Amis" />
+          <StatCard icon="people-outline" value={String(friends.length)} label="Amis" />
         </TouchableOpacity>
         <TouchableOpacity style={{ flex: 1 }} activeOpacity={0.8} onPress={() => router.push('/social?tab=amis')}>
           <StatCard icon="person-add-outline" value={String(pendingCount)} label="Demandes d'amis" />
@@ -138,32 +131,6 @@ export default function ProfilScreen() {
           <TouchableOpacity style={{ flex: 1 }} activeOpacity={0.8} onPress={() => router.push('/social?tab=clubs&view=clubRanking')}>
             <StatCard icon="people" label="Classement club" value={clubRankLabel ?? '—'} />
           </TouchableOpacity>
-      </View>
-
-      {/* HISTORIQUE DE POINTS (carte unique, seulement 2 dernières) */}
-      <View style={{ backgroundColor: colors.surface, padding: 16, borderRadius: 16, marginVertical: 10 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>Historique des points</Text>
-          <Text style={{ color: colors.mutedText, fontWeight: '600' }}>{totalEarned} pts</Text>
-        </View>
-        {transactions.length === 0 ? (
-          <Text style={{ color: colors.mutedText }}>Aucune transaction pour le moment.</Text>
-        ) : (
-          (transactions.slice(0, 2)).map((tx) => (
-            <View key={tx.id} style={{ backgroundColor: colors.surfaceAlt, padding: 12, borderRadius: 12, marginBottom: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: colors.text, fontWeight: '600' }}>{tx.source}</Text>
-                <Text style={{ color: colors.mutedText, fontSize: 12 }}>{new Date(tx.timestamp).toLocaleString()}</Text>
-              </View>
-              <Text style={{ color: tx.type === 'earn' ? '#2ECC71' : '#E74C3C', fontWeight: '700' }}>
-                {tx.type === 'earn' ? `+${tx.amount}` : `-${tx.amount}`} pts
-              </Text>
-            </View>
-          ))
-        )}
-        <TouchableOpacity onPress={() => router.push('/profil-historique')} style={{ marginTop: 6, alignSelf: 'flex-end' }}>
-          <Text style={{ color: colors.accent, fontWeight: '600' }}>Voir tout l'historique</Text>
-        </TouchableOpacity>
       </View>
 
       {/* HISTORIQUE DES DEFIS (placé juste après les points) */}

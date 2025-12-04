@@ -56,6 +56,21 @@ export async function sendFriendRequest(targetId: string) {
     throw new Error("Vous êtes déjà amis.");
   }
 
+  const meProfileSnap = await getDoc(doc(db, "users", uid));
+  const meProfile = meProfileSnap.data() as any;
+  const displayName =
+    [meProfile?.firstName, meProfile?.lastName].filter(Boolean).join(" ") ||
+    meProfile?.username ||
+    meProfile?.usernameLowercase ||
+    auth.currentUser?.displayName ||
+    auth.currentUser?.email ||
+    uid;
+
+  const avatarUri =
+    (typeof meProfile?.photoURL === "string" && meProfile.photoURL.length > 0 && meProfile.photoURL) ||
+    (typeof meProfile?.avatar === "string" && meProfile.avatar.length > 0 && meProfile.avatar) ||
+    null;
+
   // Déjà une demande en attente ? on met l'ID du doc = expéditeur pour unicité
   const reqRef = doc(db, "users", targetId, "friendRequests", uid);
   // On ne peut pas lire la boîte de réception de la cible avec les règles actuelles,
@@ -65,6 +80,8 @@ export async function sendFriendRequest(targetId: string) {
   try {
     await setDoc(reqRef, {
       from: uid,
+      fromName: displayName,
+      fromAvatar: avatarUri,
       status: "pending",
       createdAt: serverTimestamp(),
     });
@@ -107,4 +124,21 @@ export async function rejectFriendRequest(userId: string, requestId: string) {
   } catch (e) {
     console.log("delete request error", e);
   }
+}
+
+// -------------------------------------------------------------
+// ❌ Supprimer un ami
+// -------------------------------------------------------------
+export async function removeFriend(friendId: string) {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error("Non connecté.");
+  if (!friendId) return;
+
+  const myRef = doc(db, "users", uid, "friends", friendId);
+  const theirRef = doc(db, "users", friendId, "friends", uid);
+
+  await Promise.all([
+    deleteDoc(myRef).catch(() => undefined),
+    deleteDoc(theirRef).catch(() => undefined),
+  ]);
 }
