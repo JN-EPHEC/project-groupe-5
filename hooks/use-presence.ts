@@ -1,6 +1,6 @@
+import { setUserOffline, setUserOnline } from "@/services/presence";
 import { useEffect } from "react";
 import { AppState } from "react-native";
-import { setUserOffline, setUserOnline } from "@/services/presence";
 
 export function usePresence() {
   useEffect(() => {

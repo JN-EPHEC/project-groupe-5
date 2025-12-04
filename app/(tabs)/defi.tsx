@@ -1,8 +1,8 @@
 import { useClub } from "@/hooks/club-context";
 import { useFriends } from "@/hooks/friends-context";
 import { usePoints } from "@/hooks/points-context";
-import { useUser } from "@/hooks/user-context";
 import { useThemeMode } from "@/hooks/theme-context";
+import { useUser } from "@/hooks/user-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";

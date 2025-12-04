@@ -12,15 +12,15 @@ import { ShareQRModal } from "@/components/ui/qr/ShareQRModal";
 // clubsData removed; clubs list now comes from Firestore
 import { auth, db } from "@/firebaseConfig";
 import { useClub } from "@/hooks/club-context";
-import { useFriends } from "@/hooks/friends-context";
 import type { Friend } from "@/hooks/friends-context";
+import { useFriends } from "@/hooks/friends-context";
 import { usePoints } from "@/hooks/points-context";
 import { useUser } from "@/hooks/user-context";
 import { acceptFriendRequest, getUserProfile, rejectFriendRequest, searchUsers, sendFriendRequest } from "@/services/friends";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { collection, doc, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot } from "firebase/firestore";
 import { useEffect } from "react";
 
 export default function SocialScreen() {

@@ -1,7 +1,7 @@
-import { useThemeMode } from "@/hooks/theme-context";
-import { useUser } from "@/hooks/user-context";
 import { useClub } from "@/hooks/club-context";
 import { usePoints } from "@/hooks/points-context";
+import { useThemeMode } from "@/hooks/theme-context";
+import { useUser } from "@/hooks/user-context";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { Image, StyleSheet, Text, View } from "react-native";

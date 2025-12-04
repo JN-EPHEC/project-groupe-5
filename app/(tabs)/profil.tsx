@@ -8,7 +8,6 @@ import { auth, db } from "@/firebaseConfig";
 import { useClub } from "@/hooks/club-context";
 import { useFriends } from "@/hooks/friends-context";
 import { usePoints } from "@/hooks/points-context";
-import { useSubscriptions } from "@/hooks/subscriptions-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { useUser } from "@/hooks/user-context";
 import * as Linking from "expo-linking";
@@ -19,13 +18,12 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-nati
 
 export default function ProfilScreen() {
   const { colors } = useThemeMode();
-  const { points, totalEarned, totalSpent, transactions } = usePoints();
+  const { points } = usePoints();
   const { user } = useUser();
   const fullName = `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim();
   const { joinedClub, members } = useClub();
   const [showQR, setShowQR] = useState(false);
   const { friends } = useFriends();
-  const { followers, following } = useSubscriptions();
   const router = useRouter();
   const [friendRequests, setFriendRequests] = useState<any[]>([]);
   const [friendsCount, setFriendsCount] = useState<number>(0);
@@ -88,7 +86,11 @@ export default function ProfilScreen() {
     );
     const sortedScores = [...scores, myPoints].sort((a, b) => b - a);
     const positionIndex = sortedScores.findIndex((score) => score === myPoints);
-    return positionIndex >= 0 ? `#${positionIndex + 1}` : "#—";
+    const position = positionIndex >= 0 ? positionIndex + 1 : null;
+    if (!position) return "—";
+    const totalFriends = sortedScores.length;
+    const label = position === 1 ? "1er" : `${position}e`;
+    return `${label} sur ${totalFriends}`;
   }, [friends, myPoints]);
 
   // Classement club (si club)
@@ -99,7 +101,11 @@ export default function ProfilScreen() {
     );
     const sortedScores = [...memberScores, myPoints].sort((a, b) => b - a);
     const positionIndex = sortedScores.findIndex((score) => score === myPoints);
-    return positionIndex >= 0 ? `#${positionIndex + 1}` : "#—";
+    const position = positionIndex >= 0 ? positionIndex + 1 : null;
+    if (!position) return "—";
+    const totalMembers = sortedScores.length;
+    const label = position === 1 ? "1er" : `${position}e`;
+    return `${label} sur ${totalMembers}`;
   }, [joinedClub, members, myPoints]);
 
   const pendingCount = friendRequests.filter(r => r.status === 'pending').length;
@@ -143,34 +149,8 @@ export default function ProfilScreen() {
   {/* CLASSEMENTS -> components/ui/profil/StatCard */}
       <View style={styles.row}>
         <StatCard icon="person-outline" label="Classement entre amis" value={friendRankLabel} />
-          <TouchableOpacity style={{ flex: 1 }} activeOpacity={0.8} onPress={() => router.push('/social?tab=clubs&view=clubRanking')}>
-            <StatCard icon="people" label="Classement club" value={clubRankLabel ?? '—'} />
-          </TouchableOpacity>
-      </View>
-
-      {/* HISTORIQUE DE POINTS (carte unique, seulement 2 dernières) */}
-      <View style={{ backgroundColor: colors.surface, padding: 16, borderRadius: 16, marginVertical: 10 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>Historique des points</Text>
-          <Text style={{ color: colors.mutedText, fontWeight: '600' }}>{totalEarned} pts</Text>
-        </View>
-        {transactions.length === 0 ? (
-          <Text style={{ color: colors.mutedText }}>Aucune transaction pour le moment.</Text>
-        ) : (
-          (transactions.slice(0, 2)).map((tx) => (
-            <View key={tx.id} style={{ backgroundColor: colors.surfaceAlt, padding: 12, borderRadius: 12, marginBottom: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: colors.text, fontWeight: '600' }}>{tx.source}</Text>
-                <Text style={{ color: colors.mutedText, fontSize: 12 }}>{new Date(tx.timestamp).toLocaleString()}</Text>
-              </View>
-              <Text style={{ color: tx.type === 'earn' ? '#2ECC71' : '#E74C3C', fontWeight: '700' }}>
-                {tx.type === 'earn' ? `+${tx.amount}` : `-${tx.amount}`} pts
-              </Text>
-            </View>
-          ))
-        )}
-        <TouchableOpacity onPress={() => router.push('/profil-historique')} style={{ marginTop: 6, alignSelf: 'flex-end' }}>
-          <Text style={{ color: colors.accent, fontWeight: '600' }}>Voir tout l'historique</Text>
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={0.8} onPress={() => router.push('/social?tab=clubs&view=clubRanking')}>
+          <StatCard icon="people" label="Classement club" value={clubRankLabel ?? '—'} />
         </TouchableOpacity>
       </View>
 

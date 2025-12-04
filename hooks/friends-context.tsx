@@ -1,18 +1,18 @@
 import { auth, db } from "@/firebaseConfig";
-import {
-  collection,
-  doc,
-  onSnapshot,
-} from "firebase/firestore";
 import type { Unsubscribe } from "firebase/firestore";
+import {
+    collection,
+    doc,
+    onSnapshot,
+} from "firebase/firestore";
 import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
 } from "react";
 
 export type Friend = {

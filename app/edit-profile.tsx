@@ -1,11 +1,11 @@
 import { useThemeMode } from "@/hooks/theme-context";
 import { useUser } from "@/hooks/user-context";
+import { uploadProfilePhoto } from "@/services/profile";
 import * as ImagePicker from "expo-image-picker";
 import { Stack, useRouter } from "expo-router";
 import { doc, setDoc } from "firebase/firestore";
 import React, { useMemo, useState } from "react";
 import { Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import { uploadProfilePhoto } from "@/services/profile";
 import { auth, db } from "../firebaseConfig";
 
 export default function EditProfileScreen() {
