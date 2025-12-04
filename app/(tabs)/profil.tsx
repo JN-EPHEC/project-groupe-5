@@ -1,5 +1,4 @@
 import { ChallengeHistoryList } from "@/components/ui/profil/ChallengeHistoryList";
-import DonationBanner from "@/components/ui/profil/DonationBanner";
 import { Header } from "@/components/ui/profil/Header";
 import { SettingsSection } from "@/components/ui/profil/SettingsSection";
 import { StatCard } from "@/components/ui/profil/StatCard";
@@ -15,7 +14,7 @@ import { useUser } from "@/hooks/user-context";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import { addDoc, collection, onSnapshot } from "firebase/firestore";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function ProfilScreen() {
@@ -28,6 +27,8 @@ export default function ProfilScreen() {
   const { friends } = useFriends();
   const { followers, following } = useSubscriptions();
   const router = useRouter();
+  const [friendRequests, setFriendRequests] = useState<any[]>([]);
+  const [friendsCount, setFriendsCount] = useState<number>(0);
   const startSubscription = async () => {
     const user = auth.currentUser;
     if (!user) {
@@ -59,6 +60,25 @@ export default function ProfilScreen() {
     }
   };
 
+  // Live friend requests section
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    return onSnapshot(collection(db, 'users', uid, 'friendRequests'), (snap) => {
+      const arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setFriendRequests(arr);
+    });
+  }, []);
+
+  // Live friends count for stats
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    return onSnapshot(collection(db, 'users', uid, 'friends'), (snap) => {
+      setFriendsCount(snap.size);
+    });
+  }, []);
+
   // Classement entre amis
   const friendRankLabel = useMemo(() => {
     const all = [...friends.map(a => a.points), points].sort((a,b) => b - a);
@@ -74,8 +94,7 @@ export default function ProfilScreen() {
     return `#${pos}`;
   }, [joinedClub, members, points]);
 
-  const followersCount = followers.length;
-  const followingCount = following.length;
+  const pendingCount = friendRequests.filter(r => r.status === 'pending').length;
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: 140 }}>
@@ -100,11 +119,11 @@ export default function ProfilScreen() {
 
   {/* STATS -> components/ui/profil/StatCard */}
       <View style={styles.row}>
-        <TouchableOpacity style={{ flex: 1 }} activeOpacity={0.8} onPress={() => router.push('/abonnements')}>
-          <StatCard icon="people-outline" value={String(followersCount)} label="Abonnés" />
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={0.8} onPress={() => router.push('/social?tab=amis')}>
+          <StatCard icon="people-outline" value={String(friendsCount)} label="Amis" />
         </TouchableOpacity>
-        <TouchableOpacity style={{ flex: 1 }} activeOpacity={0.8} onPress={() => router.push('/abonnements')}>
-          <StatCard icon="person-add-outline" value={String(followingCount)} label="Abonnements" />
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={0.8} onPress={() => router.push('/social?tab=amis')}>
+          <StatCard icon="person-add-outline" value={String(pendingCount)} label="Demandes d'amis" />
         </TouchableOpacity>
         <TouchableOpacity style={{ flex: 1 }} activeOpacity={0.8} onPress={() => router.push("/amis-plus")}> 
           <StatCard icon="person-add" label="Amis +" accent />
@@ -116,7 +135,9 @@ export default function ProfilScreen() {
   {/* CLASSEMENTS -> components/ui/profil/StatCard */}
       <View style={styles.row}>
         <StatCard icon="person-outline" label="Classement entre amis" value={friendRankLabel} />
-        <StatCard icon="people" label="Classement club" value={clubRankLabel ?? '—'} />
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={0.8} onPress={() => router.push('/social?tab=clubs&view=clubRanking')}>
+            <StatCard icon="people" label="Classement club" value={clubRankLabel ?? '—'} />
+          </TouchableOpacity>
       </View>
 
       {/* HISTORIQUE DE POINTS (carte unique, seulement 2 dernières) */}
@@ -151,10 +172,10 @@ export default function ProfilScreen() {
       {/* PREMIUM: juste au-dessus de la bannière Don */}
       <PremiumCard onSubscribe={startSubscription} />
 
-      {/* BANNIÈRE DON */}
-      <DonationBanner />
+      {/* BANNIÈRE DON supprimée */}
 
       
+      {/* DEMANDES D'AMIS supprimé */}
 
       {/* PARAMÈTRES -> components/ui/profil/SettingsSection (+ SettingSwitch) */}
       <SettingsSection />

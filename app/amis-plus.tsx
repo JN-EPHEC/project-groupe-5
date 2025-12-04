@@ -1,136 +1,183 @@
-import { useFriends } from "@/hooks/friends-context";
-import { useSubscriptions } from "@/hooks/subscriptions-context";
+import { auth, db } from "@/firebaseConfig";
 import { useThemeMode } from "@/hooks/theme-context";
+import { searchUsers, sendFriendRequest } from "@/services/friends";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useMemo, useState } from "react";
-import { FlatList, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-
-type Suggestion = {
-  id: string;
-  name: string;
-  handle: string;
-  city: string;
-};
-
-const SUGGESTIONS: Suggestion[] = [
-  { id: "s1", name: "Léa Martin", handle: "@leaverte", city: "Bruxelles" },
-  { id: "s2", name: "Arthur Dubois", handle: "@arthurcycle", city: "Liège" },
-  { id: "s3", name: "Inès B.", handle: "@ineszero", city: "Namur" },
-  { id: "s4", name: "Yanis", handle: "@yanis.eco", city: "LLN" },
-  { id: "s5", name: "Camille", handle: "@camille.green", city: "Charleroi" },
-];
-
-function avatarForSuggestion(id: string): string {
-  const map: Record<string, string> = {
-    s1: "https://randomuser.me/api/portraits/women/68.jpg",
-    s2: "https://randomuser.me/api/portraits/men/75.jpg",
-    s3: "https://randomuser.me/api/portraits/women/45.jpg",
-    s4: "https://randomuser.me/api/portraits/men/40.jpg",
-    s5: "https://randomuser.me/api/portraits/women/24.jpg",
-  };
-  return map[id] || "https://randomuser.me/api/portraits/lego/1.jpg";
-}
+import { collection, onSnapshot } from "firebase/firestore";
+import { useEffect, useState } from "react";
+import { Alert, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 export default function AmisPlusScreen() {
   const { colors } = useThemeMode();
   const router = useRouter();
-  const { addFriend, isFriend } = useFriends();
-  const { follow } = useSubscriptions();
-  const [query, setQuery] = useState("");
 
-  const results = useMemo(
-    () => SUGGESTIONS.filter((p) => `${p.name} ${p.handle}`.toLowerCase().includes(query.toLowerCase())),
-    [query]
-  );
+  const [searchText, setSearchText] = useState("");
+  const [results, setResults] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [myFriendIds, setMyFriendIds] = useState<Record<string, true>>({});
+  const [requested, setRequested] = useState<Record<string, true>>({});
+
+  // Live friends to disable the button when already friends
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    const unsub = onSnapshot(collection(db, "users", uid, "friends"), (snap) => {
+      const ids: Record<string, true> = {};
+      snap.docs.forEach((d) => { ids[d.id] = true; });
+      setMyFriendIds(ids);
+    });
+    return () => unsub();
+  }, []);
+
+  async function handleSearch() {
+    if (searchText.trim().length < 1) {
+      setResults([]);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const users = await searchUsers(searchText.trim());
+      setResults(users);
+    } catch (e) {
+      console.log("search err", e);
+      Alert.alert("Erreur", "Impossible de rechercher les utilisateurs.");
+    }
+    setLoading(false);
+  }
+
+  async function handleAddFriend(targetId: string) {
+    try {
+      await sendFriendRequest(targetId);
+      Alert.alert("Demande envoyée !");
+      setRequested((prev) => ({ ...prev, [targetId]: true }));
+    } catch (e: any) {
+      console.log(e);
+      if (String(e?.message || "").includes("Demande déjà envoyée")) {
+        setRequested((prev) => ({ ...prev, [targetId]: true }));
+        Alert.alert("Info", "Demande déjà envoyée.");
+      } else if (String(e?.message || "").includes("déjà amis")) {
+        Alert.alert("Info", "Vous êtes déjà amis.");
+      } else {
+        Alert.alert("Erreur", e.message || "Impossible d’envoyer la demande.");
+      }
+    }
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}> 
-      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 14 }}>
-        <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 8 }}>
-          <Ionicons name="arrow-back" size={22} color={colors.text} />
+      
+      {/* HEADER */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={{ paddingRight: 10 }}>
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={{ color: colors.text, fontSize: 20, fontWeight: "700" }}>Amis +</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Amis +</Text>
       </View>
 
-      <Text style={{ color: colors.mutedText, marginBottom: 12 }}>
-        Inviter tes amis ou découvre de nouveaux profils à suivre.
+      <Text style={{ color: colors.mutedText, marginBottom: 14 }}>
+        Invite tes amis ou découvre de nouveaux profils à suivre.
       </Text>
 
-      <View style={[styles.inputWrap, { borderColor: colors.accent }]}> 
+      {/* SEARCH BAR */}
+      <View style={[styles.searchContainer, { backgroundColor: colors.surfaceAlt }]}>
         <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Nom ou @handle"
+          placeholder="Recherche..."
           placeholderTextColor={colors.mutedText}
-          style={{ color: colors.text, paddingHorizontal: 12, paddingVertical: 10, flex: 1 }}
+          value={searchText}
+          onChangeText={setSearchText}
+          style={[styles.searchInput, { color: colors.text }]}
         />
+        <TouchableOpacity
+          onPress={handleSearch}
+          style={[styles.searchBtn, { backgroundColor: colors.accent }]}
+        >
+          <Text style={{ color: "#0F3327", fontWeight: "700" }}>Chercher</Text>
+        </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={[styles.searchBtn, { backgroundColor: colors.accent }]} onPress={() => { /* no-op, live filter */ }}>
-        <Text style={{ color: "#0F3327", fontWeight: "800" }}>Chercher</Text>
-      </TouchableOpacity>
+      {/* RESULTS */}
+      {loading && <Text style={{ color: colors.mutedText }}>Recherche en cours...</Text>}
 
       <FlatList
+        style={{ marginTop: 10 }}
         data={results}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingBottom: 160 }}
+        ListEmptyComponent={
+          !loading ? (
+            <Text style={{ color: colors.mutedText }}>Aucun utilisateur.</Text>
+          ) : null
+        }
         renderItem={({ item }) => {
-          const already = isFriend(item.id);
           return (
-            <View style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.surfaceAlt }]}> 
-              <Image source={{ uri: avatarForSuggestion(item.id) }} style={styles.avatar} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: colors.text, fontWeight: "700", marginBottom: 2 }}>{item.name}</Text>
-                <Text style={{ color: colors.mutedText }}>{item.handle} • {item.city}</Text>
+            <View
+              style={[
+                styles.resultRow,
+                { backgroundColor: colors.surface },
+              ]}
+            >
+              <View>
+                <Text style={{ color: colors.text, fontWeight: "700" }}>
+                  {item.username || item.firstName || "Utilisateur"}
+                </Text>
+                <Text style={{ color: colors.mutedText }}>{item.email}</Text>
               </View>
-              <TouchableOpacity
-                disabled={already}
-                onPress={() => {
-                  addFriend({ id: item.id, name: item.name, points: 400 + Math.floor(Math.random() * 300), online: Math.random() > 0.5, avatar: avatarForSuggestion(item.id) });
-                  follow({ id: item.id, name: item.name, avatar: avatarForSuggestion(item.id) });
-                }}
-                style={{
-                  paddingHorizontal: 16,
-                  paddingVertical: 10,
-                  borderRadius: 16,
-                  borderWidth: 1,
-                  borderColor: colors.accent,
-                  opacity: already ? 0.6 : 1,
-                }}
-              >
-                <Text style={{ color: colors.accent, fontWeight: "700" }}>{already ? "Ajouté" : "S'abonner"}</Text>
-              </TouchableOpacity>
+
+              {item.id !== auth.currentUser?.uid && (
+                <TouchableOpacity
+                  disabled={!!myFriendIds[item.id] || !!requested[item.id]}
+                  onPress={() => handleAddFriend(item.id)}
+                  style={[
+                    styles.addBtn,
+                    { backgroundColor: (!!myFriendIds[item.id] || !!requested[item.id]) ? colors.surfaceAlt : colors.accent },
+                  ]}
+                >
+                  <Text style={{ color: (!!myFriendIds[item.id] || !!requested[item.id]) ? colors.mutedText : "#0F3327", fontWeight: "700" }}>
+                    {myFriendIds[item.id] ? "Amis" : requested[item.id] ? "Demandé" : "Ajouter"}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           );
         }}
-        ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20 },
-  inputWrap: {
-    borderWidth: 2,
-    borderRadius: 18,
-    marginTop: 6,
-  },
-  searchBtn: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 22,
-    paddingVertical: 12,
-    borderRadius: 22,
-    marginVertical: 12,
-  },
-  row: {
+  container: { flex: 1, paddingHorizontal: 20, paddingTop: 20 },
+  header: { flexDirection: "row", alignItems: "center", marginBottom: 16 },
+  title: { fontSize: 24, fontWeight: "700" },
+
+  searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    borderRadius: 18,
-    borderWidth: 1,
+    padding: 8,
+    borderRadius: 16,
+    marginBottom: 10,
   },
-  avatar: { width: 40, height: 40, borderRadius: 20, marginRight: 12 },
+  searchInput: { flex: 1, marginLeft: 8, fontSize: 16, fontWeight: "600" },
+
+  searchBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    marginLeft: 8,
+  },
+
+  resultRow: {
+    padding: 12,
+    borderRadius: 14,
+    marginBottom: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  addBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+  },
 });
