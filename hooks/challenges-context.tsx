@@ -1,37 +1,65 @@
-import type { Challenge } from "@/components/ui/defi/types";
+// hooks/challenges-context.ts
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
+import { Challenge } from "@/components/ui/defi/types";
+import { auth, db } from "@/firebaseConfig";
 import { usePoints } from "@/hooks/points-context";
-import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  updateDoc
+} from "firebase/firestore";
+
+// ------------------------------------------------------------
+// TYPES
+// ------------------------------------------------------------
 
 export type ActiveChallenge = Challenge & {
-  status: 'active' | 'pendingValidation' | 'validated';
-  photoUri?: string;
-  photoComment?: string;
-  proofId?: string;
+  firestoreId: string;
+  status: "active" | "pendingValidation" | "validated";
+  startedAt?: Date;
+  expiresAt?: Date;
+  photoUri?: string | null;
+  photoComment?: string | null;
+  proofId?: string | null;
   proofSubmitted?: boolean;
   feedbackRating?: number | null;
   feedbackComment?: string | null;
-  feedbackSubmitted?: boolean; // une fois l'avis envoyé, on masque la carte du défi
+  feedbackSubmitted?: boolean;
 };
 
 export type ChallengeHistoryEntry = {
-  id: string; // unique id for history entry
-  challengeId: number;
+  id: string;
+  challengeId: string;
   title: string;
   description?: string;
   category: Challenge["category"];
   points: number;
-  photoUri?: string;
-  validatedAt: string; // ISO timestamp
+  photoUri?: string | null;
+  validatedAt: string;
 };
+
+// ------------------------------------------------------------
+// CONTEXT SHAPE
+// ------------------------------------------------------------
 
 type ChallengesContextType = {
   current: ActiveChallenge | null;
   start: (challenge: Challenge) => void;
   stop: (id?: number) => void;
-  validateWithPhoto: (photoUri: string, comment?: string) => void; // submits photo (+ optional comment) -> pendingValidation
-  approveCurrent: () => void; // admin/validation step
+  validateWithPhoto: (photoUri: string, comment?: string) => void;
+  approveCurrent: () => void;
   activities: Record<string, Challenge["category"]>;
-  canceledIds: number[];
+  canceledIds: number[]; // ← FIX
   reviewRequiredCount: number;
   reviewCompleted: number;
   incrementReview: () => void;
@@ -40,92 +68,300 @@ type ChallengesContextType = {
   setPhotoComment: (comment: string) => void;
 };
 
-const ChallengesContext = createContext<ChallengesContextType | undefined>(undefined);
+// ------------------------------------------------------------
+// CONTEXT
+// ------------------------------------------------------------
 
-export function ChallengesProvider({ children }: { children: React.ReactNode }) {
+const ChallengesContext = createContext<ChallengesContextType | undefined>(
+  undefined
+);
+
+
+export function ChallengesProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const [current, setCurrent] = useState<ActiveChallenge | null>(null);
-  const [activities, setActivities] = useState<Record<string, Challenge["category"]>>({});
-  const [canceledIds, setCanceledIds] = useState<number[]>([]);
   const [reviewCompleted, setReviewCompleted] = useState(0);
   const reviewRequiredCount = 3;
   const { addPoints } = usePoints();
   const [history, setHistory] = useState<ChallengeHistoryEntry[]>([]);
+  const [activities, setActivities] = useState<Record<string, Challenge["category"]>>({});
+  const [canceledIds, setCanceledIds] = useState<number[]>([]);
+  const uid = auth.currentUser?.uid;
+  const activeDefiRef = uid
+    ? doc(collection(doc(db, "users", uid), "activeDefi"), "perso")
+    : null;
 
-  const start = useCallback((challenge: Challenge) => {
-    setCurrent({ ...challenge, status: 'active' });
-    setReviewCompleted(0); // reset any previous gating progress
+  // ------------------------------------------------------------
+  // LOAD ACTIVE DEFI ON APP START
+  // ------------------------------------------------------------
+  useEffect(() => {
+    if (!activeDefiRef) return;
+
+    const load = async () => {
+      const snap = await getDoc(activeDefiRef);
+      if (!snap.exists()) return;
+
+      const data = snap.data();
+      setCurrent({
+        firestoreId: data.defiId,
+        id: Date.now(), // any number; just to have a key, it doesn't need to match rotatingChallenges
+
+        title: data.titre,
+        description: data.description,
+        category: data.categorie ?? "Recyclage",
+        difficulty:
+          data.difficulte === "facile"
+            ? "Facile"
+            : data.difficulte === "moyen"
+            ? "Moyen"
+            : "Difficile",
+        points: data.points,
+        audience: "Membre",
+        timeLeft: "Aujourd'hui",
+
+        status: data.status,
+        startedAt: data.startedAt?.toDate?.() ?? undefined,
+        expiresAt: data.expiresAt?.toDate?.() ?? undefined,
+        photoUri: data.photoUri ?? null,
+        photoComment: data.photoComment ?? null,
+        proofId: data.proofId ?? null,
+        proofSubmitted: data.proofSubmitted ?? false,
+        feedbackRating: data.feedbackRating ?? null,
+        feedbackComment: data.feedbackComment ?? null,
+        feedbackSubmitted: data.feedbackSubmitted ?? false,
+      });
+    };
+
+    load();
+  }, [uid]);
+
+  // ------------------------------------------------------------
+  // START A DEFI (WRITE TO FIRESTORE)
+  // ------------------------------------------------------------
+  const start = useCallback(async (challenge: Challenge) => {
+    if (!challenge.firestoreId) {
+      console.warn("Missing Firestore ID for challenge");
+      return;
+    }
+
+    const startedAt = new Date();
+    const expiresAt = new Date(startedAt.getTime() + 24 * 60 * 60 * 1000);
+
+    const activeData = {
+      // link to the "defis" doc
+      defiId: challenge.firestoreId,        // <-- real Firestore id of the défi
+
+      // snapshot of the défi at the moment you start it
+      titre: challenge.title,
+      description: challenge.description,
+      categorie: challenge.category,
+      difficulte:
+        challenge.difficulty === "Facile"
+          ? "facile"
+          : challenge.difficulty === "Moyen"
+          ? "moyen"
+          : "difficile",
+      points: challenge.points,
+
+      // runtime state
+      startedAt,
+      expiresAt,
+      status: "active",
+
+      // proof / feedback (initial empty)
+      photoUri: null,
+      photoComment: "",
+      proofId: null,
+      proofSubmitted: false,
+      feedbackRating: null,
+      feedbackComment: null,
+      feedbackSubmitted: false,
+    };
+
+
+    // 🔥 Save to Firestore
+    const { auth, db } = await import("@/firebaseConfig");
+    const { doc, setDoc } = await import("firebase/firestore");
+
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+
+    await setDoc(
+      doc(db, "users", uid, "activeDefi", "perso"),
+      activeData
+    );
+
+    // 🔥 Update local state
+    setCurrent({
+      ...challenge,
+      firestoreId: challenge.firestoreId,
+      status: "active",
+      startedAt,
+      expiresAt,
+      photoUri: null,
+      photoComment: null,
+      proofId: null,
+      proofSubmitted: false,
+      feedbackRating: null,
+      feedbackComment: null,
+      feedbackSubmitted: false,
+    });
+
+    setReviewCompleted(0);
   }, []);
 
-  const stop = useCallback((id?: number) => {
+
+  // ------------------------------------------------------------
+  // STOP (CANCEL)
+  // ------------------------------------------------------------
+  const stop = useCallback(async () => {
+    console.log("STOP() CALLED");
+
+    if (!activeDefiRef) {
+      console.log("❌ activeDefiRef is NULL");
+      return;
+    }
+
+    console.log("Deleting from Firestore path:", activeDefiRef.path);
+
+    try {
+      await deleteDoc(activeDefiRef);
+      console.log("✔ Successfully deleted Firestore doc");
+    } catch (err) {
+      console.log("❌ FAILED deleting Firestore doc:", err);
+    }
+
     setCurrent(null);
-    const canceledId = id ?? current?.id;
-    if (typeof canceledId === 'number') {
-      setCanceledIds((prev) => (prev.includes(canceledId) ? prev : [...prev, canceledId]));
-    }
-  }, [current]);
+    console.log("✔ local state current = null");
+  }, [activeDefiRef]);
 
-  // user submits photo evidence -> move to pendingValidation (no points yet)
-  const validateWithPhoto = useCallback((photoUri: string, comment?: string) => {
-    if (current && current.status === 'active') {
-      setCurrent({ ...current, status: 'pendingValidation', photoUri, photoComment: comment, proofSubmitted: false });
-      setReviewCompleted(0); // begin gating phase
-      // Submit to Firestore/Storage in background with empty comment for now
-      import("@/services/proofs").then(async ({ submitProof }) => {
-        try {
-          const { id } = await submitProof(String(current.id), photoUri, comment ?? "");
-          setCurrent((prev) => (prev ? { ...prev, proofId: id, proofSubmitted: true } : prev));
-        } catch (e) {
-          // keep UI state; validators list will be empty until retry
-          // Optional: surface error elsewhere
-        }
-      });
-    }
-  }, [current]);
 
-  // approval grants points and marks validated
-  const approveCurrent = useCallback(() => {
-    if (current && current.status === 'pendingValidation') {
-      const dateKey = new Date().toISOString().slice(0, 10);
-      addPoints(current.points);
-      setActivities((prev) => ({ ...prev, [dateKey]: current.category }));
-      // Push into history
-      setHistory((prev) => {
-        const already = prev.find((h) => h.challengeId === current.id);
-        if (already) return prev; // avoid duplicates
-        const entry: ChallengeHistoryEntry = {
-          id: `${current.id}-${Date.now()}`,
-          challengeId: current.id,
-          title: current.title,
-          description: current.description,
-          category: current.category,
-          points: current.points,
-          photoUri: current.photoUri,
-          validatedAt: new Date().toISOString(),
-        };
-        return [entry, ...prev];
+  // ------------------------------------------------------------
+  // SUBMIT PHOTO → pendingValidation
+  // ------------------------------------------------------------
+  const validateWithPhoto = useCallback(
+    async (photoUri: string, comment?: string) => {
+      if (!current || !activeDefiRef) return;
+
+      await updateDoc(activeDefiRef, {
+        photoUri,
+        photoComment: comment ?? "",
+        status: "pendingValidation",
       });
-      setCurrent({ ...current, status: 'validated' });
+
+      setCurrent((p) =>
+        p
+          ? {
+              ...p,
+              status: "pendingValidation",
+              photoUri,
+              photoComment: comment ?? "",
+            }
+          : p
+      );
+
       setReviewCompleted(0);
+    },
+    [current, activeDefiRef]
+  );
+
+  // ------------------------------------------------------------
+  // APPROVE (AFTER GATING)
+  // ------------------------------------------------------------
+  const approveCurrent = useCallback(async () => {
+    if (!current || current.status !== "pendingValidation") return;
+
+    const dateKey = new Date().toISOString().slice(0, 10);
+    addPoints(current.points);
+
+    setActivities(prev => ({ ...prev, [dateKey]: current.category }));
+
+    setHistory(prev => {
+      const entry: ChallengeHistoryEntry = {
+        id: `${current.firestoreId}-${Date.now()}`,
+        challengeId: String(current.firestoreId ?? current.id),
+        title: current.title,
+        description: current.description,
+        category: current.category,
+        points: current.points,
+        photoUri: current.photoUri || undefined,
+        validatedAt: new Date().toISOString(),
+      };
+      return [entry, ...prev];
+    });
+
+    setCurrent({ ...current, status: "validated" });
+    setReviewCompleted(0);
+
+    // 🔥 Optionally remove activeDefi from Firestore
+    const { auth, db } = await import("@/firebaseConfig");
+    const { doc, deleteDoc } = await import("firebase/firestore");
+
+    const uid = auth.currentUser?.uid;
+    if (uid) {
+      await deleteDoc(doc(db, "users", uid, "activeDefi", "perso"));
     }
   }, [current, addPoints]);
 
-  const incrementReview = useCallback(() => {
-    setReviewCompleted((prev) => (prev >= reviewRequiredCount ? prev : prev + 1));
-  }, [reviewRequiredCount]);
 
-  const setFeedback = useCallback((rating: number, comment: string) => {
-    setCurrent((prev) => (prev ? { ...prev, feedbackRating: rating, feedbackComment: comment, feedbackSubmitted: true } : prev));
+  // ------------------------------------------------------------
+  // FEEDBACK
+  // ------------------------------------------------------------
+  const setFeedback = useCallback(
+    async (rating: number, comment: string) => {
+      if (!current || !activeDefiRef) return;
+
+      await updateDoc(activeDefiRef, {
+        feedbackRating: rating,
+        feedbackComment: comment,
+        feedbackSubmitted: true,
+      });
+
+      setCurrent((prev) =>
+        prev
+          ? {
+              ...prev,
+              feedbackRating: rating,
+              feedbackComment: comment,
+              feedbackSubmitted: true,
+            }
+          : prev
+      );
+    },
+    [current, activeDefiRef]
+  );
+
+  // ------------------------------------------------------------
+  // UPDATE PHOTO COMMENT
+  // ------------------------------------------------------------
+  const setPhotoComment = useCallback(
+    async (comment: string) => {
+      if (!current || !activeDefiRef) return;
+
+      await updateDoc(activeDefiRef, {
+        photoComment: comment,
+      });
+
+      setCurrent((prev) =>
+        prev ? { ...prev, photoComment: comment } : prev
+      );
+    },
+    [current, activeDefiRef]
+  );
+
+  // ------------------------------------------------------------
+  // GATING
+  // ------------------------------------------------------------
+  const incrementReview = useCallback(() => {
+    setReviewCompleted((p) => (p < reviewRequiredCount ? p + 1 : p));
   }, []);
 
-  const setPhotoComment = useCallback((comment: string) => {
-    setCurrent((prev) => (prev ? { ...prev, photoComment: comment } : prev));
-    // If a proof already exists, update its comment in Firestore
-    import("@/services/proofs").then(({ updateProofComment }) => {
-      const id = current?.proofId;
-      if (id) updateProofComment(id, comment).catch(() => {});
-    });
-  }, [current?.proofId]);
-
+  // ------------------------------------------------------------
+  // VALUE
+  // ------------------------------------------------------------
   const value = useMemo(
     () => ({
       current,
@@ -139,12 +375,29 @@ export function ChallengesProvider({ children }: { children: React.ReactNode }) 
       reviewCompleted,
       incrementReview,
       setFeedback,
-      history,
       setPhotoComment,
+      history,
     }),
-    [current, start, stop, validateWithPhoto, approveCurrent, activities, canceledIds, reviewRequiredCount, reviewCompleted, incrementReview, setFeedback, history, setPhotoComment]
+    [
+      current,
+      start,
+      stop,
+      validateWithPhoto,
+      approveCurrent,
+      reviewRequiredCount,
+      reviewCompleted,
+      incrementReview,
+      setFeedback,
+      setPhotoComment,
+      history,
+    ]
   );
-  return <ChallengesContext.Provider value={value}>{children}</ChallengesContext.Provider>;
+
+  return (
+    <ChallengesContext.Provider value={value}>
+      {children}
+    </ChallengesContext.Provider>
+  );
 }
 
 export function useChallenges() {

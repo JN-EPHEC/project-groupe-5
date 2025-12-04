@@ -1,7 +1,19 @@
-import { auth, db } from "@/firebaseConfig";
-import { createClub as createClubService, demoteOfficer as demoteOfficerService, joinClub as joinClubService, leaveClub as leaveClubService, promoteOfficer as promoteOfficerService, updateClubFirebase } from "@/services/clubs";
-import { doc, onSnapshot } from "firebase/firestore";
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
+
+export type ClubVisibility = "public" | "private";
+export type ClubInfo = { id: string; name: string; participants: number; desc?: string; visibility?: ClubVisibility; emoji?: string; photoUri?: string; city?: string; ownerId?: string; officers?: string[]; logo?: string };
+export type ClubMember = { id: string; name: string; avatar: string; points: number };
+
+type ClubContextType = {
+  joinedClub: ClubInfo | null;
+  members: ClubMember[]; // members of the joined club (excluding current user)
+  joinClub: (club: ClubInfo) => boolean; // false if already in another club
+  createClub: (data: { name: string; desc: string; visibility: ClubVisibility; emoji?: string; photoUri?: string; city: string }) => ClubInfo; // returns created club
+  leaveClub: () => void;
+  promoteToOfficer: (memberId: string) => void;
+  demoteOfficer: (memberId: string) => void;
+  updateClub: (patch: Partial<Omit<ClubInfo, 'id' | 'participants'>>) => void;
+};
 
 interface ClubContextType {
   joinedClub: any;

@@ -135,21 +135,22 @@ export default function DefiScreen() {
       const selected: Challenge[] = [];
       let idCounter = 1;
 
-      // Facile → Moyen → Difficile
       const pick = (diffKey: keyof typeof byDiff, label: Challenge["difficulty"]) => {
         const d = byDiff[diffKey][0];
         if (!d) return;
         selected.push({
-          id: idCounter++,
+          id: idCounter++,                // UI ID
+          firestoreId: d.id,              // REAL Firestore ID from Firestore
           title: d.titre,
           description: d.description,
-          category: "Recyclage" as any, // not really used anymore
+          category: "Recyclage" as any,
           difficulty: label,
           points: d.points,
           audience: "Membre",
           timeLeft: "Aujourd'hui",
         });
       };
+
 
       pick("facile", "Facile");
       pick("moyen", "Moyen");
@@ -178,16 +179,27 @@ export default function DefiScreen() {
 
   // 🔁 Activate or cancel a challenge
   const toggleOngoing = (id: number) => {
-    const challenge = rotatingChallenges.find((c) => c.id === id);
-    if (!challenge) return;
+  console.log("TOGGLE CALLED WITH ID:", id);
 
-    if (current && current.id === id) {
-      stop(id);
-      return;
-    }
+  if (current && current.id === id) {
+    console.log("→ Cancelling active challenge via stop()");
+    stop(); // stop does not need the id
+    return;
+  }
 
-    start(challenge);
-  };
+  const challenge = rotatingChallenges.find((c) => c.id === id);
+  console.log("FOUND CHALLENGE:", challenge);
+  if (!challenge) {
+    console.log("⚠️ No challenge found for id", id);
+    return;
+  }
+
+  console.log("→ Starting challenge", challenge.title);
+  start(challenge);
+};
+
+
+
 
   // 📷 Camera
   const openCamera = (challengeId: number) => {
@@ -328,25 +340,28 @@ export default function DefiScreen() {
 
             {/* Normal challenge cards (3 rotation + maybe current) */}
             {!gatingActive &&
-              challengesToDisplay.map((challenge: any) => (
-                <ChallengeCard
-                  key={challenge.id}
-                  challenge={challenge}
-                  categorie="personnel"
-                  isOngoing={current?.id === challenge.id}
-                  status={
-                    current?.id === challenge.id ? current?.status : undefined
-                  }
-                  onToggle={toggleOngoing}
-                  onValidatePhoto={
-                    current &&
-                    current.id === challenge.id &&
-                    current.status === "active"
-                      ? () => openCamera(challenge.id)
-                      : undefined
-                  }
-                />
-              ))}
+              challengesToDisplay.map((challenge: any) => {
+                console.log("🔍 CHALLENGES TO DISPLAY:", challengesToDisplay);
+
+                return (
+                  <ChallengeCard
+                    key={challenge.id}
+                    challenge={challenge}
+                    categorie="personnel"
+                    isOngoing={current?.id === challenge.id}
+                    status={current?.id === challenge.id ? current?.status : undefined}
+                    onToggle={toggleOngoing}
+                    onValidatePhoto={
+                      current &&
+                      current.id === challenge.id &&
+                      current.status === "active"
+                        ? () => openCamera(challenge.id)
+                        : undefined
+                    }
+                  />
+                );
+              })}
+
 
             {/* Feedback form when pending validation & reviews complete */}
             {current &&
