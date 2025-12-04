@@ -1,7 +1,7 @@
 import { useThemeMode } from "@/hooks/theme-context";
-import { useMemo, useState } from "react";
-import { Alert, FlatList, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-
+import { useMemo, useRef, useState } from "react";
+import { Alert, Button, FlatList, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+  
 // Composants UI
 import { ChatView } from "@/components/ui/social/ChatView";
 import { ClubCard } from "@/components/ui/social/ClubCard";
@@ -9,15 +9,18 @@ import { FriendCard } from "@/components/ui/social/FriendCard";
 
 // Données statiques
 import { ShareQRModal } from "@/components/ui/qr/ShareQRModal";
-import { clubsData } from "@/components/ui/social/data";
+// clubsData removed; clubs list now comes from Firestore
+import { auth, db } from "@/firebaseConfig";
 import { useClub } from "@/hooks/club-context";
 import { useFriends } from "@/hooks/friends-context";
 import { usePoints } from "@/hooks/points-context";
 import { useSubscriptions } from "@/hooks/subscriptions-context";
 import { useUser } from "@/hooks/user-context";
+import { acceptFriendRequest, rejectFriendRequest, searchUsers, sendFriendRequest } from "@/services/friends";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { collection, doc, onSnapshot } from "firebase/firestore";
 import { useEffect } from "react";
 
 export default function SocialScreen() {
@@ -37,8 +40,13 @@ export default function SocialScreen() {
   const [messages, setMessages] = useState<any[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [friendSearchText, setFriendSearchText] = useState("");
+  const [friendSearchResults, setFriendSearchResults] = useState<any[]>([]);
+  const [friendRequests, setFriendRequests] = useState<any[]>([]);
+  const [friendsLive, setFriendsLive] = useState<any[]>([]);
+  const [friendProfiles, setFriendProfiles] = useState<Record<string, any>>({});
   const [clubSearch, setClubSearch] = useState("");
-  const [clubs, setClubs] = useState(clubsData);
+  const [clubs, setClubs] = useState<any[]>([]);
   const { joinedClub, joinClub, leaveClub, members, createClub, promoteToOfficer, demoteOfficer, updateClub } = useClub();
   const { points } = usePoints();
   const { user } = useUser();
@@ -49,12 +57,37 @@ export default function SocialScreen() {
   // Modal de confirmation pour quitter le club
   const [leaveConfirmVisible, setLeaveConfirmVisible] = useState(false);
 
+  const initFromParams = useRef(false);
   useEffect(() => {
+    if (initFromParams.current) return;
     const tabParam = (params?.tab as string) || "";
     if (tabParam === "amis" || tabParam === "clubs") {
       setSelectedTab(tabParam as any);
     }
+    initFromParams.current = true;
   }, [params]);
+
+  // Realtime clubs listing from Firestore
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "clubs"), (snap) => {
+      const firebaseClubs = snap.docs.map((doc) => {
+        const d: any = doc.data();
+        return {
+          id: doc.id,
+          name: d.name,
+          desc: d.description ?? d.desc,
+          city: d.city,
+          photoUri: d.photoUrl,
+          emoji: "🌿",
+          participants: (d.members || []).length,
+          joined: (d.members || []).includes(auth.currentUser?.uid || ""),
+        };
+      });
+      setClubs(firebaseClubs);
+    });
+    return () => unsub();
+  }, []);
+ 
   
   // Support deep-link to club ranking: /social?tab=clubs&view=clubRanking
   useEffect(() => {
@@ -84,17 +117,18 @@ export default function SocialScreen() {
   };
 
   const clubRankingData = useMemo(() => {
-    // Merge club members with current user for ranking
     const base = members.map((m) => ({ ...m, isMe: false }));
     const me = {
-      id: "me",
+      id: auth.currentUser?.uid || "me",
       name: user?.firstName ?? "Utilisateur",
       avatar: user?.photoURL ?? null,
       isMe: true,
       points: points || 0,
     } as any;
     const all = [...base, me];
-    return all.sort((a, b) => (b.points || 0) - (a.points || 0)).map((m, idx) => ({ ...m, rank: idx + 1 }));
+    return all
+      .sort((a, b) => (b.points || 0) - (a.points || 0))
+      .map((m, idx) => ({ ...m, rank: idx + 1 }));
   }, [members, points, user]);
 
   const clanTotalPoints = useMemo(() => {
@@ -104,202 +138,60 @@ export default function SocialScreen() {
 
   // no early return; keep tabs visible in all views
 
-  const handleLeaveClub = () => {
-    // update local list
-    setClubs((prev) => prev.map((c) => (c.joined ? { ...c, joined: false, participants: Math.max(0, (c.participants || 1) - 1) } : c)));
-    leaveClub();
+  const handleLeaveClub = async () => {
+    await leaveClub();
     setView("main");
   };
 
-  if (view === "createClub") {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}> 
-        <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
-        <TouchableOpacity onPress={() => setView("main")} style={{ marginBottom: 16 }}>
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={{ color: colors.text, fontSize: 22, fontWeight: "700", marginBottom: 6 }}>{editingClub ? 'Modifier le club' : 'Créer un club'}</Text>
-          {/* Avatar preview */}
-        <View style={{ alignItems: 'center', marginBottom: 12 }}>
-          {newClubPhoto ? (
-            <Image source={{ uri: newClubPhoto }} style={{ width: 72, height: 72, borderRadius: 36 }} />
-          ) : (
-            <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ fontSize: 28 }}>🌿</Text>
-            </View>
-          )}
-        </View>
-        <Text style={{ color: colors.mutedText, marginBottom: 20 }}>Définis les informations de ton nouveau club.</Text>
-        <View style={{ gap: 14 }}>
-          <View>
-            <Text style={{ color: colors.text, fontWeight: "600", marginBottom: 6 }}>Ville</Text>
-            <TextInput
-              value={newClubCity}
-              onChangeText={setNewClubCity}
-              placeholder="Ex: Bruxelles"
-              placeholderTextColor={colors.mutedText}
-              style={{
-                backgroundColor: colors.surfaceAlt,
-                color: colors.text,
-                padding: 14,
-                borderRadius: 14,
-                fontWeight: "600",
-              }}
-            />
-          </View>
-          <View>
-            <Text style={{ color: colors.text, fontWeight: "600", marginBottom: 6 }}>Nom du club</Text>
-            <TextInput
-              value={newClubName}
-              onChangeText={setNewClubName}
-              placeholder="Ex: Eco Warriors"
-              placeholderTextColor={colors.mutedText}
-              style={{
-                backgroundColor: colors.surfaceAlt,
-                color: colors.text,
-                padding: 14,
-                borderRadius: 14,
-                fontWeight: "600",
-              }}
-            />
-          </View>
-          <View>
-            <Text style={{ color: colors.text, fontWeight: "600", marginBottom: 6 }}>Description</Text>
-            <TextInput
-              multiline
-              value={newClubDesc}
-              onChangeText={setNewClubDesc}
-              numberOfLines={4}
-              style={{
-                backgroundColor: colors.surfaceAlt,
-                color: colors.text,
-                padding: 14,
-                borderRadius: 14,
-                minHeight: 110,
-                textAlignVertical: "top",
-              }}
-              placeholder="Décris ton club..."
-              placeholderTextColor={colors.mutedText}
-            />
-          </View>
-          <View>
-            <Text style={{ color: colors.text, fontWeight: "600", marginBottom: 6 }}>Photo (optionnel)</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              {newClubPhoto ? (
-                <>
-                  <Image source={{ uri: newClubPhoto }} style={{ width: 56, height: 56, borderRadius: 12 }} />
-                  <TouchableOpacity
-                    onPress={async () => {
-                      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                      if (perm.status !== 'granted') return;
-                      const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
-                      if (!res.canceled) setNewClubPhoto(res.assets[0].uri);
-                    }}
-                    style={{ backgroundColor: colors.surfaceAlt, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12 }}
-                  >
-                    <Text style={{ color: colors.text }}>Changer</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setNewClubPhoto('')} style={{ backgroundColor: colors.surfaceAlt, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12 }}>
-                    <Text style={{ color: colors.text }}>Retirer</Text>
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <TouchableOpacity
-                  onPress={async () => {
-                    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                    if (perm.status !== 'granted') return;
-                    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
-                    if (!res.canceled) setNewClubPhoto(res.assets[0].uri);
-                  }}
-                  style={{ backgroundColor: colors.surfaceAlt, paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12 }}
-                >
-                  <Text style={{ color: colors.text }}>Ajouter une photo</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-          {/* Avatars prédéfinis (DiceBear) */}
-          {(() => {
-            const accentHex = (colors.accent || '#22C55E').replace('#', '');
-            const seeds = ['eco','leaf','earth','water','forest','sun','star','recycle','planet','nature','green','club1','club2','club3','city','river'];
-            return (
-              <View>
-                <Text style={{ color: colors.text, fontWeight: '600', marginBottom: 8 }}>Choisir un avatar</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 4 }}>
-                  {seeds.map((s) => {
-                    const url = `https://api.dicebear.com/9.x/icons/png?seed=${encodeURIComponent(s)}&size=64&backgroundColor=${accentHex}`;
-                    return (
-                      <TouchableOpacity key={s} onPress={() => setNewClubPhoto(url)} style={{ marginRight: 10 }}>
-                        <Image source={{ uri: url }} style={{ width: 56, height: 56, borderRadius: 12, backgroundColor: colors.surfaceAlt }} />
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            );
-          })()}
-          <View>
-            <Text style={{ color: colors.text, fontWeight: "600", marginBottom: 10 }}>Visibilité</Text>
-            <View style={{ flexDirection: "row", gap: 10 }}>
-              <TouchableOpacity
-                style={{
-                  flex: 1,
-                  backgroundColor: newClubVisibility === "public" ? colors.accent : colors.surfaceAlt,
-                  padding: 14,
-                  borderRadius: 14,
-                  alignItems: "center",
-                }}
-                onPress={() => setNewClubVisibility("public")}
-              >
-                <Text style={{ color: newClubVisibility === "public" ? "#0F3327" : colors.text, fontWeight: "600" }}>Public</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={{
-                  flex: 1,
-                  backgroundColor: newClubVisibility === "private" ? colors.accent : colors.surfaceAlt,
-                  padding: 14,
-                  borderRadius: 14,
-                  alignItems: "center",
-                }}
-                onPress={() => setNewClubVisibility("private")}
-              >
-                <Text style={{ color: newClubVisibility === "private" ? "#0F3327" : colors.text, fontWeight: "600" }}>Privé</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-          <TouchableOpacity
-            style={{
-              backgroundColor: (newClubName.trim() && newClubCity.trim()) ? colors.accent : colors.surfaceAlt,
-              paddingVertical: 16,
-              borderRadius: 18,
-              alignItems: "center",
-            }}
-            disabled={!(newClubName.trim() && newClubCity.trim())}
-            onPress={() => {
-              if (!(newClubName.trim() && newClubCity.trim())) return;
-              if (editingClub && joinedClub) {
-                updateClub({ name: newClubName.trim(), desc: newClubDesc.trim(), visibility: newClubVisibility, photoUri: newClubPhoto || undefined, city: newClubCity.trim() });
-                setClubs((prev: any) => prev.map((c: any) => c.id === joinedClub.id ? { ...c, name: newClubName.trim(), desc: newClubDesc.trim(), city: newClubCity.trim(), photoUri: newClubPhoto || c.photoUri } : c));
-              } else {
-                const created = createClub({ name: newClubName.trim(), desc: newClubDesc.trim(), visibility: newClubVisibility, photoUri: newClubPhoto || undefined, city: newClubCity.trim() });
-                setClubs([{ id: created.id, name: created.name, desc: created.desc || "", participants: 1, joined: true, city: (created as any).city, emoji: (created as any).emoji, photoUri: (created as any).photoUri } as any, ...clubs as any]);
-              }
-              // reset form
-              setEditingClub(false);
-              setNewClubName("");
-              setNewClubDesc("");
-              setNewClubVisibility("public");
-              setNewClubPhoto("");
-              setNewClubCity("");
-              setView("main");
-            }}
-          >
-            <Text style={{ fontWeight: "700", color: newClubName.trim() ? "#0F3327" : colors.mutedText }}>{editingClub ? 'Enregistrer' : 'Créer le club'}</Text>
-          </TouchableOpacity>
-        </View>
-        </ScrollView>
-      </View>
+  // removed early return to keep hooks order stable
+
+  // Friends: live requests and list
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    const unsubReq = onSnapshot(collection(db, "users", uid, "friendRequests"), (snap) => {
+      const arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setFriendRequests(arr);
+    });
+    const unsubFriends = onSnapshot(collection(db, "users", uid, "friends"), (snap) => {
+      const arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setFriendsLive(arr);
+    });
+    return () => { unsubReq(); unsubFriends(); };
+  }, []);
+
+  // Load friend profile display info (usernameLowercase/username/firstName)
+  useEffect(() => {
+    const list = (friendsLive.length ? friendsLive : friends) as any[];
+    const ids = Array.from(new Set(list.map((f) => f?.id).filter(Boolean)));
+    if (!ids.length) return;
+    const unsubs = ids.map((fid) =>
+      onSnapshot(doc(db, "users", fid), (snap) => {
+        const d = snap.data();
+        setFriendProfiles((prev) => ({ ...prev, [fid]: { id: fid, ...d } }));
+      })
     );
+    return () => { unsubs.forEach((u) => u()); };
+  }, [friendsLive, friends]);
+
+  async function onFriendSearch(text: string) {
+    setFriendSearchText(text);
+    if (text.length < 2) return setFriendSearchResults([]);
+    try {
+      const users = await searchUsers(text);
+      setFriendSearchResults(users);
+    } catch (e) {
+      console.warn("searchUsers error", e);
+    }
+  }
+
+  async function onAddFriend(userId: string) {
+    try {
+      await sendFriendRequest(userId);
+      Alert.alert("Demande envoyée !");
+    } catch (e) {
+      Alert.alert("Erreur", "Impossible d'envoyer la demande");
+    }
   }
 
   return (
@@ -394,36 +286,18 @@ export default function SocialScreen() {
                 <ClubCard
                   key={club.id}
                   club={club}
-                  onJoin={() => {
-                    const updated = [...clubs];
-                    const currentlyJoinedIndex = updated.findIndex((c) => c.joined);
-                    if (!updated[i].joined) {
-                      // trying to join
-                      const ok = joinClub({ id: club.id, name: club.name, participants: updated[i].participants + 1, desc: club.desc, visibility: "public", city: (club as any).city });
-                      if (!ok && (joinedClub && (joinedClub as any).id !== club.id)) {
-                        Alert.alert("Information", "Vous faites déjà partie d'un club");
-                        return;
-                      }
-                      // if joining, ensure only one club joined
-                      if (currentlyJoinedIndex !== -1 && currentlyJoinedIndex !== i) {
-                        updated[currentlyJoinedIndex].joined = false;
-                      }
-                      updated[i].joined = true;
-                      updated[i].participants += 1;
-                      // open chat immediately on join
+                  onJoin={async () => {
+                    if (!club.joined) {
+                      await joinClub({ id: club.id });
                       setSelectedChat({ ...club, type: "club" });
-                      setView("chat");
+                      setView("members");
                     } else {
-                      // leaving club
-                      leaveClub();
-                      updated[i].joined = false;
-                      updated[i].participants = Math.max(0, updated[i].participants - 1);
+                      await leaveClub();
                     }
-                    setClubs(updated);
                   }}
-                  onChat={() => {
+                  onMembers={() => {
                     setSelectedChat({ ...club, type: "club" });
-                    setView("chat");
+                    setView("members");
                   }}
                   onRanking={() => {
                     if (club.joined) setView("clubRanking");
@@ -435,14 +309,14 @@ export default function SocialScreen() {
         )
       )}
 
-      {/* LISTE AMIS + RECHERCHE -> components/ui/social/FriendCard */}
+      {/* LISTE AMIS + RECHERCHE */}
       {selectedTab === "amis" && (
         <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
           <View style={[styles.searchContainer, { backgroundColor: colors.surfaceAlt, marginTop: 18 }]}> 
             <TextInput
-              value={search}
-              onChangeText={setSearch}
-              placeholder="Rechercher un ami..."
+              value={friendSearchText}
+              onChangeText={onFriendSearch}
+              placeholder="Rechercher un utilisateur..."
               placeholderTextColor={colors.mutedText}
               style={[styles.searchInput, { color: colors.text }]}
             />
@@ -452,27 +326,215 @@ export default function SocialScreen() {
             </TouchableOpacity>
           </View>
 
-          {(() => {
-            const me = { id: "me", name: user?.firstName ?? "Utilisateur", points, avatar: user?.photoURL ?? null, online: true } as any;
-            const sorted = [...friends, me]
-              .filter((a) => a.name.toLowerCase().includes(search.toLowerCase()))
-              .sort((a, b) => b.points - a.points);
+          {/* Search results with add friend */}
+          {friendSearchResults.map((u) => (
+            <View key={u.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 }}>
+              <Text style={{ color: colors.text }}>{u.username || u.id}</Text>
+              <TouchableOpacity onPress={() => onAddFriend(u.id)}>
+                <Text style={{ color: colors.accent, fontWeight: '700' }}>Ajouter</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
 
-            return sorted.map((ami, index) => (
-              <FriendCard
-                key={`${ami.id}-${index}`}
-                friend={ami}
-                rank={index + 1}
-                isMe={ami.id === "me"}
-                onChat={() => {
-                  if (ami.id === "me") return;
-                  setSelectedChat({ ...ami, type: "ami" });
-                  setView("chat");
-                }}
-              />
-            ));
+          {/* Pending friend requests */}
+          <View style={{ marginTop: 12 }}>
+            <Text style={{ color: colors.text, fontWeight: '700', marginBottom: 6 }}>Demandes d'amis</Text>
+            {friendRequests.length === 0 ? (
+              <Text style={{ color: colors.mutedText }}>Aucune demande</Text>
+            ) : (
+              friendRequests.map((r) => (
+                <View key={r.id} style={{ gap: 6, paddingVertical: 6 }}>
+                  <Text style={{ color: colors.text }}>Demande de {r.fromUsername || r.from}</Text>
+                  <View style={{ flexDirection: 'row', gap: 12 }}>
+                    <Button title="Accepter" onPress={() => acceptFriendRequest(auth.currentUser!.uid, r.id, r.from)} />
+                    <Button title="Refuser" onPress={() => rejectFriendRequest(auth.currentUser!.uid, r.id)} />
+                  </View>
+                </View>
+              ))
+            )}
+          </View>
+
+          {(() => {
+            const combinedFriends = (friendsLive.length ? friendsLive : friends) as any[];
+            const toName = (a: any) => {
+              const prof = friendProfiles[a?.id as string];
+              const base = a?.name || prof?.usernameLowercase || prof?.username || prof?.firstName || a?.id || "";
+              return String(base).toLowerCase();
+            };
+            const safePoints = (a: any) => (typeof a?.points === 'number' ? a.points : 0);
+            const filtered = combinedFriends.filter((a) => toName(a).toLowerCase().includes((search || "").toLowerCase()));
+            const sorted = filtered.sort((a, b) => safePoints(b) - safePoints(a));
+
+            return sorted.map((ami, index) => {
+              const friendForCard = {
+                ...ami,
+                name: toName(ami),
+                points: safePoints(ami),
+              };
+              return (
+                <FriendCard
+                  key={`${friendForCard.id}-${index}`}
+                  friend={friendForCard}
+                  rank={index + 1}
+                  isMe={false}
+                  onChat={() => {
+                    setSelectedChat({ ...friendForCard, type: "ami" });
+                    setView("chat");
+                  }}
+                />
+              );
+            });
           })()}
         </ScrollView>
+      )}
+      {/* Create Club overlay */}
+      {view === 'createClub' && (
+        <View style={{ position: 'absolute', top: 56, left: 0, right: 0, bottom: 0, backgroundColor: colors.background, padding: 16 }}>
+          <TouchableOpacity onPress={() => setView('main')} style={{ marginBottom: 16 }}>
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
+          </TouchableOpacity>
+          <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
+            <Text style={{ color: colors.text, fontSize: 22, fontWeight: '700', marginBottom: 6 }}>{editingClub ? 'Modifier le club' : 'Créer un club'}</Text>
+            <View style={{ alignItems: 'center', marginBottom: 12 }}>
+              {newClubPhoto ? (
+                <Image source={{ uri: newClubPhoto }} style={{ width: 72, height: 72, borderRadius: 36 }} />
+              ) : (
+                <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ fontSize: 28 }}>🌿</Text>
+                </View>
+              )}
+            </View>
+            <Text style={{ color: colors.mutedText, marginBottom: 20 }}>Définis les informations de ton nouveau club.</Text>
+            <View style={{ gap: 14 }}>
+              <View>
+                <Text style={{ color: colors.text, fontWeight: '600', marginBottom: 6 }}>Ville</Text>
+                <TextInput
+                  value={newClubCity}
+                  onChangeText={setNewClubCity}
+                  placeholder="Ex: Bruxelles"
+                  placeholderTextColor={colors.mutedText}
+                  style={{ backgroundColor: colors.surfaceAlt, color: colors.text, padding: 14, borderRadius: 14, fontWeight: '600' }}
+                />
+              </View>
+              <View>
+                <Text style={{ color: colors.text, fontWeight: '600', marginBottom: 6 }}>Nom du club</Text>
+                <TextInput
+                  value={newClubName}
+                  onChangeText={setNewClubName}
+                  placeholder="Ex: Eco Warriors"
+                  placeholderTextColor={colors.mutedText}
+                  style={{ backgroundColor: colors.surfaceAlt, color: colors.text, padding: 14, borderRadius: 14, fontWeight: '600' }}
+                />
+              </View>
+              <View>
+                <Text style={{ color: colors.text, fontWeight: '600', marginBottom: 6 }}>Description</Text>
+                <TextInput
+                  multiline
+                  value={newClubDesc}
+                  onChangeText={setNewClubDesc}
+                  numberOfLines={4}
+                  style={{ backgroundColor: colors.surfaceAlt, color: colors.text, padding: 14, borderRadius: 14, minHeight: 110, textAlignVertical: 'top' }}
+                  placeholder="Décris ton club..."
+                  placeholderTextColor={colors.mutedText}
+                />
+              </View>
+              <View>
+                <Text style={{ color: colors.text, fontWeight: '600', marginBottom: 6 }}>Photo (optionnel)</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  {newClubPhoto ? (
+                    <>
+                      <Image source={{ uri: newClubPhoto }} style={{ width: 56, height: 56, borderRadius: 12 }} />
+                      <TouchableOpacity
+                        onPress={async () => {
+                          const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                          if (perm.status !== 'granted') return;
+                          const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
+                          if (!res.canceled) setNewClubPhoto(res.assets[0].uri);
+                        }}
+                        style={{ backgroundColor: colors.surfaceAlt, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12 }}
+                      >
+                        <Text style={{ color: colors.text }}>Changer</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => setNewClubPhoto('')} style={{ backgroundColor: colors.surfaceAlt, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12 }}>
+                        <Text style={{ color: colors.text }}>Retirer</Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={async () => {
+                        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                        if (perm.status !== 'granted') return;
+                        const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
+                        if (!res.canceled) setNewClubPhoto(res.assets[0].uri);
+                      }}
+                      style={{ backgroundColor: colors.surfaceAlt, paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12 }}
+                    >
+                      <Text style={{ color: colors.text }}>Ajouter une photo</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+              {(() => {
+                const accentHex = (colors.accent || '#22C55E').replace('#', '');
+                const seeds = ['eco','leaf','earth','water','forest','sun','star','recycle','planet','nature','green','club1','club2','club3','city','river'];
+                return (
+                  <View>
+                    <Text style={{ color: colors.text, fontWeight: '600', marginBottom: 8 }}>Choisir un avatar</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 4 }}>
+                      {seeds.map((s) => {
+                        const url = `https://api.dicebear.com/9.x/icons/png?seed=${encodeURIComponent(s)}&size=64&backgroundColor=${accentHex}`;
+                        return (
+                          <TouchableOpacity key={s} onPress={() => setNewClubPhoto(url)} style={{ marginRight: 10 }}>
+                            <Image source={{ uri: url }} style={{ width: 56, height: 56, borderRadius: 12, backgroundColor: colors.surfaceAlt }} />
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                );
+              })()}
+              <View>
+                <Text style={{ color: colors.text, fontWeight: '600', marginBottom: 10 }}>Visibilité</Text>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <TouchableOpacity
+                    style={{ flex: 1, backgroundColor: newClubVisibility === 'public' ? colors.accent : colors.surfaceAlt, padding: 14, borderRadius: 14, alignItems: 'center' }}
+                    onPress={() => setNewClubVisibility('public')}
+                  >
+                    <Text style={{ color: newClubVisibility === 'public' ? '#0F3327' : colors.text, fontWeight: '600' }}>Public</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{ flex: 1, backgroundColor: newClubVisibility === 'private' ? colors.accent : colors.surfaceAlt, padding: 14, borderRadius: 14, alignItems: 'center' }}
+                    onPress={() => setNewClubVisibility('private')}
+                  >
+                    <Text style={{ color: newClubVisibility === 'private' ? '#0F3327' : colors.text, fontWeight: '600' }}>Privé</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={{ backgroundColor: (newClubName.trim() && newClubCity.trim()) ? colors.accent : colors.surfaceAlt, paddingVertical: 16, borderRadius: 18, alignItems: 'center' }}
+                disabled={!(newClubName.trim() && newClubCity.trim())}
+                onPress={async () => {
+                  if (!(newClubName.trim() && newClubCity.trim())) return;
+                  if (editingClub && joinedClub) {
+                    await updateClub({ name: newClubName.trim(), desc: newClubDesc.trim(), visibility: newClubVisibility, photoUri: newClubPhoto || undefined, city: newClubCity.trim() });
+                    setClubs((prev: any) => prev.map((c: any) => c.id === joinedClub.id ? { ...c, name: newClubName.trim(), desc: newClubDesc.trim(), city: newClubCity.trim(), photoUri: newClubPhoto || c.photoUri } : c));
+                  } else {
+                    await createClub({ name: newClubName.trim(), desc: newClubDesc.trim(), visibility: newClubVisibility, photoUri: newClubPhoto || undefined, city: newClubCity.trim() });
+                  }
+                  setEditingClub(false);
+                  setNewClubName('');
+                  setNewClubDesc('');
+                  setNewClubVisibility('public');
+                  setNewClubPhoto('');
+                  setNewClubCity('');
+                  setView('main');
+                }}
+              >
+                <Text style={{ fontWeight: '700', color: newClubName.trim() ? '#0F3327' : colors.mutedText }}>{editingClub ? 'Enregistrer' : 'Créer le club'}</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
       )}
       {joinedClub && (
         <ShareQRModal
@@ -484,6 +546,34 @@ export default function SocialScreen() {
           shareText={`Rejoins mon club ${joinedClub?.name} sur l'app ! app://club/${joinedClub?.id ?? ''}`}
           accentColor={colors.accent}
         />
+      )}
+
+      {/* Members overlay below tabs */}
+      {selectedTab === 'clubs' && view === 'members' && (
+        <View style={{ position: 'absolute', top: 56, left: 0, right: 0, bottom: 0, backgroundColor: colors.background, padding: 16 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+            <TouchableOpacity onPress={() => setView('main')} style={{ marginRight: 8 }}>
+              <Ionicons name="arrow-back" size={22} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={{ color: colors.text, fontSize: 18, fontWeight: '700', flex: 1 }}>Membres du club</Text>
+          </View>
+          <FlatList
+            data={members}
+            keyExtractor={(item) => String(item.id)}
+            renderItem={({ item }) => (
+              <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 8, borderRadius: 12 }}>
+                <Text style={{ width: 30, textAlign: 'center', color: colors.mutedText }}>{' '}</Text>
+                <Image source={{ uri: item.avatar || undefined }} style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: colors.text, fontWeight: '600' }}>{item.name || item.id}</Text>
+                </View>
+                <Text style={{ color: colors.accent, fontWeight: '700' }}>{item.points || 0} pts</Text>
+              </View>
+            )}
+            contentContainerStyle={{ paddingBottom: 140 }}
+            ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: colors.surfaceAlt }} />}
+          />
+        </View>
       )}
 
       {/* Club ranking overlay below tabs */}
@@ -504,7 +594,7 @@ export default function SocialScreen() {
             <TouchableOpacity onPress={() => setShowClubQR(true)} style={{ backgroundColor: colors.surfaceAlt, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, marginRight: 8 }}>
               <Text style={{ color: colors.text, fontWeight: '700' }}>Partager</Text>
             </TouchableOpacity>
-            {joinedClub?.ownerId === 'me' && (
+            {joinedClub?.ownerId === auth.currentUser?.uid && (
               <TouchableOpacity onPress={() => {
                 if (!joinedClub) return;
                 setEditingClub(true);
@@ -533,12 +623,16 @@ export default function SocialScreen() {
                   <Text style={{ color: item.isMe ? '#0F3327' : colors.text, fontWeight: item.isMe ? '700' : '500' }}>{item.isMe ? (user?.firstName ?? "Utilisateur") : item.name}</Text>
                   {joinedClub && (
                     <Text style={{ color: item.isMe ? '#0F3327' : colors.mutedText, fontSize: 12 }}>
-                      {joinedClub.ownerId === (item.isMe ? 'me' : item.id) ? 'Chef' : (joinedClub.officers || []).includes(item.isMe ? 'me' : item.id) ? 'Adjoint' : 'Membre'}
+                      {joinedClub.ownerId === item.id
+                        ? 'Chef'
+                        : (joinedClub.officers || []).includes(item.id)
+                          ? 'Adjoint'
+                          : 'Membre'}
                     </Text>
                   )}
                 </View>
                 <Text style={{ color: item.isMe ? '#0F3327' : colors.accent, fontWeight: '700' }}>{item.points} pts</Text>
-                {joinedClub?.ownerId === 'me' && !item.isMe && (
+                {joinedClub?.ownerId === auth.currentUser?.uid && !item.isMe && (
                   (joinedClub.officers || []).includes(item.id)
                     ? (
                       <TouchableOpacity onPress={() => demoteOfficer(item.id)} style={{ marginLeft: 10, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: colors.surfaceAlt }}>

@@ -18,12 +18,12 @@ export interface Club {
 interface ClubCardProps {
   club: Club;
   onJoin: () => void;
-  onChat: () => void;
+  onMembers: () => void;
   onRanking?: () => void;
   totalPoints?: number;
 }
 
-export const ClubCard: React.FC<ClubCardProps> = ({ club, onJoin, onChat, onRanking, totalPoints }) => {
+export const ClubCard: React.FC<ClubCardProps> = ({ club, onJoin, onMembers, onRanking, totalPoints }) => {
   const { colors } = useThemeMode();
 
   return (
@@ -60,10 +60,10 @@ export const ClubCard: React.FC<ClubCardProps> = ({ club, onJoin, onChat, onRank
             styles.chatBtn,
             { borderColor: colors.accent, backgroundColor: colors.pill },
           ]}
-          onPress={onChat}
+          onPress={onMembers}
         >
-          <Ionicons name="chatbubbles-outline" size={18} color={colors.accent} />
-          <Text style={[styles.chatText, { color: colors.accent }]}>Discuter</Text>
+          <Ionicons name="people-outline" size={18} color={colors.accent} />
+          <Text style={[styles.chatText, { color: colors.accent }]}>Membres</Text>
         </TouchableOpacity>
 
         {club.joined && onRanking && (

@@ -3,14 +3,14 @@ import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import React, { useMemo, useState } from "react";
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { auth, db } from "../../firebaseConfig";
 
@@ -48,19 +48,24 @@ export default function Register() {
 
       const uid = result.user.uid;
 
-      // 2️⃣ Create Firestore user profile
+      // 2️⃣ Create Firestore user profile (include friend system fields)
       await setDoc(doc(db, "users", uid), {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         postalCode: postalCode.trim(),
         birthDate: birthDate.trim(),
         email: email.trim(),
+        username: `${firstName.trim()} ${lastName.trim()}`.trim(),
+        usernameLowercase: `${firstName.trim()} ${lastName.trim()}`.trim().toLowerCase(),
         points: 0,
         isAdmin: false,
         clubId: null,
         abonnementId: null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
+        friends: [],
+        pendingSent: [],
+        pendingReceived: [],
       });
 
       Alert.alert("Compte créé", "Votre compte a été créé avec succès !");
