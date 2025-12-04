@@ -13,10 +13,10 @@ import { ShareQRModal } from "@/components/ui/qr/ShareQRModal";
 import { auth, db } from "@/firebaseConfig";
 import { useClub } from "@/hooks/club-context";
 import { useFriends } from "@/hooks/friends-context";
+import type { Friend } from "@/hooks/friends-context";
 import { usePoints } from "@/hooks/points-context";
-import { useSubscriptions } from "@/hooks/subscriptions-context";
 import { useUser } from "@/hooks/user-context";
-import { acceptFriendRequest, rejectFriendRequest, searchUsers, sendFriendRequest } from "@/services/friends";
+import { acceptFriendRequest, getUserProfile, rejectFriendRequest, searchUsers, sendFriendRequest } from "@/services/friends";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -43,8 +43,7 @@ export default function SocialScreen() {
   const [friendSearchText, setFriendSearchText] = useState("");
   const [friendSearchResults, setFriendSearchResults] = useState<any[]>([]);
   const [friendRequests, setFriendRequests] = useState<any[]>([]);
-  const [friendsLive, setFriendsLive] = useState<any[]>([]);
-  const [friendProfiles, setFriendProfiles] = useState<Record<string, any>>({});
+  const [friendsLive, setFriendsLive] = useState<Friend[]>([]);
   const [clubSearch, setClubSearch] = useState("");
   const [clubs, setClubs] = useState<any[]>([]);
   const { joinedClub, joinClub, leaveClub, members, createClub, promoteToOfficer, demoteOfficer, updateClub } = useClub();
@@ -52,7 +51,6 @@ export default function SocialScreen() {
   const { user } = useUser();
   const params = useLocalSearchParams();
   const router = useRouter();
-  const { follow } = useSubscriptions();
   const { friends } = useFriends();
   // Modal de confirmation pour quitter le club
   const [leaveConfirmVisible, setLeaveConfirmVisible] = useState(false);
@@ -117,24 +115,34 @@ export default function SocialScreen() {
   };
 
   const clubRankingData = useMemo(() => {
-    const base = members.map((m) => ({ ...m, isMe: false }));
-    const me = {
-      id: auth.currentUser?.uid || "me",
-      name: user?.firstName ?? "Utilisateur",
-      avatar: user?.photoURL ?? null,
-      isMe: true,
-      points: points || 0,
-    } as any;
-    const all = [...base, me];
-    return all
+    const uid = auth.currentUser?.uid;
+    const merged = new Map<string, any>();
+
+    members.forEach((member) => {
+      merged.set(member.id, {
+        ...member,
+        isMe: uid ? member.id === uid : false,
+      });
+    });
+
+    if (uid) {
+      merged.set(uid, {
+        id: uid,
+        name: user?.firstName || user?.username || members.find((m) => m.id === uid)?.name || "Utilisateur",
+        avatar: user?.photoURL ?? members.find((m) => m.id === uid)?.avatar ?? null,
+        points: typeof points === "number" ? points : members.find((m) => m.id === uid)?.points || 0,
+        isMe: true,
+      });
+    }
+
+    return Array.from(merged.values())
       .sort((a, b) => (b.points || 0) - (a.points || 0))
       .map((m, idx) => ({ ...m, rank: idx + 1 }));
   }, [members, points, user]);
 
   const clanTotalPoints = useMemo(() => {
-    const membersSum = members.reduce((s, m) => s + (m.points || 0), 0);
-    return membersSum + (points || 0);
-  }, [members, points]);
+    return clubRankingData.reduce((total, m) => total + (m.points || 0), 0);
+  }, [clubRankingData]);
 
   // no early return; keep tabs visible in all views
 
@@ -153,26 +161,35 @@ export default function SocialScreen() {
       const arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       setFriendRequests(arr);
     });
-    const unsubFriends = onSnapshot(collection(db, "users", uid, "friends"), (snap) => {
-      const arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setFriendsLive(arr);
-    });
-    return () => { unsubReq(); unsubFriends(); };
-  }, []);
+    const unsubFriends = onSnapshot(collection(db, "users", uid, "friends"), async (snap) => {
+      try {
+        const profiles = await Promise.all(snap.docs.map((docSnap) => getUserProfile(docSnap.id)));
 
-  // Load friend profile display info (usernameLowercase/username/firstName)
-  useEffect(() => {
-    const list = (friendsLive.length ? friendsLive : friends) as any[];
-    const ids = Array.from(new Set(list.map((f) => f?.id).filter(Boolean)));
-    if (!ids.length) return;
-    const unsubs = ids.map((fid) =>
-      onSnapshot(doc(db, "users", fid), (snap) => {
-        const d = snap.data();
-        setFriendProfiles((prev) => ({ ...prev, [fid]: { id: fid, ...d } }));
-      })
-    );
-    return () => { unsubs.forEach((u) => u()); };
-  }, [friendsLive, friends]);
+        const results: Friend[] = profiles
+          .filter((profile): profile is Record<string, any> => Boolean(profile))
+          .map((profile) => ({
+            id: profile.id,
+            name:
+              profile.firstName ||
+              profile.username ||
+              profile.usernameLowercase ||
+              profile.id,
+            points: typeof profile.points === "number" ? profile.points : 0,
+            photoURL: typeof profile.photoURL === "string" ? profile.photoURL : "",
+            online: Boolean(profile.online),
+          }))
+          .sort((a, b) => (b.points || 0) - (a.points || 0));
+
+        setFriendsLive(results);
+      } catch (error) {
+        console.error("friends snapshot error", error);
+      }
+    });
+    return () => {
+      unsubReq();
+      unsubFriends();
+    };
+  }, []);
 
   async function onFriendSearch(text: string) {
     setFriendSearchText(text);
@@ -355,21 +372,21 @@ export default function SocialScreen() {
           </View>
 
           {(() => {
-            const combinedFriends = (friendsLive.length ? friendsLive : friends) as any[];
-            const toName = (a: any) => {
-              const prof = friendProfiles[a?.id as string];
-              const base = a?.name || prof?.usernameLowercase || prof?.username || prof?.firstName || a?.id || "";
-              return String(base).toLowerCase();
-            };
-            const safePoints = (a: any) => (typeof a?.points === 'number' ? a.points : 0);
-            const filtered = combinedFriends.filter((a) => toName(a).toLowerCase().includes((search || "").toLowerCase()));
+            const combinedFriends: Friend[] = friendsLive.length ? friendsLive : friends;
+            const toName = (friendItem: Friend) => friendItem.name ? String(friendItem.name) : String(friendItem.id || "");
+            const safePoints = (friendItem: Friend) => (typeof friendItem.points === "number" ? friendItem.points : 0);
+            const filtered = combinedFriends.filter((a) =>
+              toName(a).toLowerCase().includes((search || "").toLowerCase())
+            );
             const sorted = filtered.sort((a, b) => safePoints(b) - safePoints(a));
 
             return sorted.map((ami, index) => {
-              const friendForCard = {
-                ...ami,
+              const friendForCard: Friend = {
+                id: ami.id,
                 name: toName(ami),
                 points: safePoints(ami),
+                photoURL: typeof ami.photoURL === "string" ? ami.photoURL : "",
+                online: Boolean(ami.online),
               };
               return (
                 <FriendCard
@@ -558,16 +575,22 @@ export default function SocialScreen() {
             <Text style={{ color: colors.text, fontSize: 18, fontWeight: '700', flex: 1 }}>Membres du club</Text>
           </View>
           <FlatList
-            data={members}
+            data={clubRankingData}
             keyExtractor={(item) => String(item.id)}
             renderItem={({ item }) => (
               <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 8, borderRadius: 12 }}>
-                <Text style={{ width: 30, textAlign: 'center', color: colors.mutedText }}>{' '}</Text>
-                <Image source={{ uri: item.avatar || undefined }} style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10 }} />
+                <Text style={{ width: 30, textAlign: 'center', color: colors.mutedText }}>{item.rank ?? ' '}</Text>
+                {item.avatar ? (
+                  <Image source={{ uri: item.avatar }} style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10 }} />
+                ) : (
+                  <View style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="person-outline" size={18} color={colors.mutedText} />
+                  </View>
+                )}
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: colors.text, fontWeight: '600' }}>{item.name || item.id}</Text>
+                  <Text style={{ color: colors.text, fontWeight: item.isMe ? '700' : '600' }}>{item.name || item.id}</Text>
                 </View>
-                <Text style={{ color: colors.accent, fontWeight: '700' }}>{item.points || 0} pts</Text>
+                <Text style={{ color: item.isMe ? colors.accent : colors.text, fontWeight: '700' }}>{item.points || 0} pts</Text>
               </View>
             )}
             contentContainerStyle={{ paddingBottom: 140 }}

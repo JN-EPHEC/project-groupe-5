@@ -14,22 +14,44 @@ import {
   View,
 } from "react-native";
 
-interface MessageItem { id: string; text?: string; imageUri?: string; type?: 'text' | 'image'; sender: string; reactions?: string[] }
+export interface MessageItem {
+  id: string;
+  sender: string;
+  text?: string;
+  imageUri?: string;
+  type?: "text" | "image";
+  reactions?: string[];
+}
+
+type SelectedChat = {
+  id?: string;
+  name?: string;
+  username?: string;
+  photoURL?: string;
+  photoUri?: string;
+  emoji?: string;
+  type?: "ami" | "club" | string;
+  desc?: string;
+  city?: string;
+  online?: boolean;
+};
 
 interface ChatViewProps {
-  selectedChat: any;
+  selectedChat: SelectedChat | null;
   messages: MessageItem[];
   input: string;
-  setInput: (v: string) => void;
+  setInput: (value: string) => void;
   onSend: () => void;
+  onSendImage: (uri: string) => void;
   onBack: () => void;
   onDeleteMessage: (id: string) => void;
   onStartEditMessage: (id: string, text: string) => void;
   onReactMessage: (id: string, emoji: string) => void;
-  editingId?: string | null;
+  editingId: string | null;
   showBack?: boolean;
-  onSendImage?: (uri: string) => void;
 }
+
+const EMOJIS = ["👍", "❤️", "🔥", "👏", "😊", "🌿"];
 
 export const ChatView: React.FC<ChatViewProps> = ({
   selectedChat,
@@ -37,123 +59,276 @@ export const ChatView: React.FC<ChatViewProps> = ({
   input,
   setInput,
   onSend,
+  onSendImage,
   onBack,
   onDeleteMessage,
   onStartEditMessage,
   onReactMessage,
   editingId,
   showBack = true,
-  onSendImage,
 }) => {
-    const pickImage = async () => {
-      try {
-        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (perm.status !== 'granted') return;
-        const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
-        if (!res.canceled && res.assets?.[0]?.uri) {
-          onSendImage && onSendImage(res.assets[0].uri);
-        }
-      } catch {}
-    };
   const { colors } = useThemeMode();
   const [actionFor, setActionFor] = useState<string | null>(null);
   const [showReactionsFor, setShowReactionsFor] = useState<string | null>(null);
-  const emojis = useMemo(() => ["👍", "😊", "🔥", "🎉", "❤️"], []);
+  const isIOS = Platform.OS === "ios";
+
+  const displayName = useMemo(() => {
+    if (!selectedChat) return "Discussion";
+    return (
+      selectedChat.name ||
+      selectedChat.username ||
+      selectedChat.id ||
+      "Discussion"
+    );
+  }, [selectedChat]);
+
+  const subtitle = useMemo(() => {
+    if (!selectedChat) return undefined;
+    if (selectedChat.type === "ami") {
+      return selectedChat.online ? "En ligne" : "Hors ligne";
+    }
+    if (selectedChat.type === "club") {
+      return selectedChat.city || selectedChat.desc;
+    }
+    return undefined;
+  }, [selectedChat]);
+
+  const avatarUri = selectedChat?.photoURL || selectedChat?.photoUri || null;
+
+  const pickImage = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (permission.status !== "granted") {
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.7,
+      });
+      if (result.canceled) return;
+      const uri = result.assets?.[0]?.uri;
+      if (uri) {
+        onSendImage(uri);
+      }
+    } catch (error) {
+      console.warn("pickImage error", error);
+    }
+  };
+
+  const renderMessage = ({ item }: { item: MessageItem }) => {
+    const isMine = item.sender === "me";
+    const bubbleColor = isMine ? colors.accent : colors.surfaceAlt;
+    const textColor = isMine ? "#0F3327" : colors.text;
+
+    return (
+      <TouchableOpacity
+        delayLongPress={500}
+        onLongPress={() => setActionFor(item.id)}
+        activeOpacity={0.8}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "flex-end",
+            justifyContent: isMine ? "flex-end" : "flex-start",
+            marginVertical: 4,
+          }}
+        >
+          {!isMine && (
+            avatarUri ? (
+              <Image
+                source={{ uri: avatarUri }}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 16,
+                  marginRight: 6,
+                  backgroundColor: "#222",
+                }}
+              />
+            ) : (
+              <View
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 16,
+                  marginRight: 6,
+                  backgroundColor: colors.surfaceAlt,
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
+              >
+                <Text>{selectedChat?.emoji || "👤"}</Text>
+              </View>
+            )
+          )}
+
+          <View
+            style={{
+              maxWidth: "75%",
+              backgroundColor: bubbleColor,
+              padding: 10,
+              borderRadius: 12,
+            }}
+          >
+            {item.imageUri ? (
+              <Image
+                source={{ uri: item.imageUri }}
+                style={{ width: 160, height: 160, borderRadius: 10 }}
+              />
+            ) : (
+              <Text style={{ color: textColor, fontSize: 15 }}>{item.text}</Text>
+            )}
+
+            {item.reactions?.length ? (
+              <View style={{ marginTop: 4 }}>
+                <Text style={{ fontSize: 12 }}>
+                  {Array.from(new Set(item.reactions)).join(" ")}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+
+        {actionFor === item.id && (
+          <View
+            style={[
+              styles.actionsRow,
+              { backgroundColor: colors.surfaceAlt },
+            ]}
+          >
+            {isMine && (
+              <>
+                <TouchableOpacity
+                  onPress={() => {
+                    setActionFor(null);
+                    onDeleteMessage(item.id);
+                  }}
+                  style={styles.actionBtn}
+                >
+                  <Ionicons name="trash" size={16} color={colors.text} />
+                  <Text
+                    style={[styles.actionText, { color: colors.text }]}
+                  >
+                    Supprimer
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    setActionFor(null);
+                    onStartEditMessage(item.id, item.text ?? "");
+                  }}
+                  style={styles.actionBtn}
+                >
+                  <Ionicons name="create-outline" size={16} color={colors.text} />
+                  <Text
+                    style={[styles.actionText, { color: colors.text }]}
+                  >
+                    Modifier
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+            <TouchableOpacity
+              onPress={() => {
+                setShowReactionsFor(item.id);
+              }}
+              style={styles.actionBtn}
+            >
+              <Ionicons name="happy-outline" size={16} color={colors.text} />
+              <Text style={[styles.actionText, { color: colors.text }]}>Réagir</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        {showReactionsFor === item.id && (
+          <View
+            style={[
+              styles.emojiRow,
+              { backgroundColor: colors.surface },
+            ]}
+          >
+            {EMOJIS.map((emoji) => (
+              <TouchableOpacity
+                key={emoji}
+                onPress={() => {
+                  onReactMessage(item.id, emoji);
+                  setShowReactionsFor(null);
+                  setActionFor(null);
+                }}
+                style={styles.emojiBtn}
+              >
+                <Text style={{ fontSize: 18 }}>{emoji}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior={isIOS ? "padding" : undefined}
+      keyboardVerticalOffset={isIOS ? 88 : 0}
     >
-      {/* --- Header --- */}
-      {showBack && (
-        <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
-        </TouchableOpacity>
-      )}
-      {showBack && (
-        <Text style={[styles.header, { color: colors.text }]}>
-          {selectedChat?.type === "club"
-            ? `Salon ${selectedChat.name}`
-            : `Chat avec ${selectedChat.name}`}
-        </Text>
-      )}
-
-      {/* --- Messages --- */}
-      {messages.length === 0 && (
-        <Text style={[styles.empty, { color: colors.mutedText }]}>
-          Commencez la discussion 🌿
-        </Text>
-      )}
+      <View style={{ marginBottom: 12 }}>
+        {showBack && (
+          <TouchableOpacity onPress={onBack} style={styles.backBtn}>
+            <Ionicons name="arrow-back" size={22} color={colors.text} />
+          </TouchableOpacity>
+        )}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          {avatarUri ? (
+            <Image
+              source={{ uri: avatarUri }}
+              style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surfaceAlt }}
+            />
+          ) : (
+            <View
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                backgroundColor: colors.surfaceAlt,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Text style={{ fontSize: 24 }}>{selectedChat?.emoji || "💬"}</Text>
+            </View>
+          )}
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.header, { color: colors.text }]}>{displayName}</Text>
+            {subtitle ? (
+              <Text style={{ color: colors.mutedText, fontSize: 12 }}>{subtitle}</Text>
+            ) : null}
+          </View>
+          {editingId && (
+            <View style={{ backgroundColor: colors.surfaceAlt, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 }}>
+              <Text style={{ color: colors.text, fontSize: 12 }}>Modification...</Text>
+            </View>
+          )}
+        </View>
+      </View>
 
       <FlatList
         data={messages}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            delayLongPress={500}
-            onLongPress={() => setActionFor(item.id)}
-            activeOpacity={0.8}
-          >
-            <View
-              style={[
-                styles.message,
-                {
-                  backgroundColor:
-                    item.sender === "me" ? colors.accent : colors.surfaceAlt,
-                  alignSelf:
-                    item.sender === "me" ? "flex-end" : "flex-start",
-                },
-              ]}
-            >
-              {item.imageUri ? (
-                <Image source={{ uri: item.imageUri }} style={{ width: 180, height: 180, borderRadius: 10 }} />
-              ) : (
-                <Text style={[styles.text, { color: colors.text }]}>{item.text}</Text>
-              )}
-              {item.reactions && item.reactions.length > 0 && (
-                <View style={styles.reactionsCorner}>
-                  <Text style={{ fontSize: 12 }}>{Array.from(new Set(item.reactions)).join(" ")}</Text>
-                </View>
-              )}
-            </View>
-            {actionFor === item.id && (
-              <View style={[styles.actionsRow, { backgroundColor: colors.surfaceAlt }]}>
-                <TouchableOpacity onPress={() => { setActionFor(null); onDeleteMessage(item.id); }} style={styles.actionBtn}>
-                  <Ionicons name="trash" size={16} color={colors.text} />
-                  <Text style={[styles.actionText, { color: colors.text }]}>Supprimer</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => { setActionFor(null); onStartEditMessage(item.id, item.text ?? ""); }} style={styles.actionBtn}>
-                  <Ionicons name="create-outline" size={16} color={colors.text} />
-                  <Text style={[styles.actionText, { color: colors.text }]}>Modifier</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => { setShowReactionsFor(item.id); }} style={styles.actionBtn}>
-                  <Ionicons name="happy-outline" size={16} color={colors.text} />
-                  <Text style={[styles.actionText, { color: colors.text }]}>Réagir</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-            {showReactionsFor === item.id && (
-              <View style={[styles.emojiRow, { backgroundColor: colors.surface }]}>
-                {emojis.map((e) => (
-                  <TouchableOpacity
-                    key={e}
-                    onPress={() => { onReactMessage(item.id, e); setShowReactionsFor(null); setActionFor(null); }}
-                    style={styles.emojiBtn}
-                  >
-                    <Text style={{ fontSize: 18 }}>{e}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </TouchableOpacity>
-        )}
+        renderItem={renderMessage}
         contentContainerStyle={{ paddingVertical: 10, paddingBottom: 72 }}
+        ListEmptyComponent={() => (
+          <Text style={[styles.empty, { color: colors.mutedText }]}>
+            Commencez la discussion 🌿
+          </Text>
+        )}
       />
 
-      {/* --- Input --- */}
-      <View style={[styles.inputRow, { marginBottom: 110 }]}>
-        <TouchableOpacity onPress={pickImage} style={[styles.attach, { backgroundColor: colors.surfaceAlt }]}>
+      <View style={[styles.inputRow, { borderColor: colors.surfaceAlt }]}>
+        <TouchableOpacity
+          onPress={pickImage}
+          style={[styles.attach, { backgroundColor: colors.surfaceAlt }]}
+        >
           <Ionicons name="image-outline" size={20} color={colors.text} />
         </TouchableOpacity>
         <TextInput
@@ -161,12 +336,16 @@ export const ChatView: React.FC<ChatViewProps> = ({
           onChangeText={setInput}
           placeholder="Écrire un message..."
           placeholderTextColor={colors.mutedText}
-          style={[styles.input, { backgroundColor: colors.surfaceAlt, color: colors.text }]}
+          style={[
+            styles.input,
+            { backgroundColor: colors.surfaceAlt, color: colors.text },
+          ]}
           multiline
         />
         <TouchableOpacity
           onPress={onSend}
           style={[styles.send, { backgroundColor: colors.accent }]}
+          disabled={!input.trim()}
         >
           <Ionicons name="send" size={20} color={colors.text} />
         </TouchableOpacity>
@@ -176,23 +355,39 @@ export const ChatView: React.FC<ChatViewProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingTop: 8, paddingHorizontal: 12, paddingBottom: 0 },
+  container: {
+    flex: 1,
+    paddingTop: 8,
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+  },
   backBtn: { marginBottom: 10 },
-  header: { fontSize: 18, fontWeight: "600", textAlign: "center", marginBottom: 10 },
-  message: { padding: 10, borderRadius: 12, marginVertical: 4, maxWidth: "80%" },
-  text: { fontSize: 14 },
-  reactionsCorner: { position: "absolute", top: -6, right: -6, backgroundColor: "#FFFFFFCC", borderRadius: 10, paddingHorizontal: 4, paddingVertical: 2 },
-  actionsRow: { flexDirection: "row", alignItems: "center", borderRadius: 10, paddingVertical: 6, paddingHorizontal: 8, marginTop: 6, alignSelf: "flex-end" },
+  header: { fontSize: 18, fontWeight: "600" },
+  actionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    marginTop: 6,
+    alignSelf: "flex-end",
+  },
   actionBtn: { flexDirection: "row", alignItems: "center", marginHorizontal: 6 },
   actionText: { marginLeft: 4, fontSize: 12 },
-  emojiRow: { flexDirection: "row", alignItems: "center", borderRadius: 10, padding: 6, marginTop: 6, alignSelf: "flex-end" },
+  emojiRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 10,
+    padding: 6,
+    marginTop: 6,
+    alignSelf: "flex-end",
+  },
   emojiBtn: { paddingHorizontal: 6, paddingVertical: 4 },
   empty: { textAlign: "center", marginTop: 40 },
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
     borderTopWidth: 1,
-    borderColor: "#1C2A27",
     paddingTop: 8,
   },
   input: { flex: 1, borderRadius: 20, padding: 10, fontSize: 14 },

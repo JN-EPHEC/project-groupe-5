@@ -1,7 +1,7 @@
 import { auth, db } from "@/firebaseConfig";
 import { createClub as createClubService, demoteOfficer as demoteOfficerService, joinClub as joinClubService, leaveClub as leaveClubService, promoteOfficer as promoteOfficerService, updateClubFirebase } from "@/services/clubs";
-import { doc, onSnapshot } from "firebase/firestore";
-import React, { createContext, useContext, useEffect, useState } from "react";
+import { doc, onSnapshot, Unsubscribe } from "firebase/firestore";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 
 interface ClubContextType {
   joinedClub: any;
@@ -28,24 +28,50 @@ const ClubContext = createContext<ClubContextType>({
 export const ClubProvider = ({ children }: any) => {
   const [joinedClub, setJoinedClub] = useState<any>(null);
   const [members, setMembers] = useState<any[]>([]);
+  const clubUnsubRef = useRef<Unsubscribe | null>(null);
+  const memberUnsubsRef = useRef<Record<string, Unsubscribe>>({});
+
+  const resetMemberListeners = () => {
+    Object.values(memberUnsubsRef.current).forEach((fn) => fn());
+    memberUnsubsRef.current = {};
+    setMembers([]);
+  };
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
 
     const userRef = doc(db, "users", uid);
+    let currentClubId: string | null = null;
 
     const unsub = onSnapshot(userRef, (snap) => {
       const data = snap.data();
-      if (data?.clubId) {
-        subscribeToClub(data.clubId);
-      } else {
-        setJoinedClub(null);
-        setMembers([]);
+      const clubId = data?.clubId ?? null;
+
+      if (clubId === currentClubId) {
+        return;
       }
+
+      currentClubId = clubId;
+
+      if (!clubId) {
+        clubUnsubRef.current?.();
+        clubUnsubRef.current = null;
+        setJoinedClub(null);
+        resetMemberListeners();
+        return;
+      }
+
+      clubUnsubRef.current?.();
+      clubUnsubRef.current = subscribeToClub(clubId);
     });
 
-    return () => unsub();
+    return () => {
+      unsub();
+      clubUnsubRef.current?.();
+      clubUnsubRef.current = null;
+      resetMemberListeners();
+    };
   }, []);
 
   const subscribeToClub = (clubId: string) => {
@@ -54,7 +80,7 @@ export const ClubProvider = ({ children }: any) => {
       const data: any = snap.data();
       if (!data) {
         setJoinedClub(null);
-        setMembers([]);
+        resetMemberListeners();
         return;
       }
 
@@ -67,16 +93,59 @@ export const ClubProvider = ({ children }: any) => {
         ownerId: data.ownerId,
         visibility: data.visibility,
         officers: data.officers || [],
+        emoji: data.emoji || "🌿",
       });
 
-      const memberList = (data.members || []).map((uid: string) => ({
-        id: uid,
-        points: 0,
-        name: uid,
-        avatar: null,
-      }));
+      hydrateMembers(Array.isArray(data.members) ? data.members : []);
+    });
+  };
 
-      setMembers(memberList);
+  const hydrateMembers = (memberIds: string[]) => {
+    const nextIds = new Set(memberIds);
+
+    Object.keys(memberUnsubsRef.current).forEach((uid) => {
+      if (!nextIds.has(uid)) {
+        memberUnsubsRef.current[uid]?.();
+        delete memberUnsubsRef.current[uid];
+        setMembers((prev) => prev.filter((m) => m.id !== uid));
+      }
+    });
+
+    memberIds.forEach((uid) => {
+      if (memberUnsubsRef.current[uid]) {
+        return;
+      }
+
+      const userRef = doc(db, "users", uid);
+      memberUnsubsRef.current[uid] = onSnapshot(userRef, (userSnap) => {
+        if (!userSnap.exists()) {
+          setMembers((prev) => prev.filter((m) => m.id !== uid));
+          return;
+        }
+
+        const data: any = userSnap.data();
+        const displayName =
+          data?.username ||
+          data?.usernameLowercase ||
+          [data?.firstName, data?.lastName].filter(Boolean).join(" ") ||
+          uid;
+
+        const pointsValue = typeof data?.points === "number" ? data.points : 0;
+
+        setMembers((prev) => {
+          const filtered = prev.filter((m) => m.id !== uid);
+          const next = [
+            ...filtered,
+            {
+              id: uid,
+              name: String(displayName).trim() || "Membre",
+              points: pointsValue,
+              avatar: data?.photoURL ?? null,
+            },
+          ];
+          return next.sort((a, b) => (b.points || 0) - (a.points || 0));
+        });
+      });
     });
   };
 

@@ -18,7 +18,7 @@ import { Image, ScrollView as RNScrollView, ScrollView, StyleSheet, Text, Toucha
 
 export default function AcceuilScreen() {
   const { colors } = useThemeMode();
-  const { totalEarned } = usePoints();
+  const { points, totalEarned } = usePoints();
   const { user } = useUser();
   const router = useRouter();
   const { joinedClub, members } = useClub();
@@ -58,19 +58,32 @@ export default function AcceuilScreen() {
   const defisFaient = 2; // TODO: derive from real data
   const defisTotal = 5;  // TODO: derive from real data
 
-  // Classement entre amis basé sur totalEarned
-  const friendPoints = [...friends.map(a => a.points), totalEarned];
-  const sorted = [...friendPoints].sort((a,b) => b - a);
-  const position = sorted.indexOf(totalEarned) + 1;
-  const totalFriends = sorted.length;
-  const positionLabel = position === 1 ? "1er" : position + "e";
+  const myPoints = typeof points === "number" ? points : 0;
+
+  // Classement entre amis basé sur les points du contexte
+  const friendScores = friends.map((friend: any) =>
+    typeof friend.points === "number" ? friend.points : 0
+  );
+  const friendSorted = [...friendScores, myPoints].sort((a, b) => b - a);
+  const friendRankIndex = friendSorted.findIndex((score) => score === myPoints);
+  const friendRankPosition = friendRankIndex >= 0 ? friendRankIndex + 1 : null;
+  const totalFriends = friendSorted.length;
+  const positionLabel = friendRankPosition === 1 ? "1er" : friendRankPosition ? `${friendRankPosition}e` : "—";
 
   // Classement Club
-  const clubAllPoints = joinedClub ? [...members.map(m => m.points), totalEarned] : [];
-  const clubSorted = joinedClub ? [...clubAllPoints].sort((a,b) => b - a) : [];
-  const clubPosition = joinedClub ? clubSorted.indexOf(totalEarned) + 1 : 0;
+  const clubScores = joinedClub
+    ? members.map((member: any) =>
+        typeof member.points === "number" ? member.points : 0
+      )
+    : [];
+  const clubSorted = joinedClub ? [...clubScores, myPoints].sort((a, b) => b - a) : [];
+  const clubRankIndex = joinedClub ? clubSorted.findIndex((score) => score === myPoints) : -1;
+  const clubPosition = clubRankIndex >= 0 ? clubRankIndex + 1 : null;
   const clubTotal = joinedClub ? clubSorted.length : 0;
-  const clubLabel = clubPosition === 1 ? "1er" : clubPosition + "e";
+  const clubLabel = clubPosition === 1 ? "1er" : clubPosition ? `${clubPosition}e` : "—";
+
+  const getDefaultAvatar = (seed: string) =>
+    `https://api.dicebear.com/9.x/initials/png?seed=${encodeURIComponent(seed || "GreenUp")}&backgroundColor=1F2A27&textColor=ffffff`;
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: 100 }}>
@@ -79,8 +92,8 @@ export default function AcceuilScreen() {
       <HeaderProfile />
 
       {/* Section: Points (simple bloc inline ici; si besoin, on l’extrait plus tard) */}
-      <View style={[styles.pointsBox, { backgroundColor: colors.surface }]}>
-        <Text style={[styles.pointsNumber, { color: colors.accent }]}>{totalEarned}</Text>
+      <View style={[styles.pointsBox, { backgroundColor: colors.surface }]}> 
+        <Text style={[styles.pointsNumber, { color: colors.accent }]}>{points}</Text>
         <Text style={[styles.pointsLabel, { color: colors.mutedText }]}>Points</Text>
       </View>
 
@@ -106,20 +119,26 @@ export default function AcceuilScreen() {
       {/* Barre "Moi" supprimée à la demande */}
       {/* Avatars des amis (en ligne: cercle vert) - sans l'utilisateur */}
       <RNScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 10 }}>
-        {friends.map((a: any) => (
-          <Image
-            key={a.id}
-            source={{ uri: a.avatar }}
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: 17,
-              marginRight: 8,
-              borderWidth: a.online ? 2 : 0,
-              borderColor: colors.accent,
-            }}
-          />
-        ))}
+        {friends.map((friend: any) => {
+          const avatarUri = friend.photoURL && friend.photoURL.length > 0
+            ? friend.photoURL
+            : getDefaultAvatar(friend.name || friend.id || "Ami");
+          return (
+            <Image
+              key={friend.id}
+              source={{ uri: avatarUri }}
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 17,
+                marginRight: 8,
+                borderWidth: friend.online ? 2 : 0,
+                borderColor: colors.accent,
+                backgroundColor: colors.surfaceAlt,
+              }}
+            />
+          );
+        })}
       </RNScrollView>
 
       {/* Série d'activités (streak) */}

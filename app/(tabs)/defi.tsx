@@ -1,6 +1,7 @@
 import { useClub } from "@/hooks/club-context";
 import { useFriends } from "@/hooks/friends-context";
 import { usePoints } from "@/hooks/points-context";
+import { useUser } from "@/hooks/user-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -44,6 +45,9 @@ export default function DefiScreen() {
   const { friends } = useFriends();
   const { points } = usePoints();
   const { joinedClub, members } = useClub();
+  const { user } = useUser();
+
+  const myPoints = typeof points === "number" ? points : 0;
 
   const [activeTab, setActiveTab] = useState<TabKey>("perso");
   const [viewMode, setViewMode] = useState<"defis" | "classement">("defis");
@@ -478,39 +482,95 @@ export default function DefiScreen() {
                   </View>
                 </View>
                 {(() => {
-                  // Build 50-person ranking using friends data, padding with mock profiles
-                  const base = friends.map((f:any) => ({ name: f.name ?? 'Ami', pts: f.points || 0, avatar: f.avatar }));
-                  base.push({ name: 'Aymeric', pts: points, avatar: 'https://i.pravatar.cc/100?u=me' });
-                  const mockNames = ['Arthur Dubois', 'Camille', 'Yanis', 'Inès B.', 'Léa', 'Lucas', 'Maël', 'Nina', 'Noah', 'Sofia'];
-                  while (base.length < 50) {
-                    const n = mockNames[(base.length) % mockNames.length] + ' ' + (Math.floor(Math.random()*90)+10);
-                    base.push({ name: n, pts: Math.floor(Math.random()*800), avatar: `https://i.pravatar.cc/100?u=${encodeURIComponent(n)}` });
+                  const getDefaultAvatar = (seed: string) =>
+                    `https://api.dicebear.com/9.x/initials/png?seed=${encodeURIComponent(seed || "GreenUp")}&backgroundColor=1F2A27&textColor=ffffff`;
+
+                  const friendEntries = friends.map((f: any) => {
+                    const name = f.name ?? "Ami";
+                    const id = f.id ?? name;
+                    const pts = typeof f.points === "number" ? f.points : 0;
+                    const photoURL = f.photoURL && f.photoURL.length > 0 ? f.photoURL : getDefaultAvatar(name || id);
+                    return { id, name, pts, photoURL };
+                  });
+
+                  const meId = user?.uid ?? "me";
+                  const meName = user?.firstName
+                    ? `${user.firstName}${user.lastName ? ` ${user.lastName}` : ""}`
+                    : user?.username || "Moi";
+                  const mePhoto = user?.photoURL && user.photoURL.length > 0 ? user.photoURL : getDefaultAvatar(meName);
+
+                  const existingIndex = friendEntries.findIndex((entry) => entry.id === meId);
+                  if (existingIndex >= 0) {
+                    friendEntries[existingIndex] = {
+                      ...friendEntries[existingIndex],
+                      name: meName,
+                      pts: myPoints,
+                      photoURL: mePhoto,
+                    };
+                  } else {
+                    friendEntries.push({ id: meId, name: meName, pts: myPoints, photoURL: mePhoto });
                   }
-                  const sorted = base.sort((a,b) => b.pts - a.pts).slice(0,50);
-                  const myIndex = sorted.findIndex(x => x.name === 'Aymeric');
+
+                  const sortedEntries = [...friendEntries].sort((a, b) => b.pts - a.pts);
+                  const myIndex = sortedEntries.findIndex((entry) => entry.id === meId);
+                  const displayEntries = sortedEntries.slice(0, 50);
+
                   return (
                     <View style={{ marginTop: 12 }}>
-                      {sorted.map((x, idx) => {
-                        const isMe = myIndex === idx;
-                        const rankColor = idx === 0 ? '#52D192' : idx === 1 ? '#F6D365' : idx === 2 ? '#F45B69' : colors.surfaceAlt;
+                      {displayEntries.map((entry, idx) => {
+                        const isMe = entry.id === meId;
+                        const rankColor =
+                          idx === 0
+                            ? "#52D192"
+                            : idx === 1
+                            ? "#F6D365"
+                            : idx === 2
+                            ? "#F45B69"
+                            : colors.surfaceAlt;
                         return (
-                          <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 14, marginBottom: 8, backgroundColor: isMe ? '#1A2F28' : colors.surfaceAlt }}>
-                            <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: rankColor, alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
-                              <Text style={{ color: '#0F3327', fontWeight: '800' }}>{idx+1}</Text>
+                          <View
+                            key={entry.id ?? idx}
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              paddingVertical: 10,
+                              paddingHorizontal: 12,
+                              borderRadius: 14,
+                              marginBottom: 8,
+                              backgroundColor: isMe ? "#1A2F28" : colors.surfaceAlt,
+                            }}
+                          >
+                            <View
+                              style={{
+                                width: 28,
+                                height: 28,
+                                borderRadius: 14,
+                                backgroundColor: rankColor,
+                                alignItems: "center",
+                                justifyContent: "center",
+                                marginRight: 10,
+                              }}
+                            >
+                              <Text style={{ color: "#0F3327", fontWeight: "800" }}>{idx + 1}</Text>
                             </View>
-                            <Image source={{ uri: x.avatar || `https://i.pravatar.cc/100?u=${encodeURIComponent(x.name)}` }} style={{ width: 28, height: 28, borderRadius: 14, marginRight: 10 }} />
+                            <Image
+                              source={{ uri: entry.photoURL || getDefaultAvatar(entry.name || entry.id || "Ami") }}
+                              style={{ width: 28, height: 28, borderRadius: 14, marginRight: 10 }}
+                            />
                             <View style={{ flex: 1 }}>
-                              <Text style={{ color: colors.text, fontWeight: isMe ? '800' : '600' }}>{x.name}</Text>
+                              <Text style={{ color: colors.text, fontWeight: isMe ? "800" : "600" }}>{entry.name}</Text>
                               {isMe && <Text style={{ color: colors.mutedText, fontSize: 12 }}>Ta position</Text>}
                             </View>
-                            <View style={{ backgroundColor: '#D4F7E7', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6 }}>
-                              <Text style={{ color: '#0F3327', fontWeight: '800' }}>{x.pts} pts</Text>
+                            <View style={{ backgroundColor: "#D4F7E7", borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6 }}>
+                              <Text style={{ color: "#0F3327", fontWeight: "800" }}>{entry.pts} pts</Text>
                             </View>
                           </View>
                         );
                       })}
                       <View style={{ marginTop: 8, borderTopWidth: 1, borderColor: colors.surfaceAlt, paddingTop: 8 }}>
-                        <Text style={{ color: colors.text, fontWeight: '700' }}>Ta position: {myIndex >= 0 ? myIndex + 1 : '—'}</Text>
+                        <Text style={{ color: colors.text, fontWeight: "700" }}>
+                          Ta position: {myIndex >= 0 ? myIndex + 1 : "—"}
+                        </Text>
                       </View>
                     </View>
                   );

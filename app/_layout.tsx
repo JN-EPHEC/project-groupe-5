@@ -10,6 +10,7 @@ import { FriendsProvider } from "@/hooks/friends-context";
 import { PointsProvider } from "@/hooks/points-context";
 import { SubscriptionsProvider } from "@/hooks/subscriptions-context";
 import { ThemeProviderCustom, useThemeMode } from "@/hooks/theme-context";
+import { usePresence } from "@/hooks/use-presence";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { UserProvider } from "@/hooks/user-context";
 import React from "react";
@@ -20,6 +21,7 @@ export const unstable_settings = {
 };
 
 function RootNavigation() {
+  usePresence();
   const { mode } = useThemeMode();
   const colorScheme = useColorScheme();
   const theme = (mode ?? colorScheme) === "dark" ? DarkTheme : DefaultTheme;

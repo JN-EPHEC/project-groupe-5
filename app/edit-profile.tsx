@@ -5,6 +5,7 @@ import { Stack, useRouter } from "expo-router";
 import { doc, setDoc } from "firebase/firestore";
 import React, { useMemo, useState } from "react";
 import { Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { uploadProfilePhoto } from "@/services/profile";
 import { auth, db } from "../firebaseConfig";
 
 export default function EditProfileScreen() {
@@ -33,13 +34,31 @@ export default function EditProfileScreen() {
     } catch {}
   }
 
+  const isRemoteUri = (uri: string | null) => Boolean(uri && uri.startsWith("http"));
+
   async function save() {
     if (!canSave || !auth.currentUser) return;
     setSaving(true);
     try {
       const ref = doc(db, "users", auth.currentUser.uid);
+      let nextPhotoURL: string | null = photoURL ?? null;
+
+      if (photoURL && !isRemoteUri(photoURL)) {
+        nextPhotoURL = await uploadProfilePhoto(photoURL);
+        setPhotoURL(nextPhotoURL);
+      }
+
+      const updatePayload: Record<string, any> = {
+        username: username || null,
+        bio: bio || null,
+      };
+
+      if ((nextPhotoURL ?? null) !== (user?.photoURL ?? null)) {
+        updatePayload.photoURL = nextPhotoURL ?? null;
+      }
+
       // Merge fields; if doc doesn't exist yet, create it
-      await setDoc(ref, { username: username || null, bio: bio || null, photoURL: photoURL || null }, { merge: true });
+      await setDoc(ref, updatePayload, { merge: true });
       Alert.alert("Profil mis à jour");
       router.back();
     } catch (e: any) {

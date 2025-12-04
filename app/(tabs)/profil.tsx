@@ -79,20 +79,28 @@ export default function ProfilScreen() {
     });
   }, []);
 
+  const myPoints = typeof points === "number" ? points : 0;
+
   // Classement entre amis
   const friendRankLabel = useMemo(() => {
-    const all = [...friends.map(a => a.points), points].sort((a,b) => b - a);
-    const position = all.indexOf(points) + 1;
-    return `#${position}`;
-  }, [friends, points]);
+    const scores = friends.map((friend) =>
+      typeof friend.points === "number" ? friend.points : 0
+    );
+    const sortedScores = [...scores, myPoints].sort((a, b) => b - a);
+    const positionIndex = sortedScores.findIndex((score) => score === myPoints);
+    return positionIndex >= 0 ? `#${positionIndex + 1}` : "#—";
+  }, [friends, myPoints]);
 
   // Classement club (si club)
   const clubRankLabel = useMemo(() => {
     if (!joinedClub) return null;
-    const arr = [...members.map(m => m.points), points].sort((a,b) => b - a);
-    const pos = arr.indexOf(points) + 1;
-    return `#${pos}`;
-  }, [joinedClub, members, points]);
+    const memberScores = members.map((member) =>
+      typeof member.points === "number" ? member.points : 0
+    );
+    const sortedScores = [...memberScores, myPoints].sort((a, b) => b - a);
+    const positionIndex = sortedScores.findIndex((score) => score === myPoints);
+    return positionIndex >= 0 ? `#${positionIndex + 1}` : "#—";
+  }, [joinedClub, members, myPoints]);
 
   const pendingCount = friendRequests.filter(r => r.status === 'pending').length;
 

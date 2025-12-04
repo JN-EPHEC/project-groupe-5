@@ -41,6 +41,15 @@ export async function searchUsers(text: string) {
   });
 }
 
+export async function getUserProfile(uid: string) {
+  if (!uid) {
+    return null;
+  }
+
+  const snap = await getDoc(doc(db, "users", uid));
+  return snap.exists() ? { id: uid, ...snap.data() } : null;
+}
+
 // -------------------------------------------------------------
 // ➕ Envoyer une demande
 // -------------------------------------------------------------

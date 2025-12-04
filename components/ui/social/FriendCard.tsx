@@ -6,7 +6,7 @@ export interface Friend {
   id: string;
   name: string;
   points: number;
-  avatar: string;
+  photoURL: string;
   online: boolean;
 }
 
@@ -22,6 +22,9 @@ interface FriendCardProps {
 export const FriendCard: React.FC<FriendCardProps> = ({ friend, rank, onChat, isMe, actionLabel, onAction }) => {
   const { colors } = useThemeMode();
   const rankColor = isMe ? "#0F3327" : colors.accent;
+  const getDefaultAvatar = (seed: string) =>
+    `https://api.dicebear.com/9.x/initials/png?seed=${encodeURIComponent(seed || "GreenUp")}&backgroundColor=1F2A27&textColor=ffffff`;
+  const avatarUri = friend.photoURL && friend.photoURL.length > 0 ? friend.photoURL : getDefaultAvatar(friend.name || friend.id);
 
   return (
     <TouchableOpacity
@@ -31,7 +34,10 @@ export const FriendCard: React.FC<FriendCardProps> = ({ friend, rank, onChat, is
     >
       <View style={styles.left}>
         <Text style={[styles.rank, { color: rankColor }]}>#{rank}</Text>
-        <Image source={{ uri: friend.avatar }} style={[styles.avatar, isMe && { borderWidth: 2, borderColor: colors.text }]} />
+        <Image
+          source={{ uri: avatarUri }}
+          style={[styles.avatar, isMe && { borderWidth: 2, borderColor: colors.text }]}
+        />
         <Text style={[styles.name, { color: colors.text }]}>{friend.name}</Text>
         {friend.online && <View style={[styles.dot, { backgroundColor: "#19D07D" }]} />}
       </View>
