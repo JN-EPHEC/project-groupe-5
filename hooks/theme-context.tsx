@@ -9,6 +9,10 @@ type Palette = {
   accent: string;
   surface: string;
   surfaceAlt: string;
+  card: string;
+  cardAlt: string;
+  cardText: string;
+  cardMuted: string;
   pill: string;
   pillActive: string;
   success: string;
@@ -25,12 +29,16 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 const palettes: Record<ThemeMode, Palette> = {
   dark: {
-    background: "#0B1412",
+    background: "#0C3327",
     text: "#F2F6F4",
     mutedText: "#9FB9AE",
     accent: "#19D07D",
     surface: "#111F1B",
     surfaceAlt: "#152922",
+    card: "#111F1B",
+    cardAlt: "#152922",
+    cardText: "#F2F6F4",
+    cardMuted: "#9FB9AE",
     pill: "#111F1B",
     pillActive: "#D4F7E7",
     success: "#7DCAB0",
@@ -42,6 +50,10 @@ const palettes: Record<ThemeMode, Palette> = {
     accent: "#19D07D",
     surface: "#FFFFFF",
     surfaceAlt: "#ECF5F1",
+    card: "#0C3327",
+    cardAlt: "#134434",
+    cardText: "#F2F6F4",
+    cardMuted: "#B4D3C8",
     pill: "#ECF5F1",
     pillActive: "#0F3327",
     success: "#19D07D",

@@ -5,16 +5,20 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
 export function CouponCard({ coupon }: { coupon: Coupon }) {
-  const { colors } = useThemeMode();
+  const { colors, mode } = useThemeMode();
+  const isLight = mode === "light";
+  const cardBackground = isLight ? colors.card : colors.surface;
+  const cardText = isLight ? colors.cardText : colors.text;
+  const cardMuted = isLight ? colors.cardMuted : colors.mutedText;
   const [open, setOpen] = useState(false);
   return (
     <>
-      <View style={[styles.card, { backgroundColor: colors.surface }]}> 
+      <View style={[styles.card, { backgroundColor: cardBackground }]}> 
         <View style={styles.row}> 
           <View style={{ flex: 1 }}>
-            <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>{coupon.name} • {coupon.voucherAmountEuro}€</Text>
+            <Text style={[styles.title, { color: cardText }]} numberOfLines={1}>{coupon.name} • {coupon.voucherAmountEuro}€</Text>
             <Text style={[styles.code, { color: colors.accent }]}>Code: {coupon.code}</Text>
-            <Text style={[styles.expiry, { color: colors.mutedText }]}>Expire: {coupon.expiresAt}</Text>
+            <Text style={[styles.expiry, { color: cardMuted }]}>Expire: {coupon.expiresAt}</Text>
           </View>
           <Pressable onPress={() => setOpen(true)}>
             <QRCode value={coupon.code} size={72} backgroundColor='transparent' />
@@ -23,10 +27,10 @@ export function CouponCard({ coupon }: { coupon: Coupon }) {
       </View>
       <Modal transparent visible={open} animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={[styles.overlay, { backgroundColor: 'rgba(0,0,0,0.6)' }]} onPress={() => setOpen(false)}>
-          <View style={[styles.qrModal, { backgroundColor: colors.surface }]}> 
-            <Text style={{ color: colors.text, fontWeight: '700', marginBottom: 12 }}>{coupon.name}</Text>
+          <View style={[styles.qrModal, { backgroundColor: cardBackground }]}> 
+            <Text style={{ color: cardText, fontWeight: '700', marginBottom: 12 }}>{coupon.name}</Text>
             <QRCode value={coupon.code} size={240} backgroundColor='transparent' />
-            <Text style={{ color: colors.mutedText, marginTop: 12 }}>Tap pour fermer</Text>
+            <Text style={{ color: cardMuted, marginTop: 12 }}>Tap pour fermer</Text>
           </View>
         </Pressable>
       </Modal>

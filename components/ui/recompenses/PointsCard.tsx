@@ -8,12 +8,15 @@ interface PointsCardProps {
 }
 
 export const PointsCard: React.FC<PointsCardProps> = ({ points }) => {
-  const { colors } = useThemeMode();
+  const { colors, mode } = useThemeMode();
+  const isLight = mode === "light";
+  const cardText = isLight ? colors.cardText : colors.text;
+  const cardMuted = isLight ? colors.cardMuted : colors.mutedText;
 
   return (
-    <View style={[styles.card, { backgroundColor: colors.surface }]}>
+    <View style={[styles.card, { backgroundColor: isLight ? colors.card : colors.surface }]}> 
       <Ionicons name="leaf" size={22} color={colors.accent} />
-      <Text style={[styles.label, { color: colors.mutedText }]}>Points disponibles</Text>
+      <Text style={[styles.label, { color: cardMuted }]}>Points disponibles</Text>
       <Text style={[styles.value, { color: colors.accent }]}>{points}</Text>
     </View>
   );

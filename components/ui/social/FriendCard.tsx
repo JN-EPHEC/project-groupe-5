@@ -61,9 +61,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
+    borderRadius: 22,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 10,
   },
   left: { flexDirection: "row", alignItems: "center" },
   avatar: {

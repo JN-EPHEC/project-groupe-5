@@ -1,8 +1,11 @@
+import { auth, db } from "@/firebaseConfig";
 import { useThemeMode } from "@/hooks/theme-context";
 import { useUser } from "@/hooks/user-context";
 import { Ionicons } from "@expo/vector-icons";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import * as ImagePicker from "expo-image-picker";
-import React, { useMemo, useState } from "react";
+import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp, Unsubscribe } from "firebase/firestore";
+import React, { useEffect, useMemo, useState } from "react";
 import {
     Alert,
     FlatList,
@@ -15,51 +18,40 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface MessageItem {
   id: string;
   text?: string;
-  imageUri?: string;
-  type?: "text" | "image";
-  sender: string;
-  reactions?: string[];
+  imageUrl?: string;
+  userId?: string;
+  userName?: string;
+  photoURL?: string;
 }
 
 interface ChatViewProps {
   selectedChat: any;
-  messages: MessageItem[];
   input: string;
   setInput: (v: string) => void;
-  onSend: () => void;
   onBack: () => void;
-  onDeleteMessage: (id: string) => void;
-  onStartEditMessage: (id: string, text: string) => void;
-  onReactMessage: (id: string, emoji: string) => void;
-  editingId?: string | null;
   showBack?: boolean;
   onSendImage?: (uri: string) => void;
 }
 
 export const ChatView: React.FC<ChatViewProps> = ({
   selectedChat,
-  messages,
   input,
   setInput,
-  onSend,
   onBack,
-  onDeleteMessage,
-  onStartEditMessage,
-  onReactMessage,
-  editingId,
   showBack = true,
   onSendImage,
 }) => {
-  const { colors } = useThemeMode();
+  const { colors, mode } = useThemeMode();
   const { user } = useUser();
-
-  const [actionFor, setActionFor] = useState<string | null>(null);
-  const [showReactionsFor, setShowReactionsFor] = useState<string | null>(null);
-  const emojis = useMemo(() => ["👍", "😊", "🔥", "🎉", "❤️"], []);
+  const [messages, setMessages] = useState<MessageItem[]>([]);
+  const [sending, setSending] = useState(false);
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
 
   const currentUserName = useMemo(() => {
     if (!user) return "Moi";
@@ -71,13 +63,78 @@ export const ChatView: React.FC<ChatViewProps> = ({
   }, [user]);
 
   const currentUserAvatar = user?.photoURL ?? null;
-  const otherAvatar =
-    selectedChat?.avatar || selectedChat?.photoUri || selectedChat?.photoURL || null;
-  const otherName = selectedChat?.name || "Participant";
+  const defaultOtherAvatar = selectedChat?.avatar || selectedChat?.photoUri || selectedChat?.photoURL || null;
+  const defaultOtherName = selectedChat?.name || "Participant";
 
-  const showNameAlert = (name: string) => {
-    if (!name) return;
-    Alert.alert(name);
+  useEffect(() => {
+    if (!selectedChat?.id) {
+      setMessages([]);
+      return;
+    }
+
+    let unsubscribe: Unsubscribe | undefined;
+
+    try {
+      const q = query(
+        collection(db, "clubs", selectedChat.id, "messages"),
+        orderBy("createdAt", "asc")
+      );
+
+      unsubscribe = onSnapshot(q, (snapshot) => {
+        const mapped = snapshot.docs.map((doc) => {
+          const data = doc.data() as any;
+          return {
+            id: doc.id,
+            text: data.text ?? "",
+            imageUrl: data.imageUrl ?? data.imageUri ?? "",
+            userId: data.userId,
+            userName: data.userName ?? data.authorName,
+            photoURL: data.photoURL ?? data.avatar,
+          } as MessageItem;
+        });
+        setMessages(mapped);
+      });
+    } catch (error) {
+      console.warn("[ChatView] unable to init messages listener", error);
+      setMessages([]);
+    }
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [selectedChat?.id]);
+
+  const send = async () => {
+    const uid = auth.currentUser?.uid;
+    const clubId = selectedChat?.id;
+    const text = input.trim();
+
+    if (!clubId || !text || !uid || sending) {
+      return;
+    }
+
+    setSending(true);
+
+    try {
+      await addDoc(collection(db, "clubs", clubId, "messages"), {
+        text,
+        createdAt: serverTimestamp(),
+        userId: uid,
+        userName:
+          auth.currentUser?.displayName ||
+          [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
+          user?.username ||
+          "Utilisateur",
+        photoURL: auth.currentUser?.photoURL || user?.photoURL || "",
+      });
+      setInput("");
+    } catch (error) {
+      console.error("[ChatView] send message failed", error);
+    } finally {
+      setSending(false);
+    }
   };
 
   const pickImage = async () => {
@@ -94,10 +151,21 @@ export const ChatView: React.FC<ChatViewProps> = ({
     } catch {}
   };
 
+  const keyboardVerticalOffset = Platform.OS === "ios" ? tabBarHeight + insets.bottom : 0;
+  const composerBaseHeight = 72;
+  const listPaddingBottom = composerBaseHeight + tabBarHeight + insets.bottom + 8;
+  const inputPaddingBottom = Math.max(insets.bottom, 12);
+  const borderTone = mode === "light" ? "rgba(15,51,39,0.14)" : "rgba(255,255,255,0.08)";
+  const chatSurfaceBackground = mode === "light" ? "rgba(255,255,255,0.9)" : "rgba(12,51,39,0.6)";
+  const composerBackground = mode === "light" ? "rgba(255,255,255,0.92)" : "rgba(9, 40, 30, 0.7)";
+  const inputBackground = mode === "light" ? "#ffffff" : "rgba(255,255,255,0.06)";
+  const containerBottomPadding = tabBarHeight + insets.bottom + 16;
+
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      style={[styles.container, { backgroundColor: colors.background, paddingBottom: containerBottomPadding }]}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={keyboardVerticalOffset}
     >
       {showBack && (
         <>
@@ -116,13 +184,24 @@ export const ChatView: React.FC<ChatViewProps> = ({
         <Text style={[styles.empty, { color: colors.mutedText }]}>Commencez la discussion 🌿</Text>
       )}
 
-      <FlatList
-        data={messages}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => {
-          const isMe = item.sender === "me";
-          const avatarUri = isMe ? currentUserAvatar : otherAvatar;
-          const displayName = isMe ? currentUserName : otherName;
+      <View
+        style={[
+          styles.chatSurface,
+          {
+            backgroundColor: chatSurfaceBackground,
+            borderColor: borderTone,
+            marginBottom: tabBarHeight > 0 ? tabBarHeight * 0.3 : 12,
+          },
+        ]}
+      > 
+        <FlatList
+          data={messages}
+          keyExtractor={(item) => item.id}
+          showsVerticalScrollIndicator={false}
+          renderItem={({ item }) => {
+          const isMe = item.userId === auth.currentUser?.uid;
+          const avatarUri = isMe ? currentUserAvatar : item.photoURL || defaultOtherAvatar;
+          const displayName = isMe ? currentUserName : item.userName || defaultOtherName;
           const initials = displayName ? displayName.charAt(0).toUpperCase() : "?";
 
           return (
@@ -130,10 +209,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
               style={[styles.messageRow, { justifyContent: isMe ? "flex-end" : "flex-start" }]}
             >
               {!isMe && (
-                <TouchableOpacity
-                  onPress={() => showNameAlert(displayName)}
-                  style={styles.avatarTouch}
-                >
+                <TouchableOpacity onPress={() => Alert.alert(displayName)} style={styles.avatarTouch}>
                   {avatarUri ? (
                     <Image source={{ uri: avatarUri }} style={styles.avatar} />
                   ) : (
@@ -154,8 +230,6 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
               <View style={styles.messageContent}>
                 <TouchableOpacity
-                  delayLongPress={500}
-                  onLongPress={() => setActionFor(item.id)}
                   activeOpacity={0.85}
                 >
                   <View
@@ -167,84 +241,20 @@ export const ChatView: React.FC<ChatViewProps> = ({
                       },
                     ]}
                   >
-                    {item.imageUri ? (
+                    {item.imageUrl ? (
                       <Image
-                        source={{ uri: item.imageUri }}
+                        source={{ uri: item.imageUrl }}
                         style={{ width: 180, height: 180, borderRadius: 10 }}
                       />
                     ) : (
                       <Text style={[styles.text, { color: colors.text }]}>{item.text}</Text>
                     )}
-                    {item.reactions && item.reactions.length > 0 && (
-                      <View style={styles.reactionsCorner}>
-                        <Text style={{ fontSize: 12 }}>
-                          {Array.from(new Set(item.reactions)).join(" ")}
-                        </Text>
-                      </View>
-                    )}
                   </View>
                 </TouchableOpacity>
-
-                {actionFor === item.id && (
-                  <View style={[styles.actionsRow, { backgroundColor: colors.surfaceAlt }]}
-                  >
-                    <TouchableOpacity
-                      onPress={() => {
-                        setActionFor(null);
-                        onDeleteMessage(item.id);
-                      }}
-                      style={styles.actionBtn}
-                    >
-                      <Ionicons name="trash" size={16} color={colors.text} />
-                      <Text style={[styles.actionText, { color: colors.text }]}>Supprimer</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => {
-                        setActionFor(null);
-                        onStartEditMessage(item.id, item.text ?? "");
-                      }}
-                      style={styles.actionBtn}
-                    >
-                      <Ionicons name="create-outline" size={16} color={colors.text} />
-                      <Text style={[styles.actionText, { color: colors.text }]}>Modifier</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => {
-                        setShowReactionsFor(item.id);
-                      }}
-                      style={styles.actionBtn}
-                    >
-                      <Ionicons name="happy-outline" size={16} color={colors.text} />
-                      <Text style={[styles.actionText, { color: colors.text }]}>Réagir</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                {showReactionsFor === item.id && (
-                  <View style={[styles.emojiRow, { backgroundColor: colors.surface }]}
-                  >
-                    {emojis.map((emoji) => (
-                      <TouchableOpacity
-                        key={emoji}
-                        onPress={() => {
-                          onReactMessage(item.id, emoji);
-                          setShowReactionsFor(null);
-                          setActionFor(null);
-                        }}
-                        style={styles.emojiBtn}
-                      >
-                        <Text style={{ fontSize: 18 }}>{emoji}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
               </View>
 
               {isMe && (
-                <TouchableOpacity
-                  onPress={() => showNameAlert(displayName)}
-                  style={styles.avatarTouch}
-                >
+                <TouchableOpacity onPress={() => Alert.alert(displayName)} style={styles.avatarTouch}>
                   {avatarUri ? (
                     <Image source={{ uri: avatarUri }} style={styles.avatar} />
                   ) : (
@@ -265,26 +275,57 @@ export const ChatView: React.FC<ChatViewProps> = ({
             </View>
           );
         }}
-        contentContainerStyle={{ paddingVertical: 10, paddingBottom: 72 }}
-      />
+          contentContainerStyle={{ paddingVertical: 12, paddingBottom: listPaddingBottom }}
+          ListEmptyComponent={() => (
+            <Text style={[styles.empty, { color: colors.mutedText }]}>Démarre la conversation avec ton club</Text>
+          )}
+          style={{ flex: 1 }}
+        />
+      </View>
 
-      <View style={[styles.inputRow, { marginBottom: 110 }]}>
-        <TouchableOpacity onPress={pickImage} style={[styles.attach, { backgroundColor: colors.surfaceAlt }]}>
-          <Ionicons name="image-outline" size={20} color={colors.text} />
-        </TouchableOpacity>
+      <View
+        style={[
+          styles.inputRow,
+          {
+            paddingBottom: inputPaddingBottom,
+            borderColor: "transparent",
+            backgroundColor: composerBackground,
+          },
+        ]}
+      >
+        {onSendImage ? (
+          <TouchableOpacity
+            onPress={pickImage}
+            style={[styles.attach, { backgroundColor: colors.surfaceAlt }]}
+          >
+            <Ionicons name="image-outline" size={20} color={colors.text} />
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 0, height: 0 }} />
+        )}
         <TextInput
           value={input}
           onChangeText={setInput}
           placeholder="Écrire un message..."
           placeholderTextColor={colors.mutedText}
-          style={[styles.input, { backgroundColor: colors.surfaceAlt, color: colors.text }]}
+          style={[styles.input, { backgroundColor: inputBackground, color: colors.text, borderColor: mode === "light" ? "rgba(15,51,39,0.1)" : "rgba(255,255,255,0.08)" }]}
           multiline
         />
         <TouchableOpacity
-          onPress={onSend}
-          style={[styles.send, { backgroundColor: colors.accent }]}
+          onPress={send}
+          disabled={sending || !input.trim().length}
+          style={[
+            styles.send,
+            {
+              backgroundColor: sending || !input.trim().length ? colors.surfaceAlt : colors.accent,
+            },
+          ]}
         >
-          <Ionicons name="send" size={20} color={colors.text} />
+          <Ionicons
+            name="send"
+            size={20}
+            color={sending || !input.trim().length ? colors.mutedText : colors.text}
+          />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -292,55 +333,33 @@ export const ChatView: React.FC<ChatViewProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingTop: 8, paddingHorizontal: 12, paddingBottom: 0 },
+  container: { flex: 1, paddingTop: 8, paddingHorizontal: 12 },
   backBtn: { marginBottom: 10 },
   header: { fontSize: 18, fontWeight: "600", textAlign: "center", marginBottom: 10 },
   messageRow: { flexDirection: "row", alignItems: "flex-end", marginVertical: 6 },
   messageContent: { maxWidth: "78%" },
   message: { padding: 10, borderRadius: 12, marginVertical: 4, maxWidth: "100%" },
   text: { fontSize: 14 },
-  reactionsCorner: {
-    position: "absolute",
-    top: -6,
-    right: -6,
-    backgroundColor: "#FFFFFFCC",
-    borderRadius: 10,
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-  },
-  actionsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    marginTop: 6,
-    alignSelf: "flex-end",
-  },
-  actionBtn: { flexDirection: "row", alignItems: "center", marginHorizontal: 6 },
-  actionText: { marginLeft: 4, fontSize: 12 },
-  emojiRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 10,
-    padding: 6,
-    marginTop: 6,
-    alignSelf: "flex-end",
-  },
-  emojiBtn: { paddingHorizontal: 6, paddingVertical: 4 },
-  empty: { textAlign: "center", marginTop: 40 },
+  empty: { textAlign: "center", marginTop: 40, fontSize: 15, fontWeight: "600" },
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
-    borderTopWidth: 1,
-    borderColor: "#1C2A27",
+    borderTopWidth: StyleSheet.hairlineWidth,
     paddingTop: 8,
   },
-  input: { flex: 1, borderRadius: 20, padding: 10, fontSize: 14 },
+  input: { flex: 1, borderRadius: 20, padding: 10, fontSize: 14, borderWidth: StyleSheet.hairlineWidth },
   attach: { marginRight: 8, borderRadius: 20, padding: 10 },
   send: { marginLeft: 8, borderRadius: 20, padding: 10 },
   avatar: { width: 36, height: 36, borderRadius: 18 },
   avatarTouch: { marginHorizontal: 8 },
   avatarPlaceholder: { alignItems: "center", justifyContent: "center" },
   avatarInitial: { fontWeight: "700" },
+  chatSurface: {
+    flex: 1,
+    borderRadius: 22,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    marginBottom: 12,
+  },
 });

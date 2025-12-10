@@ -1,9 +1,9 @@
 import { ChallengeOfTheDay } from "@/components/ui/acceuil/ChallengeOfTheDay";
 import { HeaderProfile } from "@/components/ui/acceuil/HeaderProfile";
 import { ProgressionCard } from "@/components/ui/acceuil/ProgressionCard";
-import { RankCard } from "@/components/ui/acceuil/RankCard";
 import StreakCalendar from "@/components/ui/acceuil/StreakCalendar";
 import PremiumCard from "@/components/ui/recompenses/PremiumCard";
+import { FontFamilies } from "@/constants/fonts";
 import { auth, db } from "@/firebaseConfig";
 import { useChallenges } from "@/hooks/challenges-context";
 import { useClub } from "@/hooks/club-context";
@@ -11,13 +11,15 @@ import { useFriends } from "@/hooks/friends-context";
 import { usePoints } from "@/hooks/points-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { useUser } from "@/hooks/user-context";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import { addDoc, collection, onSnapshot } from "firebase/firestore";
-import { Image, ScrollView as RNScrollView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function AcceuilScreen() {
-  const { colors } = useThemeMode();
+  const { colors, mode } = useThemeMode();
   const { points } = usePoints();
   const { user } = useUser();
   const router = useRouter();
@@ -76,109 +78,150 @@ export default function AcceuilScreen() {
   const clubTotal = joinedClub ? clubSorted.length : 0;
   const clubLabel = clubPosition === 1 ? "1er" : `${clubPosition}e`;
 
+  const isLight = mode === "light";
+  const rankingGradient = isLight ? [colors.cardAlt, colors.card] : [colors.surfaceAlt, colors.surface];
+  const rankingBorder = isLight ? "rgba(255,255,255,0.12)" : colors.surfaceAlt;
+  const miniCardBg = isLight ? colors.cardAlt : "#123C2F";
+  const miniCardBorder = isLight ? "rgba(255,255,255,0.12)" : "#0E2B21";
+  const miniCardLabel = isLight ? colors.cardMuted : colors.mutedText;
+  const miniCardValue = isLight ? colors.cardText : colors.text;
+
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: 100 }}>
-      <Text style={[styles.bigTitle, { color: colors.text }]}>Green{"\n"}Up</Text>
-      {/* Section: Profil -> components/ui/acceuil/HeaderProfile */}
-      <HeaderProfile />
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: colors.background }]}
+      edges={["top", "left", "right", "bottom"]}
+    >
+      <ScrollView
+        style={[styles.container, { backgroundColor: colors.background }]}
+        contentContainerStyle={{ paddingBottom: 120 }}
+      >
+        <View style={styles.pageHeader}>
+          <Text style={[styles.screenTitle, { color: colors.text }]}>Green Up</Text>
+        </View>
+        {/* Section: Profil -> components/ui/acceuil/HeaderProfile */}
+        <HeaderProfile clubName={joinedClub?.name} />
 
-      {/* Section: Points (simple bloc inline ici; si besoin, on l’extrait plus tard) */}
-      <View style={[styles.pointsBox, { backgroundColor: colors.surface }]}>
-        <Text style={[styles.pointsNumber, { color: colors.accent }]}>{myPoints}</Text>
-        <Text style={[styles.pointsLabel, { color: colors.mutedText }]}>Points</Text>
-      </View>
-
-      {/* Section: Classement -> components/ui/acceuil/RankCard */}
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>Classement</Text>
-      <View style={styles.row}>
-        <TouchableOpacity activeOpacity={0.85} style={{ width: "48%" }} onPress={() => router.push({ pathname: "/social", params: { tab: "amis" } })}>
-          <RankCard value={`${positionLabel} sur ${totalFriends}`} label="Entre amis" />
-        </TouchableOpacity>
-        {joinedClub ? (
-          <TouchableOpacity
-            activeOpacity={0.85}
-            style={{ width: "48%" }}
-            onPress={() => router.push({ pathname: "/social", params: { tab: "clubs", view: "clubRanking" } })}
-          >
-            <RankCard value={`${clubLabel} sur ${clubTotal}`} label="Club" active />
-          </TouchableOpacity>
-        ) : (
-          <RankCard value="—" label="Club" active style={{ width: "48%" }} />
-        )}
-      </View>
-
-      {/* Barre "Moi" supprimée à la demande */}
-      {/* Avatars des amis (en ligne: cercle vert) - sans l'utilisateur */}
-      <RNScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 10 }}>
-        {friends.map((friend: any) => {
-          const initial = friend.name ? String(friend.name).charAt(0).toUpperCase() : "?";
-          const baseStyle = {
-            width: 34,
-            height: 34,
-            borderRadius: 17,
-            marginRight: 8,
-            borderWidth: friend.online ? 2 : 0,
-            borderColor: colors.accent,
-          };
-
-          if (friend.avatar) {
-            return (
-              <Image
-                key={friend.id}
-                source={{ uri: friend.avatar }}
-                style={{ ...baseStyle, overflow: "hidden" }}
-              />
-            );
-          }
-
-          return (
-            <View
-              key={friend.id}
-              style={{
-                ...baseStyle,
-                backgroundColor: "#1F2A27",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
+        {/* Section: Classement + Points regroupés */}
+        <LinearGradient
+          colors={rankingGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.rankingWrapper, { borderColor: rankingBorder, shadowColor: isLight ? colors.card : "#000000" }]}
+        >
+          <Text style={[styles.sectionTitle, { color: miniCardValue, marginBottom: 14 }]}>Classement</Text>
+          <View style={styles.rankingRow}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              style={[styles.miniCard, { backgroundColor: miniCardBg, borderColor: miniCardBorder }]}
+              onPress={() => router.push({ pathname: "/social", params: { tab: "amis" } })}
             >
-              <Text style={{ color: "#fff", fontWeight: "700" }}>{initial}</Text>
+              <Text style={[styles.miniLabel, { color: miniCardLabel }]}>Entre amis</Text>
+              <Text style={[styles.miniValue, { color: miniCardValue }]}>{`${positionLabel} / ${totalFriends}`}</Text>
+            </TouchableOpacity>
+
+            <View
+              style={[styles.miniCard, { backgroundColor: miniCardBg, borderColor: miniCardBorder }]}
+            >
+              <Text style={[styles.miniLabel, { color: miniCardLabel }]}>Points</Text>
+              <Text style={[styles.miniValue, { color: miniCardValue }]}>{myPoints}</Text>
             </View>
-          );
-        })}
-      </RNScrollView>
 
-      {/* Série d'activités (streak) */}
-      <StreakCalendar />
+            <TouchableOpacity
+              activeOpacity={joinedClub ? 0.85 : 1}
+              style={[styles.miniCard, { backgroundColor: miniCardBg, borderColor: miniCardBorder }]}
+              disabled={!joinedClub}
+              onPress={() => router.push({ pathname: "/social", params: { tab: "clubs", view: "clubRanking" } })}
+            >
+              <Text style={[styles.miniLabel, { color: miniCardLabel }]}>Club</Text>
+              <Text style={[styles.miniValue, { color: miniCardValue }]}
+              >
+                {joinedClub ? `${clubLabel} / ${clubTotal}` : "—"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
 
-      {/* Section: Progression -> components/ui/acceuil/ProgressionCard + components/ProgressCircle */}
-        <ProgressionCard done={defisFaient} total={defisTotal} pointsText="50 Points gagnés" streakText="2 jours de suite 🔥" />
+        {/* Série d'activités (streak) */}
+        <View style={styles.blockSpacing}>
+          <StreakCalendar />
+        </View>
 
-      {/* PREMIUM sous la progression */}
-      <PremiumCard onSubscribe={startSubscription} />
+        {/* Section: Progression -> components/ui/acceuil/ProgressionCard + components/ProgressCircle */}
+        <View style={styles.blockSpacing}>
+          <ProgressionCard
+            done={defisFaient}
+            total={defisTotal}
+            pointsText="50 Points gagnés"
+            streakText="2 jours de suite"
+          />
+        </View>
 
-      {/* Section: Défi en cours (seulement si status active) */}
-      {current && current.status === 'active' && (
-        <ChallengeOfTheDay
-          title={current.title}
-          description={current.description}
-          difficulty={current.difficulty}
-          onValidate={() => router.push({ pathname: "/camera", params: { id: String(current.id) } })}
-        />
-      )}
-    </ScrollView>
+        {/* PREMIUM sous la progression */}
+        <View style={styles.blockSpacing}>
+          <PremiumCard onSubscribe={startSubscription} />
+        </View>
+
+        {/* Section: Défi en cours (seulement si status active) */}
+        {current && current.status === 'active' && (
+          <View style={styles.blockSpacing}>
+            <ChallengeOfTheDay
+              title={current.title}
+              description={current.description}
+              difficulty={current.difficulty}
+              onValidate={() => router.push({ pathname: "/camera", params: { id: String(current.id) } })}
+            />
+          </View>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16 },
-  bigTitle: { fontSize: 34, fontWeight: '700', lineHeight: 36, marginBottom: 12 },
-  row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  pointsBox: { padding: 14, borderRadius: 14, alignItems: "center", marginBottom: 20 },
-  pointsNumber: { fontWeight: "700", fontSize: 24 },
-  pointsLabel: { marginTop: 2 },
-  sectionTitle: { fontWeight: "600", marginVertical: 10, fontSize: 16 },
-  myRow: { flexDirection: "row", alignItems: "center", padding: 12, borderRadius: 12, marginTop: 8 },
-  myAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: "#E45353", marginRight: 10 },
-  myName: { fontWeight: "600" },
-  myPoints: { fontWeight: "700" },
+  safeArea: { flex: 1 },
+  container: { flex: 1, paddingHorizontal: 20, paddingTop: 8 },
+  pageHeader: { alignItems: "center", marginTop: 8, marginBottom: 20 },
+  screenTitle: {
+    fontSize: 34,
+    lineHeight: 38,
+    fontFamily: FontFamilies.heading,
+  },
+  rankingWrapper: {
+    borderRadius: 26,
+    borderWidth: 1,
+    padding: 18,
+    marginBottom: 17,
+    shadowColor: "#000000",
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+  },
+  rankingRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "stretch",
+    flexWrap: "wrap",
+  },
+  miniCard: {
+    flexGrow: 1,
+    flexBasis: "30%",
+    minWidth: 100,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+    marginHorizontal: 4,
+  },
+  miniLabel: { fontSize: 13, fontFamily: FontFamilies.headingMedium },
+  miniValue: { fontSize: 18, fontFamily: FontFamilies.heading },
+  sectionTitle: {
+    fontSize: 18,
+    marginBottom: 16,
+    fontFamily: FontFamilies.heading,
+  },
+  blockSpacing: { marginBottom: 17 },
 });

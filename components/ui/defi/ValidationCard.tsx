@@ -41,10 +41,10 @@ export function ValidationCard({ item, onValidate, onReject }: Props) {
   ];
 
   return (
-    <View style={[styles.card, { backgroundColor: colors.surface }]}>
+    <View style={[styles.card, { backgroundColor: colors.card }]}> 
       {/* HEADER */}
       <View style={styles.header}>
-        <View style={[styles.categoryPill, { backgroundColor: colors.surfaceAlt }]}>
+        <View style={[styles.categoryPill, { backgroundColor: colors.cardAlt }]}> 
           <Ionicons name={category.icon} size={16} color="#7DCAB0" />
           <Text style={styles.categoryText}>{category.label}</Text>
         </View>
@@ -56,21 +56,21 @@ export function ValidationCard({ item, onValidate, onReject }: Props) {
       </View>
 
       {/* TITRE */}
-      <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
-      <Text style={[styles.subtitle, { color: colors.mutedText }]}>Par {item.userName}</Text>
+      <Text style={[styles.title, { color: colors.cardText }]}>{item.title}</Text>
+      <Text style={[styles.subtitle, { color: colors.cardMuted }]}>Par {item.userName}</Text>
 
       {/* Message de signalement */}
       {reported && (
-        <View style={[styles.banner, { backgroundColor: colors.surfaceAlt }]}> 
+        <View style={[styles.banner, { backgroundColor: colors.cardAlt }]}> 
           <Ionicons name="alert-circle" size={18} color={colors.accent} style={styles.leadingIcon} />
-          <Text style={{ color: colors.text, fontWeight: '600' }}>Merci, votre signalement a été pris en compte.</Text>
+          <Text style={{ color: colors.cardText, fontWeight: '600' }}>Merci, votre signalement a été pris en compte.</Text>
         </View>
       )}
 
       {/* BOÎTE DE PREUVE */}
       {hiddenProof ? (
-        <View style={[styles.hiddenBox, { backgroundColor: colors.surfaceAlt }]}> 
-          <Text style={{ color: colors.mutedText }}>Cette preuve est temporairement masquée en attente de vérification.</Text>
+        <View style={[styles.hiddenBox, { backgroundColor: colors.cardAlt }]}> 
+          <Text style={{ color: colors.cardMuted }}>Cette preuve est temporairement masquée en attente de vérification.</Text>
         </View>
       ) : (
         <Image source={{ uri: item.photoUrl }} style={styles.photo} />
@@ -78,12 +78,12 @@ export function ValidationCard({ item, onValidate, onReject }: Props) {
 
       {/* Commentaire de l'auteur (s'il existe) */}
       {item.comment && !hiddenProof && (
-        <Text style={{ color: colors.text, marginTop: 10 }}>{item.comment}</Text>
+        <Text style={{ color: colors.cardText, marginTop: 10 }}>{item.comment}</Text>
       )}
 
       {/* ACTIONS */}
       <View style={styles.actions}>
-        <TouchableOpacity style={[styles.secondaryButton, { backgroundColor: colors.surfaceAlt }]}
+        <TouchableOpacity style={[styles.secondaryButton, { backgroundColor: colors.cardAlt }]}
           onPress={onReject}
         > 
           <Ionicons name="close-circle" size={18} color="#EBE6D3" style={styles.leadingIcon} />
@@ -106,14 +106,14 @@ export function ValidationCard({ item, onValidate, onReject }: Props) {
       {/* Report modal */}
       <Modal transparent visible={reportVisible} animationType="fade" onRequestClose={() => setReportVisible(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: colors.surface }] }>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Signaler la preuve</Text>
-            <Text style={{ color: colors.mutedText, marginTop: 6 }}>Sélectionnez un motif et ajoutez un commentaire facultatif.</Text>
+          <View style={[styles.modalCard, { backgroundColor: colors.card }] }>
+            <Text style={[styles.modalTitle, { color: colors.cardText }]}>Signaler la preuve</Text>
+            <Text style={{ color: colors.cardMuted, marginTop: 6 }}>Sélectionnez un motif et ajoutez un commentaire facultatif.</Text>
             <View style={{ marginTop: 12 }}>
               {reasons.map((r) => (
                 <TouchableOpacity key={r} onPress={() => setSelectedReason(r)} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }}>
                   <Ionicons name={selectedReason === r ? 'radio-button-on' : 'radio-button-off'} size={18} color={colors.accent} />
-                  <Text style={{ marginLeft: 8, color: colors.text }}>{r}</Text>
+                  <Text style={{ marginLeft: 8, color: colors.cardText }}>{r}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -121,18 +121,18 @@ export function ValidationCard({ item, onValidate, onReject }: Props) {
               value={comment}
               onChangeText={setComment}
               placeholder="Commentaire (facultatif)"
-              placeholderTextColor={colors.mutedText}
+              placeholderTextColor={colors.cardMuted}
               multiline
               numberOfLines={3}
-              style={{ backgroundColor: colors.surfaceAlt, color: colors.text, borderRadius: 12, padding: 12, marginTop: 10, textAlignVertical: 'top' }}
+              style={{ backgroundColor: colors.cardAlt, color: colors.cardText, borderRadius: 12, padding: 12, marginTop: 10, textAlignVertical: 'top' }}
             />
             <View style={styles.modalButtons}>
-              <TouchableOpacity style={[styles.modalBtn, { backgroundColor: colors.surfaceAlt }]} onPress={() => setReportVisible(false)}>
-                <Text style={{ color: colors.text, fontWeight: '700' }}>Annuler</Text>
+              <TouchableOpacity style={[styles.modalBtn, { backgroundColor: colors.cardAlt }]} onPress={() => setReportVisible(false)}>
+                <Text style={{ color: colors.cardText, fontWeight: '700' }}>Annuler</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 disabled={!selectedReason}
-                style={[styles.modalBtn, { backgroundColor: selectedReason ? colors.accent : colors.surfaceAlt }]}
+                style={[styles.modalBtn, { backgroundColor: selectedReason ? colors.accent : colors.cardAlt }]}
                 onPress={() => {
                   // In a real app, send report: { reason: selectedReason, comment }
                   setReportVisible(false);
@@ -140,7 +140,7 @@ export function ValidationCard({ item, onValidate, onReject }: Props) {
                   setHiddenProof(true);
                 }}
               >
-                <Text style={{ color: selectedReason ? '#0F3327' : colors.mutedText, fontWeight: '700' }}>Envoyer</Text>
+                <Text style={{ color: selectedReason ? '#0F3327' : colors.cardMuted, fontWeight: '700' }}>Envoyer</Text>
               </TouchableOpacity>
             </View>
           </View>

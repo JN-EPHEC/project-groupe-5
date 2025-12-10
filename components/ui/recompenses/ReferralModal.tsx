@@ -11,7 +11,12 @@ function randomCode(len = 6) {
 }
 
 export function ReferralModal({ visible, onClose, onShared }: { visible: boolean; onClose: () => void; onShared?: () => void }) {
-  const { colors } = useThemeMode();
+  const { colors, mode } = useThemeMode();
+  const isLight = mode === "light";
+  const cardBackground = isLight ? colors.card : colors.surface;
+  const cardAlt = isLight ? colors.cardAlt : colors.surfaceAlt;
+  const cardText = isLight ? colors.cardText : colors.text;
+  const cardMuted = isLight ? colors.cardMuted : colors.mutedText;
   const [code] = useState(() => randomCode());
 
   const message = useMemo(() => `Rejoins-moi sur notre app écoresponsable !\n\nVoici mon code de parrainage : ${code}\n\n• 250 🌿 pour toi lorsque ton ami atteint 1000 pièces au total\n• 500 🌿 pour ton ami quand il entre le code à l'inscription\n\nBoutique cadeaux: échange tes pièces contre des bons (PayPal, Nike, etc.).`, [code]);
@@ -49,11 +54,11 @@ export function ReferralModal({ visible, onClose, onShared }: { visible: boolean
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.backdrop}>
-        <View style={[styles.card, { backgroundColor: colors.surface }]}>          
-          <Text style={[styles.h1, { color: colors.text }]}>Parrainage</Text>
-          <Text style={[styles.p, { color: colors.mutedText }]}>Gagne des pièces en parrainant tes amis !</Text>
+        <View style={[styles.card, { backgroundColor: cardBackground }]}>          
+          <Text style={[styles.h1, { color: cardText }]}>Parrainage</Text>
+          <Text style={[styles.p, { color: cardMuted }]}>Gagne des pièces en parrainant tes amis !</Text>
 
-          <View style={[styles.codeBox, { backgroundColor: colors.surfaceAlt }]}>
+          <View style={[styles.codeBox, { backgroundColor: cardAlt }]}> 
             <Text style={styles.code}>{code}</Text>
             <TouchableOpacity onPress={copyCode} style={[styles.copyBtn, { backgroundColor: colors.accent }]}>
               <Text style={{ color: "#0F3327", fontWeight: "700" }}>Copier</Text>
@@ -61,8 +66,8 @@ export function ReferralModal({ visible, onClose, onShared }: { visible: boolean
           </View>
 
           <View style={styles.bullets}>
-            <Text style={[styles.p, { color: colors.text }]}>• 250 🌿 pour le parrain quand le filleul atteint 1000 pièces</Text>
-            <Text style={[styles.p, { color: colors.text }]}>• 500 🌿 pour le filleul quand il entre le code</Text>
+            <Text style={[styles.p, { color: cardText }]}>• 250 🌿 pour le parrain quand le filleul atteint 1000 pièces</Text>
+            <Text style={[styles.p, { color: cardText }]}>• 500 🌿 pour le filleul quand il entre le code</Text>
           </View>
 
           {/* Bouton unique "Partager" avec petit logo WhatsApp à droite */}
@@ -72,7 +77,7 @@ export function ReferralModal({ visible, onClose, onShared }: { visible: boolean
           </TouchableOpacity>
 
           <TouchableOpacity onPress={onClose} style={styles.close}>
-            <Text style={{ color: colors.mutedText }}>Fermer</Text>
+            <Text style={{ color: cardMuted }}>Fermer</Text>
           </TouchableOpacity>
         </View>
       </View>

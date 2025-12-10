@@ -1,22 +1,23 @@
 // hooks/challenges-context.ts
 import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useState,
 } from "react";
 
 import { Challenge } from "@/components/ui/defi/types";
 import { auth, db } from "@/firebaseConfig";
 import { usePoints } from "@/hooks/points-context";
+import { markDefiDone } from "@/services/notifications";
 import {
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  updateDoc
+    collection,
+    deleteDoc,
+    doc,
+    getDoc,
+    updateDoc
 } from "firebase/firestore";
 
 // ------------------------------------------------------------
@@ -292,6 +293,8 @@ export function ChallengesProvider({
       };
       return [entry, ...prev];
     });
+
+    await markDefiDone();
 
     setCurrent({ ...current, status: "validated" });
     setReviewCompleted(0);

@@ -24,7 +24,12 @@ interface RewardCardProps {
 }
 
 export const RewardCard: React.FC<RewardCardProps> = ({ item, onRedeem, redeemed, canAfford }) => {
-  const { colors } = useThemeMode();
+  const { colors, mode } = useThemeMode();
+  const isLight = mode === "light";
+  const cardBackground = isLight ? colors.card : colors.surface;
+  const cardAlt = isLight ? colors.cardAlt : colors.surfaceAlt;
+  const cardText = isLight ? colors.cardText : colors.text;
+  const cardMuted = isLight ? colors.cardMuted : colors.mutedText;
   const router = useRouter();
 
   const slideW = 188; // image width + spacing approx
@@ -42,7 +47,7 @@ export const RewardCard: React.FC<RewardCardProps> = ({ item, onRedeem, redeemed
   };
 
   return (
-    <View style={[styles.card, { backgroundColor: colors.surface }]}> 
+    <View style={[styles.card, { backgroundColor: cardBackground }]}> 
       <View style={styles.carouselWrapper}>
         <ScrollView
           ref={scRef}
@@ -64,24 +69,24 @@ export const RewardCard: React.FC<RewardCardProps> = ({ item, onRedeem, redeemed
         {/* Trois petites boules vides pour indiquer le swipe */}
         <View style={styles.dotsContainer} pointerEvents="none">
           {item.images.slice(0,3).map((_, i) => (
-            <View key={i} style={[styles.dot, { borderColor: colors.mutedText, backgroundColor: i === active ? colors.accent : 'transparent' }]} />
+            <View key={i} style={[styles.dot, { borderColor: cardMuted, backgroundColor: i === active ? colors.accent : 'transparent' }]} />
           ))}
         </View>
       </View>
-      <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
-      <Text style={[styles.city, { color: colors.mutedText }]} numberOfLines={1}>{item.city}</Text>
-      <Text style={[styles.desc, { color: colors.mutedText }]} numberOfLines={2}>{item.description}</Text>
+      <Text style={[styles.name, { color: cardText }]} numberOfLines={1}>{item.name}</Text>
+      <Text style={[styles.city, { color: cardMuted }]} numberOfLines={1}>{item.city}</Text>
+      <Text style={[styles.desc, { color: cardMuted }]} numberOfLines={2}>{item.description}</Text>
       <View style={styles.metaRow}>
         <Ionicons name="pricetag-outline" size={14} color={colors.accent} />
-        <Text style={[styles.metaText, { color: colors.mutedText }]}>Bon: {item.voucherAmountEuro}€</Text>
+        <Text style={[styles.metaText, { color: cardMuted }]}>Bon: {item.voucherAmountEuro}€</Text>
       </View>
       <View style={styles.metaRow}>
         <Ionicons name="time-outline" size={14} color={colors.accent} />
-        <Text style={[styles.metaText, { color: colors.mutedText }]}>Expire: {item.expiresAt}</Text>
+        <Text style={[styles.metaText, { color: cardMuted }]}>Expire: {item.expiresAt}</Text>
       </View>
       <View style={styles.metaRow}>
         <Ionicons name="leaf-outline" size={14} color={colors.accent} />
-        <Text style={[styles.metaText, { color: colors.mutedText }]}>Coût: {item.pointsCost} pts</Text>
+        <Text style={[styles.metaText, { color: cardMuted }]}>Coût: {item.pointsCost} pts</Text>
       </View>
       {onRedeem && (
         <TouchableOpacity
@@ -94,10 +99,10 @@ export const RewardCard: React.FC<RewardCardProps> = ({ item, onRedeem, redeemed
             paddingVertical: 10,
             borderRadius: 12,
             alignItems: 'center',
-            backgroundColor: redeemed ? colors.surfaceAlt : (canAfford ? colors.accent : '#2A3431'),
+            backgroundColor: redeemed ? cardAlt : (canAfford ? colors.accent : '#2A3431'),
           }}
         >
-          <Text style={{ color: redeemed ? colors.mutedText : (canAfford ? '#0F3327' : '#8AA39C'), fontWeight: '700', fontSize: 13 }}>
+          <Text style={{ color: redeemed ? cardMuted : (canAfford ? '#0F3327' : '#8AA39C'), fontWeight: '700', fontSize: 13 }}>
             {redeemed ? 'Échangé' : 'Échanger'}
           </Text>
         </TouchableOpacity>
@@ -106,9 +111,9 @@ export const RewardCard: React.FC<RewardCardProps> = ({ item, onRedeem, redeemed
       {/* Confirm exchange modal */}
       <Modal transparent visible={confirmVisible} animationType="fade" onRequestClose={() => setConfirmVisible(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Confirmer l'échange</Text>
-            <Text style={{ color: colors.mutedText, marginTop: 6 }}>
+          <View style={[styles.modalCard, { backgroundColor: cardBackground }]}> 
+            <Text style={[styles.modalTitle, { color: cardText }]}>Confirmer l'échange</Text>
+            <Text style={{ color: cardMuted, marginTop: 6 }}>
               {canAfford ? `Échanger ${item.pointsCost} pts contre ${item.voucherAmountEuro}€ chez ${item.name} ?` : `Points insuffisants: il faut ${item.pointsCost} pts.`}
             </Text>
             <View style={styles.modalButtons}>
@@ -131,9 +136,9 @@ export const RewardCard: React.FC<RewardCardProps> = ({ item, onRedeem, redeemed
       </Modal>
       <TouchableOpacity
         onPress={() => router.push({ pathname: `/reward/${item.id}` })}
-        style={{ marginTop: 8, paddingVertical: 8, borderRadius: 10, alignItems: 'center', backgroundColor: colors.surfaceAlt }}
+        style={{ marginTop: 8, paddingVertical: 8, borderRadius: 10, alignItems: 'center', backgroundColor: cardAlt }}
       >
-        <Text style={{ color: colors.text, fontWeight: '600', fontSize: 12 }}>En savoir plus</Text>
+        <Text style={{ color: cardText, fontWeight: '600', fontSize: 12 }}>En savoir plus</Text>
       </TouchableOpacity>
     </View>
   );

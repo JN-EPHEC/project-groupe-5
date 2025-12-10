@@ -23,7 +23,7 @@ export function ChallengeCard({
   status,
   onValidatePhoto,
 }: Props) {
-  const { colors } = useThemeMode();
+  const { colors, mode } = useThemeMode();
   const [confirmVisible, setConfirmVisible] = useState(false);
   const { current, reviewCompleted, reviewRequiredCount } = useChallenges();
 
@@ -45,6 +45,14 @@ export function ChallengeCard({
     }
     return false;
   }, [isOngoing, reviewCompleted, reviewRequiredCount, current, challenge.id]);
+
+  const isLightMode = mode === "light";
+  const cardBackground = isLightMode ? colors.card : colors.surface;
+  const cardAlt = isLightMode ? colors.cardAlt : colors.surfaceAlt;
+  const cardText = isLightMode ? colors.cardText : colors.text;
+  const cardMuted = isLightMode ? colors.cardMuted : colors.mutedText;
+  const timerBackground = isLightMode ? "rgba(25, 208, 125, 0.08)" : "rgba(125, 202, 176, 0.14)";
+  const timerBorder = isLightMode ? "#33d186" : "#7DCAB0";
 
   // Countdown until next noon (12:00)
   const [remainingMs, setRemainingMs] = useState<number>(0);
@@ -86,10 +94,10 @@ export function ChallengeCard({
   if (shouldHide) return null;
 
   return (
-    <View style={[styles.card, { backgroundColor: colors.surface }]}>
+    <View style={[styles.card, { backgroundColor: cardBackground }]}> 
       {/* HEADER PILL + POINTS */}
       <View style={styles.header}>
-        <View style={[styles.categoryPill, { backgroundColor: colors.surfaceAlt }]}>
+        <View style={[styles.categoryPill, { backgroundColor: cardAlt }]}>
           <Ionicons name={categoryIcon} size={16} color="#7DCAB0" />
           <Text style={styles.categoryText}>{categoryLabel}</Text>
         </View>
@@ -100,8 +108,8 @@ export function ChallengeCard({
         </View>
       </View>
 
-      <Text style={[styles.title, { color: colors.text }]}>{challenge.title}</Text>
-      <Text style={[styles.description, { color: colors.mutedText }]}>
+      <Text style={[styles.title, { color: cardText }]}>{challenge.title}</Text>
+      <Text style={[styles.description, { color: cardMuted }]}>
         {challenge.description}
       </Text>
 
@@ -150,54 +158,40 @@ export function ChallengeCard({
         </View>
 
         {/* Time left */}
-        <View style={[styles.metaPillMuted, { backgroundColor: colors.surfaceAlt }]}>
+        <View style={[styles.metaPillMuted, { backgroundColor: cardAlt }]}>
           <Ionicons name="time-outline" size={16} color="#9FB9AE" />
           <Text style={styles.metaText}>{challenge.timeLeft}</Text>
         </View>
       </View>
 
-      {/* REAL TIMER when active or pending validation */}
-      {(status === "active" || status === "pendingValidation") && (
-        <View style={styles.timerPill}>
-          <Ionicons name="time-outline" size={16} color={colors.accent} />
-          <Text style={[styles.timerText, { color: colors.text }]}>
-            Temps restant jusqu&apos;à midi : {formatTime(remainingMs)}
-          </Text>
-        </View>
-      )}
-
       {/* ACTIONS */}
       {isOngoing ? (
-        <View style={{ marginTop: 20 }}>
+        <View style={styles.actionsContainer}>
+          {(status === "active" || status === "pendingValidation") && (
+              <View style={[styles.timerPill, { backgroundColor: timerBackground, borderColor: timerBorder }]}> 
+              <Ionicons name="time-outline" size={16} color={colors.accent} />
+              <Text style={[styles.timerText, { color: cardText }]}>
+                Temps restant jusqu&apos;à midi : {formatTime(remainingMs)}
+              </Text>
+            </View>
+          )}
+
+          {status === "active" && onValidatePhoto && (
+            <TouchableOpacity
+                style={[styles.photoBtn, { backgroundColor: colors.accent }]}
+              onPress={onValidatePhoto}
+              activeOpacity={0.9}
+            >
+              <Ionicons name="camera" size={18} color="#0F3327" style={{ marginRight: 8 }} />
+              <Text style={styles.photoBtnText}>Valider avec photo</Text>
+            </TouchableOpacity>
+          )}
+
           {status === "active" && (
-            <>
-              <TouchableOpacity
-                style={[styles.cancelBtn]}
-                onPress={() => setConfirmVisible(true)}
-              >
-                <Text style={[styles.cancelText]}>Annuler le défi</Text>
-                <Ionicons
-                  name="close-circle"
-                  size={18}
-                  color="#F45B69"
-                  style={{ marginLeft: 8 }}
-                />
-              </TouchableOpacity>
-              {onValidatePhoto && (
-                <TouchableOpacity
-                  style={[styles.photoBtn, { backgroundColor: colors.accent }]}
-                  onPress={onValidatePhoto}
-                >
-                  <Ionicons
-                    name="camera"
-                    size={16}
-                    color="#0F3327"
-                    style={{ marginRight: 6 }}
-                  />
-                  <Text style={styles.photoBtnText}>Valider avec photo</Text>
-                </TouchableOpacity>
-              )}
-            </>
+              <TouchableOpacity style={[styles.cancelBtn]} onPress={() => setConfirmVisible(true)}>
+              <Ionicons name="close-circle" size={16} color="#F45B69" style={{ marginRight: 6 }} />
+              <Text style={styles.cancelText}>Annuler le défi</Text>
+            </TouchableOpacity>
           )}
 
           {/* Proof preview + comment above pending status */}
@@ -205,7 +199,7 @@ export function ChallengeCard({
             <View style={{ marginTop: 12 }}>
               <Image source={{ uri: current.photoUri }} style={{ height: 150, width: '100%', borderRadius: 16 }} />
               {current.photoComment ? (
-                <Text style={{ color: colors.text, marginTop: 8 }}>{current.photoComment}</Text>
+                <Text style={{ color: cardText, marginTop: 8 }}>{current.photoComment}</Text>
               ) : null}
             </View>
           )}
@@ -248,9 +242,9 @@ export function ChallengeCard({
         onRequestClose={() => setConfirmVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Annuler le défi</Text>
-            <Text style={{ color: colors.mutedText, marginTop: 6 }}>
+          <View style={[styles.modalCard, { backgroundColor: cardBackground }]}> 
+            <Text style={[styles.modalTitle, { color: cardText }]}>Annuler le défi</Text>
+            <Text style={{ color: cardMuted, marginTop: 6 }}>
               Êtes-vous sûr d&apos;annuler ce défi ?
             </Text>
             <View style={styles.modalButtons}>
@@ -317,39 +311,50 @@ const styles = StyleSheet.create({
   },
   metaText: { color: "#9FB9AE", marginLeft: 6, fontWeight: "600" },
   metaTextDark: { color: "#0F3327", marginLeft: 6, fontWeight: "700" },
+  actionsContainer: {
+    marginTop: 18,
+    gap: 12,
+    alignItems: "stretch",
+  },
   cancelBtn: {
-    marginTop: 16,
-    backgroundColor: "#2A171A",
-    borderWidth: 1,
-    borderColor: "#F45B69",
     borderRadius: 18,
     paddingVertical: 12,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-  },
-  cancelText: { color: "#F45B69", fontWeight: "700" },
-  timerPill: {
-    marginTop: 12,
+    backgroundColor: "#2A171A",
     borderWidth: 1,
-    borderColor: "#7DCAB0",
-    borderRadius: 16,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    borderColor: "#F45B69",
+    paddingHorizontal: 18,
+    alignSelf: "stretch",
+  },
+  cancelText: { color: "#F45B69", fontWeight: "600", fontSize: 14 },
+  timerPill: {
+    borderWidth: 1,
+    borderRadius: 18,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 8,
+    alignSelf: "stretch",
   },
-  timerText: { fontWeight: "700" },
+  timerText: { fontWeight: "700", fontSize: 15 },
   photoBtn: {
-    marginTop: 12,
     borderRadius: 18,
-    paddingVertical: 10,
+    paddingVertical: 14,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
+    shadowColor: "rgba(0, 231, 118, 0.4)",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.25,
+    shadowRadius: 18,
+    elevation: 6,
+    alignSelf: "stretch",
   },
-  photoBtnText: { color: "#0F3327", fontWeight: "700" },
+  photoBtnText: { color: "#0F3327", fontWeight: "800", fontSize: 16, letterSpacing: 0.3 },
   pendingPill: {
     backgroundColor: "#142822",
     borderWidth: 1,

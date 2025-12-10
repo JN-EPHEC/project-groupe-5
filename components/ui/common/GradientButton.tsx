@@ -1,3 +1,4 @@
+import { FontFamilies } from "@/constants/fonts";
 import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
 import { Text, TouchableOpacity, ViewStyle } from "react-native";
@@ -21,7 +22,7 @@ export const GradientButton: React.FC<Props> = ({ label, onPress, style, disable
         end={{ x: 1, y: 1 }}
         style={{ paddingVertical: 12, borderRadius: 18, alignItems: "center", justifyContent: "center" }}
       >
-        <Text style={{ color: "#0F3327", fontWeight: "700" }}>{label}</Text>
+        <Text style={{ color: "#0F3327", fontFamily: FontFamilies.heading }}>{label}</Text>
       </LinearGradient>
     </TouchableOpacity>
   );
