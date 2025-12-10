@@ -4,13 +4,12 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Image,
-  Modal,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Image,
+    SafeAreaView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 export default function CameraScreen() {
@@ -18,8 +17,8 @@ export default function CameraScreen() {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const cameraRef = useRef<CameraView>(null);
   const [facing, setFacing] = useState<"back" | "front">("back");
-  const [confirmVisible, setConfirmVisible] = useState(false);
   const router = useRouter();
+  const [navigating, setNavigating] = useState(false);
 
   useEffect(() => {
     if (!permission) return;
@@ -74,53 +73,26 @@ export default function CameraScreen() {
 
           <TouchableOpacity
             style={styles.primaryBtn}
-            onPress={() => setConfirmVisible(true)}
+            disabled={navigating}
+            onPress={() => {
+              if (!photoUri || navigating) {
+                return;
+              }
+              setNavigating(true);
+              const uriToSend = photoUri;
+              router.push({
+                pathname: "/commentaire",
+                params: { photoUri: uriToSend },
+              });
+              setTimeout(() => {
+                setPhotoUri(null);
+                setNavigating(false);
+              }, 300);
+            }}
           >
             <Text style={styles.primaryText}>Confirmer</Text>
           </TouchableOpacity>
         </View>
-
-        {/* Confirmation modal */}
-        <Modal
-          transparent
-          visible={confirmVisible}
-          animationType="fade"
-          onRequestClose={() => setConfirmVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalCard}>
-              <Text style={styles.modalTitle}>
-                Êtes-vous sûr d'envoyer cette photo ?
-              </Text>
-
-              <View style={styles.modalButtons}>
-                <TouchableOpacity
-                  style={[styles.modalBtn, styles.modalCancel]}
-                  onPress={() => {
-                    setConfirmVisible(false);
-                    setPhotoUri(null);
-                  }}
-                >
-                  <Text style={styles.modalCancelText}>Non</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.modalBtn, styles.modalConfirm]}
-                  onPress={() => {
-                    setConfirmVisible(false);
-                    // 👉 IMPORTANT: Go to commentaire screen *with the photoUri*
-                    router.push({
-                      pathname: "/commentaire",
-                      params: { photoUri },
-                    });
-                  }}
-                >
-                  <Text style={styles.modalConfirmText}>Oui</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
       </SafeAreaView>
     );
   }
@@ -203,37 +175,4 @@ const styles = StyleSheet.create({
   },
   primaryText: { color: "#0F3327", fontWeight: "700" },
 
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
-  },
-  modalCard: {
-    width: "100%",
-    maxWidth: 420,
-    backgroundColor: "#111F1B",
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#152922",
-  },
-  modalTitle: {
-    color: "#F2F6F4",
-    fontSize: 16,
-    fontWeight: "700",
-    marginBottom: 10,
-  },
-  modalButtons: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    gap: 10,
-    marginTop: 8,
-  },
-  modalBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 12 },
-  modalCancel: { backgroundColor: "#2A3431" },
-  modalConfirm: { backgroundColor: "#19D07D" },
-  modalCancelText: { color: "#E6FFF5", fontWeight: "700" },
-  modalConfirmText: { color: "#0F3327", fontWeight: "700" },
 });

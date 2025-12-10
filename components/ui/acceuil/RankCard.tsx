@@ -1,6 +1,8 @@
+import { FontFamilies } from "@/constants/fonts";
 import { useThemeMode } from "@/hooks/theme-context";
+import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
-import { StyleSheet, Text, View, ViewStyle } from "react-native";
+import { StyleSheet, Text, ViewStyle } from "react-native";
 
 export type RankCardProps = {
   value: string;
@@ -10,17 +12,30 @@ export type RankCardProps = {
 };
 
 export function RankCard({ value, label, style, active = false }: RankCardProps) {
-  const { colors } = useThemeMode();
+  const { colors, mode } = useThemeMode();
+  const isLight = mode === "light";
+  const gradientColors = isLight
+    ? (active ? [colors.card, colors.cardAlt] : [colors.cardAlt, colors.card])
+    : (active ? [colors.surfaceAlt, colors.surface] : [colors.surface, colors.surfaceAlt]);
+  const borderColor = isLight ? "rgba(255,255,255,0.12)" : colors.surfaceAlt;
+  const valueColor = isLight ? colors.cardText : colors.text;
+  const labelColor = isLight ? colors.cardMuted : colors.mutedText;
+
   return (
-    <View style={[styles.card, { backgroundColor: active ? colors.surfaceAlt : colors.surface }, style]}>
-      <Text style={[styles.value, { color: colors.text }]}>{value}</Text>
-      <Text style={[styles.label, { color: colors.mutedText }]}>{label}</Text>
-    </View>
+    <LinearGradient
+      colors={gradientColors}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={[styles.card, { borderColor }, style]}
+    >
+      <Text style={[styles.value, { color: valueColor }]}>{value}</Text>
+      <Text style={[styles.label, { color: labelColor }]}>{label}</Text>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { padding: 16, borderRadius: 14 },
-  value: { fontWeight: "600", fontSize: 16 },
-  label: { marginTop: 4 },
+  card: { padding: 20, borderRadius: 22, borderWidth: 1, overflow: "hidden", width: "100%" },
+  value: { fontSize: 17, fontFamily: FontFamilies.heading },
+  label: { marginTop: 6, fontFamily: FontFamilies.headingMedium },
 });

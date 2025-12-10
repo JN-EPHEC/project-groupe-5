@@ -14,7 +14,12 @@ type Props = {
 };
 
 export function ClubChallengeCard({ challenge, participating, onParticipate, onCancel }: Props) {
-  const { colors } = useThemeMode();
+  const { colors, mode } = useThemeMode();
+  const isLight = mode === "light";
+  const cardBackground = isLight ? colors.card : colors.surface;
+  const cardAlt = isLight ? colors.cardAlt : colors.surfaceAlt;
+  const cardText = isLight ? colors.cardText : colors.text;
+  const cardMuted = isLight ? colors.cardMuted : colors.mutedText;
   const category = CATEGORY_CONFIG[challenge.category];
   const [confirmVisible, setConfirmVisible] = useState(false);
   const { current, reviewCompleted, reviewRequiredCount } = useChallenges();
@@ -55,9 +60,9 @@ export function ClubChallengeCard({ challenge, participating, onParticipate, onC
 
   return (
     shouldHide ? null : (
-    <View style={[styles.card, { backgroundColor: colors.surface }]}>
+    <View style={[styles.card, { backgroundColor: cardBackground }]}> 
       <View style={styles.header}>
-        <View style={[styles.categoryPill, { backgroundColor: colors.surfaceAlt }]}>
+        <View style={[styles.categoryPill, { backgroundColor: cardAlt }]}> 
           <Ionicons name={category.icon} size={16} color="#7DCAB0" />
           <Text style={styles.categoryText}>{category.label}</Text>
         </View>
@@ -67,12 +72,12 @@ export function ClubChallengeCard({ challenge, participating, onParticipate, onC
         </View>
       </View>
 
-      <Text style={[styles.title, { color: colors.text }]}>{challenge.title}</Text>
-      <Text style={[styles.description, { color: colors.mutedText }]}>{challenge.description}</Text>
+      <Text style={[styles.title, { color: cardText }]}>{challenge.title}</Text>
+      <Text style={[styles.description, { color: cardMuted }]}>{challenge.description}</Text>
 
       <View style={styles.counterRow}>
         <Ionicons name="people-outline" size={16} color="#9FB9AE" />
-        <Text style={[styles.counterText, { color: colors.mutedText }]}>
+        <Text style={[styles.counterText, { color: cardMuted }]}>
           {challenge.participants}/{challenge.goalParticipants} participants
         </Text>
       </View>
@@ -80,7 +85,7 @@ export function ClubChallengeCard({ challenge, participating, onParticipate, onC
       {participating && (
         <View style={[styles.timerPill, { borderColor: colors.accent }]}> 
           <Ionicons name="time-outline" size={16} color={colors.accent} />
-          <Text style={[styles.timerText, { color: colors.text }]}>Temps restant aujourd'hui: {formatTime(remainingMs)}</Text>
+          <Text style={[styles.timerText, { color: cardText }]}>Temps restant aujourd'hui: {formatTime(remainingMs)}</Text>
         </View>
       )}
 
@@ -106,9 +111,9 @@ export function ClubChallengeCard({ challenge, participating, onParticipate, onC
       {/* Cancel confirmation modal */}
       <Modal transparent visible={confirmVisible} animationType="fade" onRequestClose={() => setConfirmVisible(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Annuler le défi</Text>
-            <Text style={{ color: colors.mutedText, marginTop: 6 }}>Êtes-vous sûr d'annuler ce défi ?</Text>
+          <View style={[styles.modalCard, { backgroundColor: cardBackground }]}> 
+            <Text style={[styles.modalTitle, { color: cardText }]}>Annuler le défi</Text>
+            <Text style={{ color: cardMuted, marginTop: 6 }}>Êtes-vous sûr d'annuler ce défi ?</Text>
             <View style={styles.modalButtons}>
               <TouchableOpacity style={[styles.modalBtn, styles.modalCancelBtn]} onPress={() => setConfirmVisible(false)}>
                 <Text style={styles.modalCancelText}>Non</Text>

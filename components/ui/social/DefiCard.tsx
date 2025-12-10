@@ -17,13 +17,16 @@ interface DefiCardProps {
 }
 
 export const DefiCard: React.FC<DefiCardProps> = ({ defi, onJoin }) => {
-  const { colors } = useThemeMode();
+  const { colors, mode } = useThemeMode();
+  const isLight = mode === "light";
+  const cardText = isLight ? colors.cardText : colors.text;
+  const cardMuted = isLight ? colors.cardMuted : colors.mutedText;
 
   return (
-    <View style={[styles.card, { backgroundColor: colors.surface }]}>
-      <Text style={[styles.title, { color: colors.text }]}>{defi.name}</Text>
-      <Text style={[styles.desc, { color: colors.mutedText }]}>{defi.desc}</Text>
-      <Text style={[styles.participants, { color: colors.mutedText }]}>
+    <View style={[styles.card, { backgroundColor: isLight ? colors.card : colors.surface }]}> 
+      <Text style={[styles.title, { color: cardText }]}>{defi.name}</Text>
+      <Text style={[styles.desc, { color: cardMuted }]}>{defi.desc}</Text>
+      <Text style={[styles.participants, { color: cardMuted }]}>
         🧍‍♂️ {defi.mode.toUpperCase()} • {defi.places} places restantes
       </Text>
 
@@ -34,7 +37,12 @@ export const DefiCard: React.FC<DefiCardProps> = ({ defi, onJoin }) => {
           { backgroundColor: defi.joined ? colors.surfaceAlt : colors.accent },
         ]}
       >
-        <Text style={[styles.joinText, { color: colors.text }]}>
+        <Text
+          style={[
+            styles.joinText,
+            { color: defi.joined ? colors.text : "#0F3327" },
+          ]}
+        >
           {defi.joined ? "Rejoint ✅" : "Rejoindre"}
         </Text>
       </TouchableOpacity>

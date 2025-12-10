@@ -6,7 +6,13 @@ import { useState } from "react";
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 export default function DonationBanner() {
-  const { colors } = useThemeMode();
+  const { colors, mode } = useThemeMode();
+  const isLight = mode === "light";
+  const cardText = isLight ? colors.cardText : colors.text;
+  const cardMuted = isLight ? colors.cardMuted : colors.mutedText;
+  const cardBackground = isLight ? colors.card : colors.surface;
+  const borderTone = isLight ? "rgba(255,255,255,0.28)" : colors.surfaceAlt;
+
   const [amount, setAmount] = useState<number>(10);
   const [editing, setEditing] = useState(false);
 
@@ -63,20 +69,20 @@ export default function DonationBanner() {
   };
 
   return (
-    <View style={[styles.card, { backgroundColor: colors.surface }]}>
-      <Text style={[styles.title, { color: colors.text }]}>
+    <View style={[styles.card, { backgroundColor: cardBackground }]}> 
+      <Text style={[styles.title, { color: cardText }]}> 
         Soutenir des projets écologiques
       </Text>
-      <Text style={[styles.subtitle, { color: colors.mutedText }]}>
+      <Text style={[styles.subtitle, { color: cardMuted }]}> 
         Chaque don finance directement les actions locales partenaires.
       </Text>
 
       <View style={styles.adjustRow}>
         <TouchableOpacity
-          style={[styles.circleBtn, { borderColor: colors.surfaceAlt }]}
+          style={[styles.circleBtn, { borderColor: borderTone }]}
           onPress={() => cycle(-step)}
         >
-          <Text style={[styles.circleText, { color: colors.text }]}>−</Text>
+          <Text style={[styles.circleText, { color: cardText }]}>−</Text>
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => setEditing(true)}>
@@ -87,20 +93,20 @@ export default function DonationBanner() {
               value={String(amount)}
               onChangeText={handleCustomChange}
               onBlur={() => setEditing(false)}
-              style={[styles.amountInput, { color: colors.text }]}
+              style={[styles.amountInput, { color: cardText }]}
             />
           ) : (
-            <Text style={[styles.amountText, { color: colors.text }]}>
+            <Text style={[styles.amountText, { color: cardText }]}> 
               {amount}€
             </Text>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.circleBtn, { borderColor: colors.surfaceAlt }]}
+          style={[styles.circleBtn, { borderColor: borderTone }]}
           onPress={() => cycle(step)}
         >
-          <Text style={[styles.circleText, { color: colors.text }]}>+</Text>
+          <Text style={[styles.circleText, { color: cardText }]}>+</Text>
         </TouchableOpacity>
       </View>
 

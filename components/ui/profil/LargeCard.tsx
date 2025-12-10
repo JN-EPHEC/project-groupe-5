@@ -10,12 +10,15 @@ interface LargeCardProps {
 }
 
 export const LargeCard: React.FC<LargeCardProps> = ({ icon, label, value }) => {
-  const { colors } = useThemeMode();
+  const { colors, mode } = useThemeMode();
+  const isLight = mode === "light";
+  const cardText = isLight ? colors.cardText : colors.text;
+  const cardMuted = isLight ? colors.cardMuted : colors.mutedText;
   return (
-    <View style={[styles.card, { backgroundColor: colors.surface }]}>
+    <View style={[styles.card, { backgroundColor: isLight ? colors.card : colors.surface }]}> 
       <Ionicons name={icon as any} size={24} color={colors.accent} />
-      <Text style={[styles.label, { color: colors.mutedText }]}>{label}</Text>
-      <Text style={[styles.value, { color: colors.text }]}>{value}</Text>
+      <Text style={[styles.label, { color: cardMuted }]}>{label}</Text>
+      <Text style={[styles.value, { color: cardText }]}>{value}</Text>
     </View>
   );
 };

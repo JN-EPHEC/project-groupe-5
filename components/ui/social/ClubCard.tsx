@@ -26,10 +26,13 @@ interface ClubCardProps {
 }
 
 export const ClubCard: React.FC<ClubCardProps> = ({ club, onJoin, onMembers, onRanking, totalPoints }) => {
-  const { colors } = useThemeMode();
+  const { colors, mode } = useThemeMode();
+  const isLight = mode === "light";
+  const cardText = isLight ? colors.cardText : colors.text;
+  const cardMuted = isLight ? colors.cardMuted : colors.mutedText;
 
   return (
-    <View style={[styles.card, { backgroundColor: colors.surface }]}>
+    <View style={[styles.card, { backgroundColor: isLight ? colors.card : colors.surface }]}> 
       <View style={styles.headerRow}>
         {club.photoUri ? (
           <Image source={{ uri: club.photoUri }} style={styles.avatar} />
@@ -38,13 +41,13 @@ export const ClubCard: React.FC<ClubCardProps> = ({ club, onJoin, onMembers, onR
             <Text style={{ fontSize: 18 }}>{club.emoji || '🌿'}</Text>
           </View>
         )}
-        <Text style={[styles.title, { color: colors.text }]}>{club.name}</Text>
+        <Text style={[styles.title, { color: cardText }]}>{club.name}</Text>
       </View>
-      <Text style={[styles.desc, { color: colors.mutedText }]}>{club.desc}</Text>
+      <Text style={[styles.desc, { color: cardMuted }]}>{club.desc}</Text>
       {club.city ? (
-        <Text style={[styles.city, { color: colors.mutedText }]}>🏙️ {club.city}</Text>
+        <Text style={[styles.city, { color: cardMuted }]}>🏙️ {club.city}</Text>
       ) : null}
-      <Text style={[styles.participants, { color: colors.mutedText }]}>
+      <Text style={[styles.participants, { color: cardMuted }]}>
         👥 {club.participants} membres
       </Text>
 

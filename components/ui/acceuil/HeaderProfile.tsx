@@ -1,12 +1,19 @@
+import { FontFamilies } from "@/constants/fonts";
 import { usePoints } from "@/hooks/points-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { useUser } from "@/hooks/user-context";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
 
-export function HeaderProfile() {
-  const { colors } = useThemeMode();
+type HeaderProfileProps = {
+  clubName?: string | null;
+};
+
+export function HeaderProfile({ clubName }: HeaderProfileProps) {
+  const { colors, mode } = useThemeMode();
+  const isLight = mode === "light";
   const { user, loading } = useUser();
   const { points } = usePoints();
 
@@ -21,36 +28,53 @@ export function HeaderProfile() {
 
   return (
     <View style={styles.center}>
-      <View style={styles.avatarContainer}>
-        {avatarUri ? (
-          <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
-        ) : (
-          <View style={[styles.avatarImage, styles.avatarFallback]}>
-            <Ionicons name="walk-outline" size={40} color="#fff" />
+      <LinearGradient
+        colors={isLight ? [colors.cardAlt, colors.card] : [colors.surfaceAlt, colors.surface]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.profileCard, { shadowColor: "#000000" }]}
+      >
+        <View style={styles.avatarContainer}>
+          {avatarUri ? (
+            <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+          ) : (
+            <View style={[styles.avatarImage, styles.avatarFallback]}>
+              <Ionicons name="walk-outline" size={40} color="#fff" />
+            </View>
+          )}
+
+          <View
+            style={[styles.badge, { backgroundColor: colors.accent }]}
+          >
+            <Ionicons name="leaf-outline" size={14} color="#0F3327" />
+            <Text style={[styles.badgeText, { fontFamily: FontFamilies.heading }]}>{displayPoints}</Text>
           </View>
-        )}
-
-        <View style={[styles.badge, { backgroundColor: colors.accent }]}>
-          <Ionicons name="leaf-outline" size={14} color="#0F3327" />
-          <Text style={styles.badgeText}>{displayPoints}</Text>
         </View>
-      </View>
 
-      {/* 🔥 Replace “Bonjour Marie” with Firestore data */}
-      <Text style={[styles.username, { color: colors.text }]}>
-        Bonjour {firstName}
-      </Text>
+        {/* 🔥 Replace “Bonjour Marie” with Firestore data */}
+        <Text style={[styles.username, { color: isLight ? colors.cardText : colors.text }]}>Bonjour {firstName}</Text>
 
-      {/* Team name static for now — you can connect clubs later */}
-      <Text style={[styles.team, { color: colors.mutedText }]}>
-        Éco-Warriors
-      </Text>
+        <Text style={[styles.team, { color: isLight ? colors.cardMuted : colors.mutedText }]}>{clubName ?? "Éco-Warriors"}</Text>
+      </LinearGradient>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  center: { alignItems: "center", marginVertical: 10 },
+  center: { alignItems: "center", marginBottom: 24 },
+  profileCard: {
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    borderRadius: 26,
+    alignItems: "center",
+    position: "relative",
+    shadowOpacity: 0.35,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+    width: "100%",
+    maxWidth: 320,
+  },
   avatarContainer: { position: "relative" },
   avatarImage: {
     width: 85,
@@ -73,7 +97,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#0F3327",
   },
-  badgeText: { color: "#0F3327", marginLeft: 4, fontWeight: "700" },
-  username: { fontSize: 22, fontWeight: "700", marginTop: 12 },
-  team: { marginBottom: 14 },
+  badgeText: { color: "#0F3327", marginLeft: 4 },
+  username: { fontSize: 24, marginTop: 12, fontFamily: FontFamilies.heading },
+  team: { marginTop: 4, fontFamily: FontFamilies.headingMedium },
 });

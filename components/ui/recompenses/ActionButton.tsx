@@ -16,16 +16,19 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
   rewardText,
   onPress,
 }) => {
-  const { colors } = useThemeMode();
+  const { colors, mode } = useThemeMode();
+  const isLight = mode === "light";
+  const cardText = isLight ? colors.cardText : colors.text;
+  const background = isLight ? colors.cardAlt : colors.surfaceAlt;
 
   return (
     <TouchableOpacity
-      style={[styles.button, { backgroundColor: colors.surfaceAlt }]}
+      style={[styles.button, { backgroundColor: background }]}
       onPress={onPress}
     >
-      <Ionicons name={icon as any} size={24} color={colors.text} />
+      <Ionicons name={icon as any} size={24} color={cardText} />
       <View style={{ marginLeft: 10 }}>
-        <Text style={[styles.label, { color: colors.text }]}>{label}</Text>
+        <Text style={[styles.label, { color: cardText }]}>{label}</Text>
         <Text style={[styles.reward, { color: colors.accent }]}>{rewardText}</Text>
       </View>
     </TouchableOpacity>

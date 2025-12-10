@@ -3,17 +3,17 @@ import { useRouter } from "expo-router";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import React, { useMemo, useState } from "react";
 import {
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { auth } from "../../firebaseConfig";
 
@@ -134,7 +134,9 @@ export default function Login() {
                 </View>
                 <Text style={styles.checkboxLabel}>Se souvenir de moi</Text>
               </TouchableOpacity>
-              <Pressable onPress={() => {}}>
+              <Pressable
+                onPress={() => router.push("/reset-password")}
+              >
                 <Text style={styles.linkMuted}>Mot de passe oublié ?</Text>
               </Pressable>
             </View>
