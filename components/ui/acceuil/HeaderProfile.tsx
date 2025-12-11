@@ -14,6 +14,7 @@ type HeaderProfileProps = {
 export function HeaderProfile({ clubName }: HeaderProfileProps) {
   const { colors, mode } = useThemeMode();
   const isLight = mode === "light";
+  const darkCardGradient = ["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"] as const;
   const { user, loading } = useUser();
   const { points } = usePoints();
 
@@ -29,7 +30,7 @@ export function HeaderProfile({ clubName }: HeaderProfileProps) {
   return (
     <View style={styles.center}>
       <LinearGradient
-        colors={isLight ? [colors.cardAlt, colors.card] : [colors.surfaceAlt, colors.surface]}
+        colors={isLight ? ([colors.cardAlt, colors.card] as const) : darkCardGradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.profileCard, { shadowColor: "#000000" }]}
@@ -39,7 +40,9 @@ export function HeaderProfile({ clubName }: HeaderProfileProps) {
             <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
           ) : (
             <View style={[styles.avatarImage, styles.avatarFallback]}>
-              <Ionicons name="walk-outline" size={40} color="#fff" />
+              <Text style={{ color: "#fff", fontSize: 32, fontFamily: FontFamilies.heading }}>
+                {firstName.charAt(0).toUpperCase()}
+              </Text>
             </View>
           )}
 

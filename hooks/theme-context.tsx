@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { useColorScheme } from "react-native";
 
 type ThemeMode = "light" | "dark";
 
@@ -16,6 +17,9 @@ type Palette = {
   pill: string;
   pillActive: string;
   success: string;
+  glass: string;
+  glassBorder: string;
+  border: string;
 };
 
 type ThemeContextType = {
@@ -29,39 +33,53 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 const palettes: Record<ThemeMode, Palette> = {
   dark: {
-    background: "#0C3327",
+    background: "#021114",
     text: "#F2F6F4",
     mutedText: "#9FB9AE",
-    accent: "#19D07D",
+    accent: "#00D68F",
     surface: "#111F1B",
-    surfaceAlt: "#152922",
-    card: "#111F1B",
-    cardAlt: "#152922",
+    surfaceAlt: "#0F242A",
+    card: "rgba(0, 151, 178, 0.1)",
+    cardAlt: "rgba(0, 151, 178, 0.05)",
     cardText: "#F2F6F4",
     cardMuted: "#9FB9AE",
     pill: "#111F1B",
     pillActive: "#D4F7E7",
     success: "#7DCAB0",
+    glass: "rgba(0, 151, 178, 0.15)",
+    glassBorder: "rgba(0, 151, 178, 0.3)",
+    border: "rgba(0, 151, 178, 0.3)",
   },
   light: {
-    background: "#F7FAF9",
-    text: "#0F3327",
-    mutedText: "#5B7D72",
-    accent: "#19D07D",
+    background: "#E9EEF1",
+    text: "#4A4F54",
+    mutedText: "#9BA4AB",
+    accent: "#00D68F",
     surface: "#FFFFFF",
-    surfaceAlt: "#ECF5F1",
-    card: "#0C3327",
-    cardAlt: "#134434",
-    cardText: "#F2F6F4",
-    cardMuted: "#B4D3C8",
-    pill: "#ECF5F1",
-    pillActive: "#0F3327",
-    success: "#19D07D",
+    surfaceAlt: "#F0F3F5",
+    card: "#FFFFFF",
+    cardAlt: "#F7F9FA",
+    cardText: "#4A4F54",
+    cardMuted: "#9BA4AB",
+    pill: "#FFFFFF",
+    pillActive: "#4A4F54",
+    success: "#00D68F",
+    glass: "rgba(255, 255, 255, 0.75)",
+    glassBorder: "rgba(255, 255, 255, 1.0)",
+    border: "#E0E0E0",
   },
 };
 
 export function ThemeProviderCustom({ children }: { children: React.ReactNode }) {
-  const [mode, setMode] = useState<ThemeMode>("dark");
+  const systemScheme = useColorScheme();
+  const [mode, setMode] = useState<ThemeMode>(systemScheme === "dark" ? "dark" : "light");
+
+  // Sync with system theme changes
+  useEffect(() => {
+    if (systemScheme) {
+      setMode(systemScheme === "dark" ? "dark" : "light");
+    }
+  }, [systemScheme]);
 
   const value = useMemo(
     () => ({

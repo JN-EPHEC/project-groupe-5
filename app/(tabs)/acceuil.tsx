@@ -2,6 +2,7 @@ import { ChallengeOfTheDay } from "@/components/ui/acceuil/ChallengeOfTheDay";
 import { HeaderProfile } from "@/components/ui/acceuil/HeaderProfile";
 import { ProgressionCard } from "@/components/ui/acceuil/ProgressionCard";
 import StreakCalendar from "@/components/ui/acceuil/StreakCalendar";
+import NotificationBell from "@/components/ui/common/NotificationBell";
 import PremiumCard from "@/components/ui/recompenses/PremiumCard";
 import { FontFamilies } from "@/constants/fonts";
 import { auth, db } from "@/firebaseConfig";
@@ -11,11 +12,11 @@ import { useFriends } from "@/hooks/friends-context";
 import { usePoints } from "@/hooks/points-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { useUser } from "@/hooks/user-context";
-import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import { addDoc, collection, onSnapshot } from "firebase/firestore";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function AcceuilScreen() {
@@ -79,97 +80,165 @@ export default function AcceuilScreen() {
   const clubLabel = clubPosition === 1 ? "1er" : `${clubPosition}e`;
 
   const isLight = mode === "light";
-  const rankingGradient = isLight ? [colors.cardAlt, colors.card] : [colors.surfaceAlt, colors.surface];
-  const rankingBorder = isLight ? "rgba(255,255,255,0.12)" : colors.surfaceAlt;
-  const miniCardBg = isLight ? colors.cardAlt : "#123C2F";
-  const miniCardBorder = isLight ? "rgba(255,255,255,0.12)" : "#0E2B21";
+  // Defensive checks to prevent "Element type is invalid" runtime errors
+  const hasHeaderProfile = typeof HeaderProfile !== "undefined";
+  const hasProgressionCard = typeof ProgressionCard !== "undefined";
+  const hasChallengeOfTheDay = typeof ChallengeOfTheDay !== "undefined";
+  const hasStreakCalendar = typeof StreakCalendar !== "undefined";
+  const hasPremiumCard = typeof PremiumCard !== "undefined";
+
+  if (!hasHeaderProfile) console.warn("Missing HeaderProfile import (undefined)");
+  if (!hasProgressionCard) console.warn("Missing ProgressionCard import (undefined)");
+  if (!hasChallengeOfTheDay) console.warn("Missing ChallengeOfTheDay import (undefined)");
+  if (!hasStreakCalendar) console.warn("Missing StreakCalendar import (undefined)");
+  if (!hasPremiumCard) console.warn("Missing PremiumCard import (undefined)");
+  
+  // Liquid Ice Theme (Dark Mode)
+  const darkBg = "#021114";
+  const darkCardGradient = ["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"] as const;
+  const darkCardBorder = "rgba(0, 151, 178, 0.3)";
+  const darkMiniCardBg = "rgba(0, 151, 178, 0.1)";
+  const darkMiniCardBorder = "rgba(0, 151, 178, 0.2)";
+
+  const rankingGradient = isLight
+    ? ([colors.card, colors.card] as const)
+    : darkCardGradient;
+  const rankingBorder = isLight ? "transparent" : darkCardBorder;
+  const miniCardBg = isLight ? colors.cardAlt : darkMiniCardBg;
+  const miniCardBorder = isLight ? "transparent" : darkMiniCardBorder;
   const miniCardLabel = isLight ? colors.cardMuted : colors.mutedText;
   const miniCardValue = isLight ? colors.cardText : colors.text;
 
   return (
     <SafeAreaView
-      style={[styles.safeArea, { backgroundColor: colors.background }]}
+      style={[styles.safeArea, { backgroundColor: isLight ? colors.background : darkBg }]}
       edges={["top", "left", "right", "bottom"]}
     >
       <ScrollView
-        style={[styles.container, { backgroundColor: colors.background }]}
+        style={[styles.container, { backgroundColor: isLight ? colors.background : darkBg }]}
         contentContainerStyle={{ paddingBottom: 120 }}
       >
         <View style={styles.pageHeader}>
-          <Text style={[styles.screenTitle, { color: colors.text }]}>Green Up</Text>
+          <Image
+            source={
+              isLight
+                ? require("../../assets/images/logo_Green_UP_noir_degradé-removebg-preview.png")
+                : require("../../assets/images/logo_fond_vert_degradé__1_-removebg-preview.png")
+            }
+            style={{ width: 160, height: 50 }}
+            resizeMode="contain"
+          />
+          <View style={{ position: 'absolute', right: 8, top: 6 }}>
+            <NotificationBell />
+          </View>
         </View>
         {/* Section: Profil -> components/ui/acceuil/HeaderProfile */}
-        <HeaderProfile clubName={joinedClub?.name} />
+        {hasHeaderProfile ? (
+          <HeaderProfile clubName={joinedClub?.name} />
+        ) : (
+          <Text style={{ color: isLight ? colors.text : "#fff" }}>Profil indisponible</Text>
+        )}
 
-        {/* Section: Classement + Points regroupés */}
-        <LinearGradient
-          colors={rankingGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.rankingWrapper, { borderColor: rankingBorder, shadowColor: isLight ? colors.card : "#000000" }]}
-        >
-          <Text style={[styles.sectionTitle, { color: miniCardValue, marginBottom: 14 }]}>Classement</Text>
-          <View style={styles.rankingRow}>
+        {/* Section: Classement Cards */}
+        <View style={{ marginBottom: 20 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 }}>
+            <Ionicons name="trophy-outline" size={20} color={isLight ? colors.text : "#fff"} />
+            <Text style={{ fontSize: 20, fontFamily: FontFamilies.heading, color: isLight ? colors.text : "#fff" }}>
+              Classement
+            </Text>
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            {/* Card Individuel */}
             <TouchableOpacity
               activeOpacity={0.85}
-              style={[styles.miniCard, { backgroundColor: miniCardBg, borderColor: miniCardBorder }]}
+              style={[
+                styles.rankCard,
+                { backgroundColor: isLight ? colors.card : "rgba(0, 151, 178, 0.15)" }
+              ]}
               onPress={() => router.push({ pathname: "/social", params: { tab: "amis" } })}
             >
-              <Text style={[styles.miniLabel, { color: miniCardLabel }]}>Entre amis</Text>
-              <Text style={[styles.miniValue, { color: miniCardValue }]}>{`${positionLabel} / ${totalFriends}`}</Text>
+              <Text style={[styles.rankCardLabel, { color: isLight ? colors.mutedText : "#9FB9AE" }]}>Individuel</Text>
+              <Text style={[styles.rankCardValue, { color: isLight ? colors.text : "#fff" }]}>
+                {positionLabel} <Text style={{ fontSize: 16, fontWeight: '400' }}>sur {totalFriends}</Text>
+              </Text>
+              <View style={{ alignItems: 'flex-end', marginTop: 'auto' }}>
+                <Ionicons name="person" size={24} color={isLight ? colors.mutedText : "rgba(255,255,255,0.5)"} />
+              </View>
             </TouchableOpacity>
 
-            <View
-              style={[styles.miniCard, { backgroundColor: miniCardBg, borderColor: miniCardBorder }]}
-            >
-              <Text style={[styles.miniLabel, { color: miniCardLabel }]}>Points</Text>
-              <Text style={[styles.miniValue, { color: miniCardValue }]}>{myPoints}</Text>
-            </View>
-
+            {/* Card Club */}
             <TouchableOpacity
               activeOpacity={joinedClub ? 0.85 : 1}
-              style={[styles.miniCard, { backgroundColor: miniCardBg, borderColor: miniCardBorder }]}
+              style={[
+                styles.rankCard,
+                { backgroundColor: isLight ? colors.card : "rgba(0, 151, 178, 0.15)" }
+              ]}
               disabled={!joinedClub}
               onPress={() => router.push({ pathname: "/social", params: { tab: "clubs", view: "clubRanking" } })}
             >
-              <Text style={[styles.miniLabel, { color: miniCardLabel }]}>Club</Text>
-              <Text style={[styles.miniValue, { color: miniCardValue }]}
-              >
-                {joinedClub ? `${clubLabel} / ${clubTotal}` : "—"}
+              <Text style={[styles.rankCardLabel, { color: isLight ? colors.mutedText : "#9FB9AE" }]}>Club</Text>
+              <Text style={[styles.rankCardValue, { color: isLight ? colors.text : "#fff" }]}>
+                {joinedClub ? (
+                  <>
+                    {clubLabel} <Text style={{ fontSize: 16, fontWeight: '400' }}>sur {clubTotal}</Text>
+                  </>
+                ) : (
+                  "—"
+                )}
               </Text>
+              <View style={{ alignItems: 'flex-end', marginTop: 'auto' }}>
+                <Ionicons name="people" size={24} color={isLight ? colors.mutedText : "rgba(255,255,255,0.5)"} />
+              </View>
             </TouchableOpacity>
           </View>
-        </LinearGradient>
+        </View>
 
         {/* Série d'activités (streak) */}
         <View style={styles.blockSpacing}>
-          <StreakCalendar />
+          {hasStreakCalendar ? (
+            <StreakCalendar />
+          ) : (
+            <Text style={{ color: isLight ? colors.text : "#fff" }}>Calendar indisponible</Text>
+          )}
         </View>
 
         {/* Section: Progression -> components/ui/acceuil/ProgressionCard + components/ProgressCircle */}
         <View style={styles.blockSpacing}>
-          <ProgressionCard
-            done={defisFaient}
-            total={defisTotal}
-            pointsText="50 Points gagnés"
-            streakText="2 jours de suite"
-          />
+          {hasProgressionCard ? (
+            <ProgressionCard
+              done={defisFaient}
+              total={defisTotal}
+              pointsText="50 Points gagnés"
+              streakText="2 jours de suite"
+            />
+          ) : (
+            <Text style={{ color: isLight ? colors.text : "#fff" }}>Progression indisponible</Text>
+          )}
         </View>
 
         {/* PREMIUM sous la progression */}
         <View style={styles.blockSpacing}>
-          <PremiumCard onSubscribe={startSubscription} />
+          {hasPremiumCard ? (
+            <PremiumCard onSubscribe={startSubscription} />
+          ) : (
+            <Text style={{ color: isLight ? colors.text : "#fff" }}>Premium indisponible</Text>
+          )}
         </View>
 
         {/* Section: Défi en cours (seulement si status active) */}
         {current && current.status === 'active' && (
           <View style={styles.blockSpacing}>
-            <ChallengeOfTheDay
-              title={current.title}
-              description={current.description}
-              difficulty={current.difficulty}
-              onValidate={() => router.push({ pathname: "/camera", params: { id: String(current.id) } })}
-            />
+            {hasChallengeOfTheDay ? (
+              <ChallengeOfTheDay
+                title={current.title}
+                description={current.description}
+                difficulty={current.difficulty}
+                onValidate={() => router.push({ pathname: "/camera", params: { id: String(current.id) } })}
+              />
+            ) : (
+              <Text style={{ color: isLight ? colors.text : "#fff" }}>Défi indisponible</Text>
+            )}
           </View>
         )}
       </ScrollView>
@@ -180,48 +249,27 @@ export default function AcceuilScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   container: { flex: 1, paddingHorizontal: 20, paddingTop: 8 },
-  pageHeader: { alignItems: "center", marginTop: 8, marginBottom: 20 },
+  pageHeader: { alignItems: "center", marginTop: 8, marginBottom: 20, position: 'relative' },
   screenTitle: {
     fontSize: 34,
     lineHeight: 38,
     fontFamily: FontFamilies.heading,
   },
-  rankingWrapper: {
-    borderRadius: 26,
-    borderWidth: 1,
-    padding: 18,
-    marginBottom: 17,
-    shadowColor: "#000000",
-    shadowOpacity: 0.12,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 6,
+  rankCard: {
+    flex: 1,
+    height: 110,
+    borderRadius: 20,
+    padding: 16,
+    justifyContent: 'space-between',
   },
-  rankingRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "stretch",
-    flexWrap: "wrap",
+  rankCardLabel: {
+    fontSize: 14,
+    fontWeight: '600',
   },
-  miniCard: {
-    flexGrow: 1,
-    flexBasis: "30%",
-    minWidth: 100,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    borderRadius: 18,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
-    marginHorizontal: 4,
-  },
-  miniLabel: { fontSize: 13, fontFamily: FontFamilies.headingMedium },
-  miniValue: { fontSize: 18, fontFamily: FontFamilies.heading },
-  sectionTitle: {
-    fontSize: 18,
-    marginBottom: 16,
-    fontFamily: FontFamilies.heading,
+  rankCardValue: {
+    fontSize: 24,
+    fontWeight: '800',
+    marginTop: 4,
   },
   blockSpacing: { marginBottom: 17 },
 });

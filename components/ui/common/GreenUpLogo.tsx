@@ -1,5 +1,5 @@
 import React from "react";
-import { StyleSheet, Text, View, ViewStyle } from "react-native";
+import { Image, StyleSheet, Text, View, ViewStyle } from "react-native";
 import Svg, { Defs, LinearGradient, Polygon, Stop } from "react-native-svg";
 
 type Props = {
@@ -9,6 +9,11 @@ type Props = {
 export function GreenUpLogo({ style }: Props) {
   return (
     <View style={[styles.container, style]}>
+      <Image 
+        source={require("../../../assets/images/logo_G2_degradé-removebg-preview.png")} 
+        style={styles.logo} 
+        resizeMode="contain" 
+      />
       <Text style={styles.green}>GREEN</Text>
       <Svg width={54} height={40} viewBox="0 0 54 40" style={styles.wedge}>
         <Defs>
@@ -28,6 +33,11 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
+  },
+  logo: {
+    width: 60,
+    height: 60,
+    marginRight: 8,
   },
   green: {
     color: "#FFFFFF",

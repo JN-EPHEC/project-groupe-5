@@ -26,8 +26,8 @@ interface RewardCardProps {
 export const RewardCard: React.FC<RewardCardProps> = ({ item, onRedeem, redeemed, canAfford }) => {
   const { colors, mode } = useThemeMode();
   const isLight = mode === "light";
-  const cardBackground = isLight ? colors.card : colors.surface;
-  const cardAlt = isLight ? colors.cardAlt : colors.surfaceAlt;
+  const cardBackground = colors.card;
+  const cardAlt = colors.cardAlt;
   const cardText = isLight ? colors.cardText : colors.text;
   const cardMuted = isLight ? colors.cardMuted : colors.mutedText;
   const router = useRouter();
@@ -47,7 +47,14 @@ export const RewardCard: React.FC<RewardCardProps> = ({ item, onRedeem, redeemed
   };
 
   return (
-    <View style={[styles.card, { backgroundColor: cardBackground }]}> 
+    <View style={[
+      styles.card, 
+      { 
+        backgroundColor: colors.glass, 
+        borderColor: colors.glassBorder,
+        borderWidth: 1,
+      }
+    ]}> 
       <View style={styles.carouselWrapper}>
         <ScrollView
           ref={scRef}

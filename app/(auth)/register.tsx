@@ -16,9 +16,11 @@ import {
     View,
 } from "react-native";
 import { auth, db } from "../../firebaseConfig";
+import { useThemeMode } from "../../hooks/theme-context";
 
 export default function Register() {
   const router = useRouter();
+  const { colors, mode } = useThemeMode();
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -89,7 +91,7 @@ export default function Register() {
       style={{ flex: 1 }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <View style={styles.root}>
+      <View style={[styles.root, { backgroundColor: colors.background }]}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
@@ -102,46 +104,46 @@ export default function Register() {
             />
           </View>
 
-          <View style={styles.card}>
-            <Text style={styles.title}>Créer un compte</Text>
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardAlt }]}>
+            <Text style={[styles.title, { color: colors.text }]}>Créer un compte</Text>
 
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.surfaceAlt, borderColor: colors.cardAlt, color: colors.text }]}
               placeholder="Prénom"
-              placeholderTextColor={palette.placeholder}
+              placeholderTextColor={colors.mutedText}
               value={firstName}
               onChangeText={setFirstName}
             />
 
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.surfaceAlt, borderColor: colors.cardAlt, color: colors.text }]}
               placeholder="Nom"
-              placeholderTextColor={palette.placeholder}
+              placeholderTextColor={colors.mutedText}
               value={lastName}
               onChangeText={setLastName}
             />
 
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.surfaceAlt, borderColor: colors.cardAlt, color: colors.text }]}
               placeholder="Code postal"
-              placeholderTextColor={palette.placeholder}
+              placeholderTextColor={colors.mutedText}
               keyboardType="numeric"
               value={postalCode}
               onChangeText={setPostalCode}
             />
 
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.surfaceAlt, borderColor: colors.cardAlt, color: colors.text }]}
               placeholder="Date de naissance (JJ/MM/AAAA)"
-              placeholderTextColor={palette.placeholder}
+              placeholderTextColor={colors.mutedText}
               value={birthDate}
               onChangeText={setBirthDate}
             />
 
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.surfaceAlt, borderColor: colors.cardAlt, color: colors.text }]}
               placeholder="Email"
-              placeholderTextColor={palette.placeholder}
+              placeholderTextColor={colors.mutedText}
               autoCapitalize="none"
               keyboardType="email-address"
               value={email}
@@ -149,9 +151,9 @@ export default function Register() {
             />
 
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.surfaceAlt, borderColor: colors.cardAlt, color: colors.text }]}
               placeholder="Mot de passe (min. 6 caractères)"
-              placeholderTextColor={palette.placeholder}
+              placeholderTextColor={colors.mutedText}
               secureTextEntry
               value={password}
               onChangeText={setPassword}
@@ -163,15 +165,15 @@ export default function Register() {
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: policyAccepted }}
               >
-                <View style={[styles.checkbox, policyAccepted && styles.checkboxChecked]}>
+                <View style={[styles.checkbox, { borderColor: colors.accent, backgroundColor: policyAccepted ? colors.accent : "transparent" }]}>
                   {policyAccepted ? <Ionicons name="checkmark" size={16} color="#00231A" /> : null}
                 </View>
               </Pressable>
-              <Text style={styles.policyText}>
+              <Text style={[styles.policyText, { color: colors.mutedText }]}>
                 J&apos;accepte la
                 {" "}
                 <Text
-                  style={styles.policyLink}
+                  style={[styles.policyLink, { color: colors.accent }]}
                   onPress={() => router.push("/politique-de-confidentialite")}
                 >
                   politique de confidentialité
@@ -182,7 +184,7 @@ export default function Register() {
             </View>
 
             <Pressable
-              style={[styles.btn, !canSubmit && styles.btnDisabled]}
+              style={[styles.btn, { backgroundColor: colors.accent }, !canSubmit && styles.btnDisabled]}
               onPress={handleRegister}
               disabled={!canSubmit}
             >
@@ -190,7 +192,7 @@ export default function Register() {
             </Pressable>
 
             <Pressable onPress={() => router.push("/login")}> 
-              <Text style={styles.link}>Déjà un compte ? Se connecter</Text>
+              <Text style={[styles.link, { color: colors.accent }]}>Déjà un compte ? Se connecter</Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -202,7 +204,6 @@ export default function Register() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#000000",
   },
   scrollContent: {
     paddingHorizontal: 24,
@@ -218,17 +219,14 @@ const styles = StyleSheet.create({
     height: 152,
   },
   card: {
-    backgroundColor: "#121212",
     borderRadius: 28,
     paddingHorizontal: 24,
     paddingVertical: 32,
     borderWidth: 1,
-    borderColor: "#1F1F1F",
   },
   title: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#FFFFFF",
     textAlign: "center",
     marginBottom: 24,
   },
@@ -236,15 +234,11 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    backgroundColor: "#101010",
     borderWidth: 1,
-    borderColor: "#181818",
-    color: "#FFFFFF",
     fontWeight: "600",
     marginBottom: 16,
   },
   btn: {
-    backgroundColor: "#58D38C",
     paddingVertical: 16,
     borderRadius: 24,
     alignItems: "center",
@@ -265,29 +259,20 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: "#58D38C",
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#101010",
   },
   checkboxChecked: {
-    backgroundColor: "#58D38C",
-    borderColor: "#58D38C",
+    // Handled dynamically
   },
   policyText: {
-    color: "#B5B5B5",
     fontSize: 12,
     lineHeight: 18,
     flex: 1,
   },
   policyLink: {
-    color: "#58D38C",
     fontWeight: "700",
     textDecorationLine: "underline",
   },
-  link: { marginTop: 18, color: "#58D38C", textAlign: "center", fontWeight: "600" },
+  link: { marginTop: 18, textAlign: "center", fontWeight: "600" },
 });
-
-const palette = {
-  placeholder: "#616161",
-};

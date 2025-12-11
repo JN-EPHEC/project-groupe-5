@@ -42,6 +42,7 @@ export function ReferralModal({ visible, onClose, onShared }: { visible: boolean
   const copyCode = async () => {
     try {
       // Try expo-clipboard first (dynamic)
+      // @ts-ignore
       const mod: any = await import("expo-clipboard").catch(() => null);
       if (mod?.setStringAsync) {
         await mod.setStringAsync(code);

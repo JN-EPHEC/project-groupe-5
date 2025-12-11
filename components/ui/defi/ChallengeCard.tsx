@@ -1,4 +1,3 @@
-import { GradientButton } from "@/components/ui/common/GradientButton";
 import { useChallenges } from "@/hooks/challenges-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -47,12 +46,12 @@ export function ChallengeCard({
   }, [isOngoing, reviewCompleted, reviewRequiredCount, current, challenge.id]);
 
   const isLightMode = mode === "light";
-  const cardBackground = isLightMode ? colors.card : colors.surface;
-  const cardAlt = isLightMode ? colors.cardAlt : colors.surfaceAlt;
+  const cardBackground = colors.card;
+  const cardAlt = colors.cardAlt;
   const cardText = isLightMode ? colors.cardText : colors.text;
   const cardMuted = isLightMode ? colors.cardMuted : colors.mutedText;
-  const timerBackground = isLightMode ? "rgba(25, 208, 125, 0.08)" : "rgba(125, 202, 176, 0.14)";
-  const timerBorder = isLightMode ? "#33d186" : "#7DCAB0";
+  const timerBackground = isLightMode ? "rgba(25, 208, 125, 0.08)" : "rgba(0, 151, 178, 0.2)";
+  const timerBorder = isLightMode ? "#33d186" : "rgba(0, 151, 178, 0.4)";
 
   // Countdown until next noon (12:00)
   const [remainingMs, setRemainingMs] = useState<number>(0);
@@ -94,7 +93,14 @@ export function ChallengeCard({
   if (shouldHide) return null;
 
   return (
-    <View style={[styles.card, { backgroundColor: cardBackground }]}> 
+    <View style={[
+      styles.card, 
+      { 
+        backgroundColor: colors.glass, 
+        borderColor: colors.glassBorder,
+        borderWidth: 1,
+      }
+    ]}> 
       {/* HEADER PILL + POINTS */}
       <View style={styles.header}>
         <View style={[styles.categoryPill, { backgroundColor: cardAlt }]}>
@@ -113,7 +119,7 @@ export function ChallengeCard({
         {challenge.description}
       </Text>
 
-      {/* Difficulty + time-left pill (timeLeft string kept for now) */}
+      {/* Difficulty + Action Button */}
       <View style={styles.metaRow}>
         {/* DIFFICULTY PILL */}
         <View
@@ -157,15 +163,28 @@ export function ChallengeCard({
           </Text>
         </View>
 
-        {/* Time left */}
-        <View style={[styles.metaPillMuted, { backgroundColor: cardAlt }]}>
-          <Ionicons name="time-outline" size={16} color="#9FB9AE" />
-          <Text style={styles.metaText}>{challenge.timeLeft}</Text>
-        </View>
+        {/* Action Button (only if not ongoing) */}
+        {!isOngoing && (
+          <TouchableOpacity
+            onPress={() => onToggle(challenge.id)}
+            style={{
+              backgroundColor: colors.accent,
+              paddingHorizontal: 14,
+              paddingVertical: 8,
+              borderRadius: 14,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6
+            }}
+          >
+            <Text style={{ color: '#0F3327', fontWeight: '700', fontSize: 13 }}>Relever</Text>
+            <Ionicons name="arrow-forward" size={14} color="#0F3327" />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* ACTIONS */}
-      {isOngoing ? (
+      {isOngoing && (
         <View style={styles.actionsContainer}>
           {(status === "active" || status === "pendingValidation") && (
               <View style={[styles.timerPill, { backgroundColor: timerBackground, borderColor: timerBorder }]}> 
@@ -228,10 +247,6 @@ export function ChallengeCard({
             </View>
           )}
         </View>
-      ) : (
-        <View style={{ marginTop: 24 }}>
-          <GradientButton label="Relever le défi" onPress={() => onToggle(challenge.id)} />
-        </View>
       )}
 
       {/* Cancel confirmation modal */}
@@ -272,28 +287,28 @@ export function ChallengeCard({
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: 24, padding: 20, marginBottom: 18 },
+  card: { borderRadius: 24, padding: 16, marginBottom: 14 },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   categoryPill: {
     flexDirection: "row",
     alignItems: "center",
     borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
-  categoryText: { color: "#7DCAB0", fontWeight: "600", marginLeft: 6 },
+  categoryText: { color: "#7DCAB0", fontWeight: "600", marginLeft: 6, fontSize: 12 },
   pointsBadge: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#D4F7E7",
     borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
-  pointsText: { color: "#0F3327", fontWeight: "700", marginLeft: 6 },
-  title: { fontSize: 18, fontWeight: "700", marginTop: 16 },
-  description: { marginTop: 8, lineHeight: 20 },
-  metaRow: { flexDirection: "row", flexWrap: "wrap", marginTop: 16 },
+  pointsText: { color: "#0F3327", fontWeight: "700", marginLeft: 6, fontSize: 12 },
+  title: { fontSize: 16, fontWeight: "700", marginTop: 12 },
+  description: { marginTop: 6, lineHeight: 18, fontSize: 13 },
+  metaRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 12 },
   metaPill: {
     flexDirection: "row",
     alignItems: "center",

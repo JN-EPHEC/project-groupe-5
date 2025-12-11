@@ -2,7 +2,6 @@ import { FontFamilies } from "@/constants/fonts";
 import { useNotificationsSettings } from "@/hooks/notifications-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { signOut } from "firebase/auth";
 import React, { useState } from "react";
@@ -30,21 +29,20 @@ export const SettingsSection = () => {
     }
   };
 
-  const gradientColors = isLight ? [colors.cardAlt, colors.card] : [colors.surfaceAlt, colors.surface];
-  const cardBackground = isLight ? colors.card : colors.surface;
+  const gradientColors = isLight
+    ? ([colors.glass, colors.glass] as const)
+    : (["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"] as const);
+  const cardBackground = isLight ? colors.glass : "rgba(0, 151, 178, 0.1)";
   const titleColor = isLight ? colors.cardText : colors.text;
   const mutedColor = isLight ? colors.cardMuted : colors.mutedText;
-  const dividerColor = isLight ? "rgba(255,255,255,0.12)" : colors.surfaceAlt;
+  const dividerColor = isLight ? colors.glassBorder : "rgba(0, 151, 178, 0.2)";
 
   return (
-    <LinearGradient
-      colors={gradientColors}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
+    <View
       style={[styles.gradientWrapper, { shadowColor: colors.accent }]}
     >
       <View
-        style={[styles.container, { backgroundColor: cardBackground, borderColor: dividerColor }]}
+        style={[styles.container, { backgroundColor: cardBackground, borderColor: dividerColor, borderWidth: 1 }]}
       >
         {/* Notifications */}
         <TouchableOpacity style={[styles.row, { borderColor: dividerColor }]} onPress={() => setShowNotifications(!showNotifications)} activeOpacity={0.85}>
@@ -59,7 +57,7 @@ export const SettingsSection = () => {
 
         {showNotifications && (
           <View
-            style={[styles.subMenu, { backgroundColor: isLight ? colors.cardAlt : "rgba(15, 51, 39, 0.1)" }]}
+            style={[styles.subMenu, { backgroundColor: isLight ? colors.cardAlt : colors.cardAlt }]}
           >
             <SettingSwitch
               label="Notifications Push"
@@ -82,7 +80,7 @@ export const SettingsSection = () => {
             value={mode === "dark"}
             onValueChange={toggle}
             thumbColor={mode === "dark" ? "#f5f5f5" : "#f3f4f6"}
-            trackColor={{ false: isLight ? "rgba(255,255,255,0.25)" : "#3f3f46", true: isLight ? colors.accent : "#1f8f5a" }}
+            trackColor={{ false: isLight ? "rgba(255,255,255,0.25)" : "#3f3f46", true: colors.accent }}
           />
         </View>
 
@@ -102,20 +100,39 @@ export const SettingsSection = () => {
           <View
             style={[
               styles.subMenu,
-              { backgroundColor: isLight ? colors.cardAlt : "rgba(15, 51, 39, 0.1)" },
+              { backgroundColor: isLight ? colors.cardAlt : colors.cardAlt },
             ]}
           >
-            <TouchableOpacity activeOpacity={0.8} onPress={() => router.push("/change-password")}>
-              <Text style={[styles.subText, { color: mutedColor }]}>Modifier le mot de passe</Text>
+            <TouchableOpacity style={styles.subRow} activeOpacity={0.8} onPress={() => router.push("/change-password")}>
+              <View style={styles.subRowLeft}>
+                <Ionicons name="lock-closed-outline" size={20} color={mutedColor} style={{ marginRight: 10 }} />
+                <Text style={[styles.subText, { color: titleColor }]}>Modifier le mot de passe</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={mutedColor} />
             </TouchableOpacity>
-            <TouchableOpacity activeOpacity={0.8} onPress={() => router.push("/conditions-generales")}>
-              <Text style={[styles.subText, { color: mutedColor }]}>Conditions Générales d’Utilisation</Text>
+
+            <TouchableOpacity style={styles.subRow} activeOpacity={0.8} onPress={() => router.push("/conditions-generales")}>
+              <View style={styles.subRowLeft}>
+                <Ionicons name="document-text-outline" size={20} color={mutedColor} style={{ marginRight: 10 }} />
+                <Text style={[styles.subText, { color: titleColor }]}>Conditions Générales</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={mutedColor} />
             </TouchableOpacity>
-            <TouchableOpacity activeOpacity={0.8} onPress={() => router.push("/mentions-legales")}>
-              <Text style={[styles.subText, { color: mutedColor }]}>Mentions Légales</Text>
+
+            <TouchableOpacity style={styles.subRow} activeOpacity={0.8} onPress={() => router.push("/mentions-legales")}>
+              <View style={styles.subRowLeft}>
+                <Ionicons name="information-circle-outline" size={20} color={mutedColor} style={{ marginRight: 10 }} />
+                <Text style={[styles.subText, { color: titleColor }]}>Mentions Légales</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={mutedColor} />
             </TouchableOpacity>
-            <TouchableOpacity activeOpacity={0.8} onPress={() => router.push("/politique-de-confidentialite")}>
-              <Text style={[styles.subText, { color: mutedColor }]}>Politique de confidentialité</Text>
+
+            <TouchableOpacity style={styles.subRow} activeOpacity={0.8} onPress={() => router.push("/politique-de-confidentialite")}>
+              <View style={styles.subRowLeft}>
+                <Ionicons name="shield-checkmark-outline" size={20} color={mutedColor} style={{ marginRight: 10 }} />
+                <Text style={[styles.subText, { color: titleColor }]}>Politique de confidentialité</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={mutedColor} />
             </TouchableOpacity>
           </View>
         )}
@@ -130,7 +147,7 @@ export const SettingsSection = () => {
           <Text style={[styles.text, { color: "#F26767" }]}>Se déconnecter</Text>
         </TouchableOpacity>
       </View>
-    </LinearGradient>
+    </View>
   );
 };
 
@@ -158,7 +175,20 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   text: { marginLeft: 10, flex: 1, fontFamily: FontFamilies.headingMedium, fontSize: 16 },
-  subMenu: { paddingLeft: 48, paddingVertical: 12, gap: 6 },
+  subMenu: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  subRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+  },
+  subRowLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
   langOption: { paddingVertical: 6 },
   langText: { fontSize: 14, fontFamily: FontFamilies.bodyRegular },
   subText: { fontSize: 14, fontFamily: FontFamilies.body },

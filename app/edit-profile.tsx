@@ -27,7 +27,12 @@ export default function EditProfileScreen() {
         const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (perm.status !== "granted") return;
       }
-      const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
+      const res = await ImagePicker.launchImageLibraryAsync({ 
+        mediaTypes: ImagePicker.MediaTypeOptions.Images, 
+        quality: 0.8,
+        allowsEditing: true,
+        aspect: [1, 1],
+      });
       if (!res.canceled && res.assets[0]?.uri) {
         setPhotoURL(res.assets[0].uri);
       }

@@ -17,15 +17,27 @@ export type ProgressionCardProps = {
 export function ProgressionCard({ done, total, pointsText, streakText, title = "Progression de la semaine" }: ProgressionCardProps) {
   const { colors, mode } = useThemeMode();
   const isLight = mode === "light";
-  const gradientColors = isLight ? [colors.cardAlt, colors.card] : [colors.surfaceAlt, colors.surface];
-  const borderColor = isLight ? "rgba(255,255,255,0.12)" : colors.surfaceAlt;
-  const titleColor = isLight ? colors.cardText : colors.text;
-  const mutedColor = isLight ? colors.cardMuted : colors.mutedText;
+  const darkCardGradient = ["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"] as const;
+  const lightCardGradient = [
+    "#99E2B4",
+    "#88D4AB",
+    "#78C6A3",
+    "#67B99A",
+    "#56AB91",
+    "#469D89",
+    "#358F80",
+    "#248277",
+    "#14746F",
+  ];
+  const gradientColors = isLight ? lightCardGradient : darkCardGradient;
+  const borderColor = isLight ? "rgba(255,255,255,0.12)" : "rgba(0, 151, 178, 0.3)";
+  const titleColor = isLight ? "#FFFFFF" : colors.text;
+  const mutedColor = isLight ? "rgba(255, 255, 255, 0.7)" : colors.mutedText;
   return (
     <LinearGradient
       colors={gradientColors}
       start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
+      end={{ x: 1, y: 0 }}
       style={[styles.card, { borderColor, shadowColor: isLight ? colors.card : colors.accent }]}
     >
       <Text style={[styles.title, { color: titleColor }]}>{title}</Text>

@@ -23,7 +23,14 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
 
   return (
     <TouchableOpacity
-      style={[styles.button, { backgroundColor: background }]}
+      style={[
+        styles.button, 
+        { 
+          backgroundColor: colors.glass, 
+          borderColor: colors.glassBorder,
+          borderWidth: 1,
+        }
+      ]}
       onPress={onPress}
     >
       <Ionicons name={icon as any} size={24} color={cardText} />

@@ -10,13 +10,26 @@ type Props = {
 export function PremiumCard({ onSubscribe }: Props) {
   const { colors, mode } = useThemeMode();
   const isLight = mode === "light";
-  const gradientColors = isLight ? [colors.cardAlt, colors.card] : [colors.surfaceAlt, colors.surface];
-  const borderColor = isLight ? "rgba(255,255,255,0.12)" : colors.surfaceAlt;
+  const darkCardGradient = ["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"] as const;
+  const gradientColors = isLight
+    ? ([colors.cardAlt, colors.card] as const)
+    : darkCardGradient;
+  const borderColor = isLight ? "rgba(255,255,255,0.12)" : "rgba(0, 151, 178, 0.3)";
   const textPrimary = isLight ? colors.cardText : colors.text;
   const textMuted = isLight ? colors.cardMuted : colors.mutedText;
   const priceColor = colors.accent;
-  const buttonBg = colors.accent;
-  const buttonTextColor = isLight ? "#FFFFFF" : "#0F3327";
+  const buttonGradient = [
+    "#99E2B4",
+    "#88D4AB",
+    "#78C6A3",
+    "#67B99A",
+    "#56AB91",
+    "#469D89",
+    "#358F80",
+    "#248277",
+    "#14746F",
+  ] as const;
+  const buttonTextColor = "#FFFFFF";
   return (
     <LinearGradient
       colors={gradientColors}
@@ -30,12 +43,15 @@ export function PremiumCard({ onSubscribe }: Props) {
       <Text style={[styles.price, { color: priceColor }]}>4,90€ / mois</Text>
       <Text style={[styles.caption, { color: textMuted }]}>Annulable à tout moment</Text>
 
-      <TouchableOpacity
-        onPress={onSubscribe}
-        activeOpacity={0.9}
-        style={[styles.button, { backgroundColor: buttonBg }]}
-      >
-        <Text style={[styles.buttonText, { color: buttonTextColor }]}>Passer en Premium</Text>
+      <TouchableOpacity onPress={onSubscribe} activeOpacity={0.9} style={styles.button}>
+        <LinearGradient
+          colors={buttonGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.buttonGradient}
+        >
+          <Text style={[styles.buttonText, { color: buttonTextColor }]}>Passer en Premium</Text>
+        </LinearGradient>
       </TouchableOpacity>
     </LinearGradient>
   );
@@ -56,8 +72,12 @@ const styles = StyleSheet.create({
   button: {
     marginTop: 16,
     borderRadius: 22,
+  },
+  buttonGradient: {
+    borderRadius: 22,
     paddingVertical: 14,
     alignItems: "center",
+    justifyContent: "center",
   },
   buttonText: { fontSize: 16, fontFamily: FontFamilies.heading },
 });

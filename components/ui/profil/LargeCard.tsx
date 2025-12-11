@@ -15,7 +15,14 @@ export const LargeCard: React.FC<LargeCardProps> = ({ icon, label, value }) => {
   const cardText = isLight ? colors.cardText : colors.text;
   const cardMuted = isLight ? colors.cardMuted : colors.mutedText;
   return (
-    <View style={[styles.card, { backgroundColor: isLight ? colors.card : colors.surface }]}> 
+    <View style={[
+      styles.card, 
+      { 
+        backgroundColor: colors.glass, 
+        borderColor: colors.glassBorder,
+        borderWidth: 1,
+      }
+    ]}> 
       <Ionicons name={icon as any} size={24} color={colors.accent} />
       <Text style={[styles.label, { color: cardMuted }]}>{label}</Text>
       <Text style={[styles.value, { color: cardText }]}>{value}</Text>

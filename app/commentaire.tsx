@@ -7,13 +7,13 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
   Image,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function CommentaireScreen() {
   const { colors } = useThemeMode();
@@ -140,7 +140,7 @@ export default function CommentaireScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
+  container: { flex: 1, paddingHorizontal: 20 },
   content: { width: "100%", maxWidth: 400, alignSelf: "center" },
   headerRow: {
     flexDirection: "row",
