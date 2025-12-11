@@ -25,7 +25,13 @@ type Props = {
 };
 
 export function ValidationCard({ item, onValidate, onReject }: Props) {
-  const { colors } = useThemeMode();
+  const { colors, mode } = useThemeMode();
+  const isLight = mode === "light";
+  const cardBackground = isLight ? colors.card : "rgba(0, 151, 178, 0.1)";
+  const cardAlt = isLight ? colors.cardAlt : "rgba(0, 151, 178, 0.05)";
+  const cardText = isLight ? colors.cardText : colors.text;
+  const cardMuted = isLight ? colors.cardMuted : colors.mutedText;
+
   const category = CATEGORY_CONFIG[item.category];
   const [reported, setReported] = useState(false);
   const [hiddenProof, setHiddenProof] = useState(false);
@@ -41,10 +47,17 @@ export function ValidationCard({ item, onValidate, onReject }: Props) {
   ];
 
   return (
-    <View style={[styles.card, { backgroundColor: colors.card }]}> 
+    <View style={[
+      styles.card, 
+      { 
+        backgroundColor: colors.glass, 
+        borderColor: colors.glassBorder,
+        borderWidth: 1,
+      }
+    ]}> 
       {/* HEADER */}
       <View style={styles.header}>
-        <View style={[styles.categoryPill, { backgroundColor: colors.cardAlt }]}> 
+        <View style={[styles.categoryPill, { backgroundColor: cardAlt }]}> 
           <Ionicons name={category.icon} size={16} color="#7DCAB0" />
           <Text style={styles.categoryText}>{category.label}</Text>
         </View>
@@ -56,21 +69,21 @@ export function ValidationCard({ item, onValidate, onReject }: Props) {
       </View>
 
       {/* TITRE */}
-      <Text style={[styles.title, { color: colors.cardText }]}>{item.title}</Text>
-      <Text style={[styles.subtitle, { color: colors.cardMuted }]}>Par {item.userName}</Text>
+      <Text style={[styles.title, { color: cardText }]}>{item.title}</Text>
+      <Text style={[styles.subtitle, { color: cardMuted }]}>Par {item.userName}</Text>
 
       {/* Message de signalement */}
       {reported && (
-        <View style={[styles.banner, { backgroundColor: colors.cardAlt }]}> 
+        <View style={[styles.banner, { backgroundColor: cardAlt }]}> 
           <Ionicons name="alert-circle" size={18} color={colors.accent} style={styles.leadingIcon} />
-          <Text style={{ color: colors.cardText, fontWeight: '600' }}>Merci, votre signalement a été pris en compte.</Text>
+          <Text style={{ color: cardText, fontWeight: '600' }}>Merci, votre signalement a été pris en compte.</Text>
         </View>
       )}
 
       {/* BOÎTE DE PREUVE */}
       {hiddenProof ? (
-        <View style={[styles.hiddenBox, { backgroundColor: colors.cardAlt }]}> 
-          <Text style={{ color: colors.cardMuted }}>Cette preuve est temporairement masquée en attente de vérification.</Text>
+        <View style={[styles.hiddenBox, { backgroundColor: cardAlt }]}> 
+          <Text style={{ color: cardMuted }}>Cette preuve est temporairement masquée en attente de vérification.</Text>
         </View>
       ) : (
         <Image source={{ uri: item.photoUrl }} style={styles.photo} />
@@ -78,12 +91,12 @@ export function ValidationCard({ item, onValidate, onReject }: Props) {
 
       {/* Commentaire de l'auteur (s'il existe) */}
       {item.comment && !hiddenProof && (
-        <Text style={{ color: colors.cardText, marginTop: 10 }}>{item.comment}</Text>
+        <Text style={{ color: cardText, marginTop: 10 }}>{item.comment}</Text>
       )}
 
       {/* ACTIONS */}
       <View style={styles.actions}>
-        <TouchableOpacity style={[styles.secondaryButton, { backgroundColor: colors.cardAlt }]}
+        <TouchableOpacity style={[styles.secondaryButton, { backgroundColor: cardAlt }]}
           onPress={onReject}
         > 
           <Ionicons name="close-circle" size={18} color="#EBE6D3" style={styles.leadingIcon} />

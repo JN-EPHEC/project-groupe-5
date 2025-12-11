@@ -16,15 +16,15 @@ export const StatCard: React.FC<StatCardProps> = ({ icon, value, label, accent }
   const { colors, mode } = useThemeMode();
   const isLight = mode === "light";
   const gradient = accent
-    ? [colors.accent, colors.success]
+    ? ([colors.accent, colors.success] as const)
     : isLight
-    ? [colors.cardAlt, colors.card]
-    : [colors.surfaceAlt, colors.surface];
+    ? ([colors.cardAlt, colors.card] as const)
+    : (["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"] as const);
   const textColor = accent ? "#0F3327" : isLight ? colors.cardText : colors.text;
   const subTextColor = accent ? "#0F3327" : isLight ? colors.cardMuted : colors.mutedText;
   const iconTint = accent ? "#0F3327" : isLight ? colors.cardText : colors.accent;
-  const badgeFill = accent ? "rgba(15, 51, 39, 0.12)" : isLight ? colors.cardAlt : "rgba(0, 255, 90, 0.15)";
-  const cardBorderColor = accent ? "rgba(15,51,39,0.1)" : isLight ? "rgba(255,255,255,0.12)" : colors.surfaceAlt;
+  const badgeFill = accent ? "rgba(15, 51, 39, 0.12)" : isLight ? colors.cardAlt : "rgba(0, 151, 178, 0.2)";
+  const cardBorderColor = accent ? "rgba(15,51,39,0.1)" : isLight ? "rgba(255,255,255,0.12)" : "rgba(0, 151, 178, 0.3)";
   const shadowShade = accent ? colors.accent : isLight ? colors.card : colors.accent;
   return (
     <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.card, { shadowColor: shadowShade, borderColor: cardBorderColor }]}>

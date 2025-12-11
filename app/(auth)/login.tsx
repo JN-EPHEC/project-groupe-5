@@ -1,3 +1,4 @@
+import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { signInWithEmailAndPassword } from "firebase/auth";
@@ -37,6 +38,8 @@ if (DEV_MODE) {
 
 export default function Login() {
   const router = useRouter();
+  const { colors, mode } = useThemeMode();
+  const isLight = mode === "light";
 
   // ✅ Autofill only in DEV, only if local file exists
   const [email, setEmail] = useState(DEV_MODE ? DEV_EMAIL : "");
@@ -65,10 +68,10 @@ export default function Login() {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1 }}
+      style={{ flex: 1, backgroundColor: colors.background }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <View style={styles.root}>
+      <View style={[styles.root, { backgroundColor: colors.background }]}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
@@ -81,18 +84,18 @@ export default function Login() {
             />
           </View>
 
-          <View style={styles.card}>
-            <View style={styles.inputRow}>
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
+            <View style={[styles.inputRow, { backgroundColor: colors.surfaceAlt }]}>
               <Ionicons
                 name="person-outline"
                 size={18}
-                color={themes.icon}
+                color={colors.mutedText}
                 style={{ marginRight: 10 }}
               />
               <TextInput
-                style={styles.inputField}
+                style={[styles.inputField, { color: colors.text }]}
                 placeholder="Email"
-                placeholderTextColor={themes.placeholder}
+                placeholderTextColor={colors.mutedText}
                 autoCapitalize="none"
                 keyboardType="email-address"
                 value={email}
@@ -101,17 +104,17 @@ export default function Login() {
               />
             </View>
 
-            <View style={styles.inputRow}>
+            <View style={[styles.inputRow, { backgroundColor: colors.surfaceAlt }]}>
               <Ionicons
                 name="lock-closed-outline"
                 size={18}
-                color={themes.icon}
+                color={colors.mutedText}
                 style={{ marginRight: 10 }}
               />
               <TextInput
-                style={styles.inputField}
+                style={[styles.inputField, { color: colors.text }]}
                 placeholder="Mot de passe"
-                placeholderTextColor={themes.placeholder}
+                placeholderTextColor={colors.mutedText}
                 secureTextEntry
                 value={password}
                 onChangeText={setPassword}
@@ -127,22 +130,23 @@ export default function Login() {
                 <View
                   style={[
                     styles.checkboxBox,
-                    rememberMe && { backgroundColor: themes.accent, borderColor: themes.accent },
+                    { borderColor: colors.mutedText },
+                    rememberMe && { backgroundColor: colors.accent, borderColor: colors.accent },
                   ]}
                 >
                   {rememberMe && <Ionicons name="checkmark" size={14} color="#00231A" />}
                 </View>
-                <Text style={styles.checkboxLabel}>Se souvenir de moi</Text>
+                <Text style={[styles.checkboxLabel, { color: colors.mutedText }]}>Se souvenir de moi</Text>
               </TouchableOpacity>
               <Pressable
                 onPress={() => router.push("/reset-password")}
               >
-                <Text style={styles.linkMuted}>Mot de passe oublié ?</Text>
+                <Text style={[styles.linkMuted, { color: colors.mutedText }]}>Mot de passe oublié ?</Text>
               </Pressable>
             </View>
 
             <Pressable
-              style={[styles.primaryBtn, (!canSubmit || loading) && styles.primaryBtnDisabled]}
+              style={[styles.primaryBtn, { backgroundColor: colors.accent }, (!canSubmit || loading) && styles.primaryBtnDisabled]}
               onPress={handleLogin}
               disabled={!canSubmit || loading}
             >
@@ -165,7 +169,6 @@ export default function Login() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#000000",
   },
   scrollContent: {
     paddingHorizontal: 24,
@@ -181,12 +184,10 @@ const styles = StyleSheet.create({
     height: 174,
   },
   card: {
-    backgroundColor: "#121212",
     borderRadius: 28,
     paddingHorizontal: 24,
     paddingVertical: 32,
     borderWidth: 1,
-    borderColor: "#1F1F1F",
   },
   inputRow: {
     flexDirection: "row",
@@ -194,14 +195,11 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    backgroundColor: "#101010",
     borderWidth: 1,
-    borderColor: "#181818",
     marginBottom: 16,
   },
   inputField: {
     flex: 1,
-    color: "#FFFFFF",
     fontWeight: "600",
   },
   rowBetween: {
@@ -220,7 +218,6 @@ const styles = StyleSheet.create({
     height: 18,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: "#3A3A3A",
     alignItems: "center",
     justifyContent: "center",
     marginRight: 8,
@@ -229,10 +226,8 @@ const styles = StyleSheet.create({
   checkboxLabel: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#9B9B9B",
   },
   linkMuted: {
-    color: "#8A8A8A",
     fontSize: 12,
     fontWeight: "600",
   },
@@ -240,7 +235,6 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     paddingVertical: 16,
     alignItems: "center",
-    backgroundColor: "#58D38C",
     marginBottom: 24,
   },
   primaryBtnDisabled: {
@@ -249,7 +243,6 @@ const styles = StyleSheet.create({
   primaryBtnText: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#00231A",
   },
   footerRow: {
     flexDirection: "row",
@@ -258,18 +251,10 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   footerText: {
-    color: "#6E6E6E",
     fontSize: 12,
   },
   footerLink: {
-    color: "#58D38C",
     fontSize: 12,
     fontWeight: "700",
   },
 });
-
-const themes = {
-  accent: "#58D38C",
-  icon: "#6ADCA0",
-  placeholder: "#616161",
-};

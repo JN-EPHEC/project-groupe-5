@@ -6,14 +6,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-  Image,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ChallengeCard } from "@/components/ui/defi/ChallengeCard";
 import { TabSwitcher } from "@/components/ui/defi/TabSwitcher";
@@ -40,10 +41,13 @@ type DefiDoc = {
 
 export default function DefiScreen() {
   const router = useRouter();
-  const { colors } = useThemeMode();
+  const { colors, mode } = useThemeMode();
   const { friends } = useFriends();
   const { points } = usePoints();
   const { joinedClub, members } = useClub();
+
+  const isLight = mode === "light";
+  const darkBg = "#021114";
 
   const [activeTab, setActiveTab] = useState<TabKey>("perso");
   const [viewMode, setViewMode] = useState<"defis" | "classement">("defis");
@@ -223,13 +227,13 @@ export default function DefiScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: isLight ? colors.background : darkBg }]}>
       {/* HEADER with toggle icon */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <Text style={[styles.title, { color: colors.text }]}>{viewMode === 'defis' ? 'Défis' : 'Classement'}</Text>
         <TouchableOpacity
           onPress={() => setViewMode(viewMode === 'defis' ? 'classement' : 'defis')}
-          style={{ padding: 8, borderRadius: 12, backgroundColor: colors.surface }}
+          style={{ padding: 8, borderRadius: 12, backgroundColor: isLight ? colors.surface : "rgba(0, 151, 178, 0.1)" }}
         >
           <Ionicons name={viewMode === 'defis' ? 'trophy-outline' : 'flag-outline'} size={22} color={colors.text} />
         </TouchableOpacity>
@@ -253,7 +257,7 @@ export default function DefiScreen() {
             {gatingActive && (
               <View
                 style={{
-                  backgroundColor: colors.surface,
+                  backgroundColor: colors.card,
                   padding: 20,
                   borderRadius: 24,
                   marginBottom: 18,
@@ -370,7 +374,7 @@ export default function DefiScreen() {
               !current.feedbackSubmitted && (
                 <View
                   style={{
-                    backgroundColor: colors.surface,
+                    backgroundColor: colors.card,
                     padding: 20,
                     borderRadius: 24,
                     marginTop: 10,
@@ -451,7 +455,7 @@ export default function DefiScreen() {
             {hideAfterFeedback && (
               <View
                 style={{
-                  backgroundColor: colors.surface,
+                  backgroundColor: colors.card,
                   padding: 20,
                   borderRadius: 24,
                   marginTop: 10,
@@ -604,12 +608,12 @@ export default function DefiScreen() {
           </View>
         )}
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
+  container: { flex: 1, paddingHorizontal: 20 },
   title: { fontSize: 28, fontWeight: "700" },
   scroll: { marginTop: 12 },
   emptyText: { textAlign: "center", marginTop: 40, fontSize: 16 },

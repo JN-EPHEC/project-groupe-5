@@ -8,12 +8,13 @@ type Props = {
   onPress: () => void;
   style?: ViewStyle;
   disabled?: boolean;
-  colors?: string[];
+  colors?: readonly [string, string] | readonly [string, string, ...string[]];
 };
 
 export const GradientButton: React.FC<Props> = ({ label, onPress, style, disabled, colors }) => {
-  const gradient = colors ?? ["#90F7D5", "#38D793", "#23C37A"];
-  const gradColors = (disabled ? ["#AABBB5", "#AABBB5"] : gradient) as any;
+  const gradient = colors ?? ["#00D68F", "#00D68F"] as const;
+  const disabledGradient = ["#AABBB5", "#AABBB5"] as const;
+  const gradColors = disabled ? disabledGradient : gradient;
   return (
     <TouchableOpacity onPress={onPress} disabled={!!disabled} style={style} activeOpacity={0.85}>
       <LinearGradient
@@ -22,7 +23,7 @@ export const GradientButton: React.FC<Props> = ({ label, onPress, style, disable
         end={{ x: 1, y: 1 }}
         style={{ paddingVertical: 12, borderRadius: 18, alignItems: "center", justifyContent: "center" }}
       >
-        <Text style={{ color: "#0F3327", fontFamily: FontFamilies.heading }}>{label}</Text>
+        <Text style={{ color: "#FFFFFF", fontFamily: FontFamilies.heading }}>{label}</Text>
       </LinearGradient>
     </TouchableOpacity>
   );

@@ -10,8 +10,8 @@ export default function DonationBanner() {
   const isLight = mode === "light";
   const cardText = isLight ? colors.cardText : colors.text;
   const cardMuted = isLight ? colors.cardMuted : colors.mutedText;
-  const cardBackground = isLight ? colors.card : colors.surface;
-  const borderTone = isLight ? "rgba(255,255,255,0.28)" : colors.surfaceAlt;
+  const cardBackground = colors.glass;
+  const borderTone = colors.glassBorder;
 
   const [amount, setAmount] = useState<number>(10);
   const [editing, setEditing] = useState(false);

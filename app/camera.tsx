@@ -5,12 +5,12 @@ import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
     Image,
-    SafeAreaView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function CameraScreen() {
   const [permission, requestPermission] = useCameraPermissions();
@@ -19,6 +19,7 @@ export default function CameraScreen() {
   const [facing, setFacing] = useState<"back" | "front">("back");
   const router = useRouter();
   const [navigating, setNavigating] = useState(false);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (!permission) return;
@@ -57,7 +58,7 @@ export default function CameraScreen() {
   if (photoUri) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: "#000" }}>
-        <TouchableOpacity onPress={() => setPhotoUri(null)} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => setPhotoUri(null)} style={[styles.backBtn, { top: insets.top }]}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
 
@@ -98,16 +99,16 @@ export default function CameraScreen() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#000" }}>
+    <View style={{ flex: 1, backgroundColor: "#000" }}>
       <CameraView ref={cameraRef} style={{ flex: 1 }} facing={facing} />
 
-      <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+      <TouchableOpacity onPress={() => router.back()} style={[styles.backBtn, { top: insets.top }]}>
         <Ionicons name="arrow-back" size={24} color="#fff" />
       </TouchableOpacity>
 
       <TouchableOpacity
         onPress={() => setFacing((f) => (f === "back" ? "front" : "back"))}
-        style={styles.switchBtn}
+        style={[styles.switchBtn, { top: insets.top }]}
       >
         <Ionicons name="camera-reverse" size={22} color="#0F3327" />
       </TouchableOpacity>
@@ -115,7 +116,7 @@ export default function CameraScreen() {
       <View style={styles.controls}>
         <TouchableOpacity onPress={takePicture} style={styles.shutter} />
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -142,13 +143,12 @@ const styles = StyleSheet.create({
   },
   switchBtn: {
     position: "absolute",
-    top: 20,
     right: 20,
     backgroundColor: "#19D07D",
     padding: 10,
     borderRadius: 22,
   },
-  backBtn: { position: "absolute", top: 20, left: 20, padding: 6 },
+  backBtn: { position: "absolute", left: 20, padding: 6 },
   footerRow: {
     flexDirection: "row",
     justifyContent: "space-between",

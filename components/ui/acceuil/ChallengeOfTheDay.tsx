@@ -14,12 +14,15 @@ export type ChallengeOfTheDayProps = {
 export function ChallengeOfTheDay({ title, description, difficulty, onValidate }: ChallengeOfTheDayProps) {
   const { colors, mode } = useThemeMode();
   const isLight = mode === "light";
-  const gradientColors = isLight ? [colors.cardAlt, colors.card] : [colors.surfaceAlt, colors.surface];
+  const darkCardGradient = ["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"] as const;
+  const gradientColors = isLight
+    ? ([colors.cardAlt, colors.card] as const)
+    : darkCardGradient;
   const titleColor = isLight ? colors.cardText : colors.text;
   const mutedColor = isLight ? colors.cardMuted : colors.mutedText;
-  const tagBackground = isLight ? colors.cardAlt : colors.surfaceAlt;
-  const cardBorder = isLight ? "rgba(255,255,255,0.12)" : colors.surfaceAlt;
-  const buttonBackground = colors.accent;
+  const tagBackground = isLight ? colors.cardAlt : "rgba(0, 151, 178, 0.1)";
+  const cardBorder = isLight ? "rgba(255,255,255,0.12)" : "rgba(0, 151, 178, 0.3)";
+  const buttonGradient = ["#0097b2", "#7ed957"] as const;
 
   return (
     <LinearGradient
@@ -42,8 +45,15 @@ export function ChallengeOfTheDay({ title, description, difficulty, onValidate }
             <Ionicons name="leaf-outline" size={14} color={colors.cardText} />
             <Text style={[styles.tagText, { color: colors.cardText }]}>{difficulty}</Text>
           </View>
-          <TouchableOpacity style={[styles.validateBtn, { backgroundColor: buttonBackground }]} onPress={onValidate}>
-            <Text style={styles.validateText}>Valider avec photo</Text>
+          <TouchableOpacity style={styles.validateBtn} onPress={onValidate} activeOpacity={0.9}>
+            <LinearGradient
+              colors={buttonGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.validateGradient}
+            >
+              <Text style={styles.validateText}>Valider avec photo</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       </View>
@@ -73,6 +83,13 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   tag: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, flexDirection: "row", alignItems: "center" },
   tagText: { marginLeft: 6, fontSize: 13, fontWeight: "600" },
-  validateBtn: { paddingVertical: 10, paddingHorizontal: 18, borderRadius: 14 },
+  validateBtn: { borderRadius: 14 },
+  validateGradient: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   validateText: { color: "#FFFFFF", fontWeight: "700", fontSize: 14 },
 });

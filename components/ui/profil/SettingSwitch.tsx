@@ -13,9 +13,9 @@ interface SettingSwitchProps {
 export const SettingSwitch: React.FC<SettingSwitchProps> = ({ label, value, onValueChange, disabled }) => {
   const { colors, mode } = useThemeMode();
   const isLight = mode === "light";
-  const inactiveThumb = isLight ? "#e5e7eb" : "#2e2e32";
+  const inactiveThumb = isLight ? "#f4f4f5" : "#2e2e32";
   const activeThumb = isLight ? colors.cardText : "#f5f5f5";
-  const inactiveTrack = isLight ? "rgba(255,255,255,0.25)" : "#3f3f46";
+  const inactiveTrack = isLight ? "#d4d4d8" : "#3f3f46";
   const activeTrack = isLight ? colors.accent : "#1f8f5a";
   return (
     <View style={styles.switchRow}>

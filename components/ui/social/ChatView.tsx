@@ -154,12 +154,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const keyboardVerticalOffset = Platform.OS === "ios" ? tabBarHeight + insets.bottom : 0;
   const composerBaseHeight = 72;
   const listPaddingBottom = composerBaseHeight + tabBarHeight + insets.bottom + 8;
-  const inputPaddingBottom = Math.max(insets.bottom, 12);
+  const inputPaddingBottom = Math.max(insets.bottom, 12) + (Platform.OS === "android" ? 20 : 0);
   const borderTone = mode === "light" ? "rgba(15,51,39,0.14)" : "rgba(255,255,255,0.08)";
-  const chatSurfaceBackground = mode === "light" ? "rgba(255,255,255,0.9)" : "rgba(12,51,39,0.6)";
+  const chatSurfaceBackground = mode === "light" ? "rgba(255,255,255,0.9)" : "rgba(0, 151, 178, 0.1)";
   const composerBackground = mode === "light" ? "rgba(255,255,255,0.92)" : "rgba(9, 40, 30, 0.7)";
   const inputBackground = mode === "light" ? "#ffffff" : "rgba(255,255,255,0.06)";
-  const containerBottomPadding = tabBarHeight + insets.bottom + 16;
+  const containerBottomPadding = tabBarHeight + insets.bottom + 16 + (Platform.OS === "android" ? 50 : 0);
 
   return (
     <KeyboardAvoidingView

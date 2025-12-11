@@ -7,13 +7,20 @@ import QRCode from 'react-native-qrcode-svg';
 export function CouponCard({ coupon }: { coupon: Coupon }) {
   const { colors, mode } = useThemeMode();
   const isLight = mode === "light";
-  const cardBackground = isLight ? colors.card : colors.surface;
+  const cardBackground = colors.card;
   const cardText = isLight ? colors.cardText : colors.text;
   const cardMuted = isLight ? colors.cardMuted : colors.mutedText;
   const [open, setOpen] = useState(false);
   return (
     <>
-      <View style={[styles.card, { backgroundColor: cardBackground }]}> 
+      <View style={[
+        styles.card, 
+        { 
+          backgroundColor: colors.glass, 
+          borderColor: colors.glassBorder,
+          borderWidth: 1,
+        }
+      ]}> 
         <View style={styles.row}> 
           <View style={{ flex: 1 }}>
             <Text style={[styles.title, { color: cardText }]} numberOfLines={1}>{coupon.name} • {coupon.voucherAmountEuro}€</Text>

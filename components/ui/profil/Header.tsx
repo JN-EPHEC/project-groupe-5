@@ -11,15 +11,21 @@ export const Header = () => {
   const { joinedClub } = useClub();
   const { colors, mode } = useThemeMode();
   const isLight = mode === "light";
-  const gradientColors = isLight ? [colors.cardAlt, colors.card] : [colors.surfaceAlt, colors.surface];
+  const gradientColors = isLight
+    ? ([colors.cardAlt, colors.card] as const)
+    : (["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"] as const);
   const primaryText = isLight ? colors.cardText : colors.text;
   const secondaryText = isLight ? colors.cardMuted : colors.mutedText;
+  
+  const displayName = (user?.username ?? `${user?.firstName ?? ""} ${user?.lastName ?? ""}`).trim() || "Invité";
+  const initials = displayName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
+
   return (
     <LinearGradient
       colors={gradientColors}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={[styles.header, { shadowColor: colors.accent }]}
+      style={[styles.header, { shadowColor: colors.accent, borderColor: isLight ? "transparent" : "rgba(0, 151, 178, 0.3)", borderWidth: isLight ? 0 : 1 }]}
     >
       <View style={styles.avatarContainer}>
         {user?.photoURL ? (
@@ -28,9 +34,17 @@ export const Header = () => {
           <View
             style={[
               styles.avatarPlaceholder,
-              { backgroundColor: isLight ? colors.cardAlt : "#1F2A27" },
+              { 
+                backgroundColor: isLight ? colors.cardAlt : "rgba(0, 151, 178, 0.1)",
+                alignItems: "center",
+                justifyContent: "center"
+              },
             ]}
-          />
+          >
+            <Text style={{ color: isLight ? colors.text : "#fff", fontSize: 28, fontFamily: FontFamilies.heading }}>
+              {initials}
+            </Text>
+          </View>
         )}
         <View
           style={[styles.badge, { backgroundColor: colors.accent }]}

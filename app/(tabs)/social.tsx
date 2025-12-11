@@ -1,6 +1,7 @@
 import { useThemeMode } from "@/hooks/theme-context";
 import { useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
   
 // Composants UI
 import { GradientButton } from "@/components/ui/common/GradientButton";
@@ -22,15 +23,17 @@ import { useUser } from "@/hooks/user-context";
 import { acceptFriendRequest, rejectFriendRequest, removeFriend, searchUsers, sendFriendRequest } from "@/services/friends";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { collection, doc, getDoc, onSnapshot } from "firebase/firestore";
 import { useEffect } from "react";
 
 export default function SocialScreen() {
-  const { colors } = useThemeMode();
+  const { colors, mode } = useThemeMode();
+  const isLight = mode === "light";
+  const darkBg = "#021114";
+
   const [selectedTab, setSelectedTab] = useState<"clubs" | "amis">("amis");
-  const [view, setView] = useState<"main" | "chat" | "clubRanking" | "createClub">("main");
+  const [view, setView] = useState<"main" | "chat" | "clubRanking" | "createClub" | "requests" | "members">("main");
   const [editingClub, setEditingClub] = useState(false);
   const [selectedChat, setSelectedChat] = useState<any>(null);
   const [input, setInput] = useState(""); // chat input
@@ -497,24 +500,24 @@ export default function SocialScreen() {
   }
 
   return (
-    <View style={[
+    <SafeAreaView style={[
       styles.container,
-      { backgroundColor: colors.background },
+      { backgroundColor: isLight ? colors.background : darkBg },
       selectedTab === 'clubs' && joinedClub ? { paddingBottom: 0 } : null,
     ]}> 
       <Text style={[styles.title, { color: colors.text }]}>Social</Text>
-      <View style={[styles.tabSwitcher, { backgroundColor: colors.surfaceAlt }]}>
+      <View style={[styles.tabSwitcher, { backgroundColor: isLight ? colors.surfaceAlt : "rgba(0, 151, 178, 0.1)" }]}>
         <TouchableOpacity
           style={[styles.switcherButton, selectedTab==='clubs' && { backgroundColor: colors.accent }]}
           onPress={() => setSelectedTab('clubs')}
         >
-          <Text style={[styles.switcherText, { color: selectedTab==='clubs' ? '#0F3327' : colors.mutedText }]}>Club</Text>
+          <Text style={[styles.switcherText, { color: selectedTab==='clubs' ? colors.pillActive : colors.mutedText }]}>Club</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.switcherButton, selectedTab==='amis' && { backgroundColor: colors.accent }]}
           onPress={() => setSelectedTab('amis')}
         >
-          <Text style={[styles.switcherText, { color: selectedTab==='amis' ? '#0F3327' : colors.mutedText }]}>Amis</Text>
+          <Text style={[styles.switcherText, { color: selectedTab==='amis' ? colors.pillActive : colors.mutedText }]}>Amis</Text>
         </TouchableOpacity>
       </View>
 
@@ -615,9 +618,14 @@ export default function SocialScreen() {
               placeholderTextColor={colors.mutedText}
               style={[styles.searchInput, { color: colors.text }]}
             />
-            <TouchableOpacity onPress={() => router.push('/amis-plus')} style={{ backgroundColor: colors.accent, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, marginLeft: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Ionicons name="person-add-outline" size={16} color="#0F3327" />
-              <Text style={{ color: '#0F3327', fontFamily: FontFamilies.heading }}>Ajouter</Text>
+            <TouchableOpacity onPress={() => setView('requests')} style={{ backgroundColor: colors.accent, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, marginLeft: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="mail-unread-outline" size={16} color={colors.pillActive} />
+              <Text style={{ color: colors.pillActive, fontFamily: FontFamilies.heading }}>Demandes</Text>
+              {friendRequests.length > 0 && (
+                <View style={{ backgroundColor: '#E45353', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2 }}>
+                  <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>{friendRequests.length}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
 
@@ -644,7 +652,7 @@ export default function SocialScreen() {
                 const incomingRequest = friendRequests.find((req) => req.from === u.id);
                 const hasSentRequest = sentRequestIds.includes(u.id);
 
-                let actionNode: JSX.Element | null = null;
+                let actionNode: React.ReactNode | null = null;
 
                 if (isFriend) {
                   actionNode = (
@@ -703,69 +711,7 @@ export default function SocialScreen() {
             <Text style={{ color: colors.mutedText, marginTop: 12 }}>Aucun résultat pour cette recherche.</Text>
           )}
 
-          {/* Pending friend requests */}
-          <View style={{ marginTop: 12 }}>
-            <GradientButton
-              label={friendRequests.length > 0 ? `Demandes d'amis (${friendRequests.length})` : "Demandes d'amis"}
-              onPress={() => setShowFriendRequests((prev) => !prev)}
-              style={styles.requestToggle}
-            />
-            {showFriendRequests && (
-              friendRequests.length === 0 ? (
-                <Text style={{ color: colors.mutedText, marginTop: 10 }}>Aucune demande reçue pour le moment.</Text>
-              ) : (
-                friendRequests.map((r) => {
-                const senderProfile = r.from ? friendProfiles[r.from] : undefined;
-                const displayName =
-                  r.fromName ||
-                  [senderProfile?.firstName, senderProfile?.lastName].filter(Boolean).join(" ") ||
-                  senderProfile?.username ||
-                  senderProfile?.usernameLowercase ||
-                  r.from;
-
-                const avatarUri =
-                  r.fromAvatar ||
-                  senderProfile?.photoURL ||
-                  senderProfile?.avatar ||
-                  senderProfile?.photoUri ||
-                  null;
-
-                const initials = displayName ? displayName.charAt(0).toUpperCase() : "?";
-
-                  return (
-                    <View key={r.id} style={[styles.requestCard, { backgroundColor: colors.surface }]}> 
-                      <View style={styles.requestInfo}>
-                        {avatarUri ? (
-                          <Image source={{ uri: avatarUri }} style={styles.requestAvatar} />
-                        ) : (
-                          <View style={[styles.requestAvatar, { backgroundColor: colors.pill }]}> 
-                            <Text style={[styles.requestInitial, { color: colors.text }]}>{initials}</Text>
-                          </View>
-                        )}
-                        <View>
-                          <Text style={[styles.requestName, { color: colors.text }]}>{displayName}</Text>
-                          <Text style={[styles.requestMeta, { color: colors.mutedText }]}>souhaite devenir ton ami</Text>
-                        </View>
-                      </View>
-                      <View style={styles.requestActions}>
-                        <GradientButton
-                          label="Accepter"
-                          onPress={() => handleAcceptRequest(r)}
-                          style={{ flex: 1 }}
-                        />
-                        <TouchableOpacity
-                          onPress={() => handleRejectRequest(r)}
-                          style={[styles.rejectBtn, { borderColor: "#F06262", backgroundColor: "transparent" }]}
-                        >
-                          <Text style={[styles.rejectText, { color: "#F06262" }]}>Refuser</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  );
-                })
-              )
-            )}
-          </View>
+          {/* Pending friend requests - REMOVED from here, moved to separate view */}
 
           {(() => {
             const primaryList = (friendsLive.length ? friendsLive : friends) as any[];
@@ -834,13 +780,81 @@ export default function SocialScreen() {
                   setSelectedChat({ ...friend, type: "ami" });
                   setView("chat");
                 }}
-                actionLabel="Supprimer"
+                actionIcon="trash-outline"
                 onAction={() => handleRemoveFriend(friend.id, friend.name)}
               />
             ));
           })()}
         </ScrollView>
       )}
+      {/* Friend Requests View */}
+      {view === 'requests' && (
+        <View style={{ position: 'absolute', top: 56, left: 0, right: 0, bottom: 0, backgroundColor: colors.background, padding: 16 }}>
+          <TouchableOpacity onPress={() => setView('main')} style={{ marginBottom: 16, flexDirection: 'row', alignItems: 'center' }}>
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
+            <Text style={{ color: colors.text, fontSize: 20, fontFamily: FontFamilies.heading, marginLeft: 10 }}>Demandes d'amis</Text>
+          </TouchableOpacity>
+          <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
+            {friendRequests.length === 0 ? (
+              <View style={{ alignItems: 'center', marginTop: 50 }}>
+                <Ionicons name="mail-open-outline" size={64} color={colors.mutedText} />
+                <Text style={{ color: colors.mutedText, marginTop: 16, fontSize: 16 }}>Aucune demande reçue pour le moment.</Text>
+              </View>
+            ) : (
+              friendRequests.map((r) => {
+                const senderProfile = r.from ? friendProfiles[r.from] : undefined;
+                const displayName =
+                  r.fromName ||
+                  [senderProfile?.firstName, senderProfile?.lastName].filter(Boolean).join(" ") ||
+                  senderProfile?.username ||
+                  senderProfile?.usernameLowercase ||
+                  r.from;
+
+                const avatarUri =
+                  r.fromAvatar ||
+                  senderProfile?.photoURL ||
+                  senderProfile?.avatar ||
+                  senderProfile?.photoUri ||
+                  null;
+
+                const initials = displayName ? displayName.charAt(0).toUpperCase() : "?";
+
+                return (
+                  <View key={r.id} style={[styles.requestCard, { backgroundColor: colors.surface, marginBottom: 12 }]}> 
+                    <View style={styles.requestInfo}>
+                      {avatarUri ? (
+                        <Image source={{ uri: avatarUri }} style={styles.requestAvatar} />
+                      ) : (
+                        <View style={[styles.requestAvatar, { backgroundColor: colors.pill }]}> 
+                          <Text style={[styles.requestInitial, { color: colors.text }]}>{initials}</Text>
+                        </View>
+                      )}
+                      <View>
+                        <Text style={[styles.requestName, { color: colors.text }]}>{displayName}</Text>
+                        <Text style={[styles.requestMeta, { color: colors.mutedText }]}>souhaite devenir ton ami</Text>
+                      </View>
+                    </View>
+                    <View style={styles.requestActions}>
+                      <GradientButton
+                        label="Accepter"
+                        onPress={() => handleAcceptRequest(r)}
+                        style={{ flex: 1 }}
+                      />
+                      <TouchableOpacity
+                        onPress={() => handleRejectRequest(r)}
+                        style={[styles.rejectBtn, { borderColor: "#F06262", backgroundColor: "transparent" }]}
+                      >
+                        <Text style={[styles.rejectText, { color: "#F06262" }]}>Refuser</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </ScrollView>
+        </View>
+      )}
+
       {/* Create Club overlay */}
       {view === 'createClub' && (
         <View style={{ position: 'absolute', top: 56, left: 0, right: 0, bottom: 0, backgroundColor: colors.background, padding: 16 }}>
@@ -1022,30 +1036,27 @@ export default function SocialScreen() {
               data={membersPreview}
               keyExtractor={(item) => String(item.id)}
               renderItem={({ item }) => (
-                <LinearGradient
-                  colors={["#90F7D5", "#38D793", "#23C37A"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.memberCard}
+                <View
+                  style={[styles.memberCard, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}
                 >
                   <View style={styles.memberCardInner}>
                     {item.avatar ? (
                       <Image source={{ uri: item.avatar }} style={styles.memberAvatar} />
                     ) : (
                       <View style={[styles.memberAvatarFallback, { backgroundColor: colors.pill }]}>
-                        <Text style={styles.memberInitial}>
+                        <Text style={[styles.memberInitial, { color: colors.accent }]}>
                           {(item.name || item.id || '?').toString().charAt(0).toUpperCase()}
                         </Text>
                       </View>
                     )}
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.memberName}>{item.name || item.id}</Text>
+                      <Text style={[styles.memberName, { color: colors.text }]}>{item.name || item.id}</Text>
                     </View>
-                    <View style={styles.memberPointsBadge}>
-                      <Text style={styles.memberPoints}>{item.points || 0} pts</Text>
+                    <View style={[styles.memberPointsBadge, { backgroundColor: colors.surfaceAlt }]}>
+                      <Text style={[styles.memberPoints, { color: colors.text }]}>{item.points || 0} pts</Text>
                     </View>
                   </View>
-                </LinearGradient>
+                </View>
               )}
               contentContainerStyle={{ paddingBottom: 140 }}
               ListEmptyComponent={(
@@ -1134,7 +1145,7 @@ export default function SocialScreen() {
                 </View>
                 <Text style={{ color: item.isMe ? '#0F3327' : colors.accent, fontFamily: FontFamilies.bodyStrong }}>{item.points} pts</Text>
                 {joinedClub?.ownerId === auth.currentUser?.uid && !item.isMe && (
-                  (joinedClub.officers || []).includes(item.id)
+                  (joinedClub?.officers || []).includes(item.id)
                     ? (
                       <TouchableOpacity onPress={() => demoteOfficer(item.id)} style={{ marginLeft: 10, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: colors.surfaceAlt }}>
                         <Text style={{ color: colors.text, fontSize: 12 }}>Rétrograder</Text>
@@ -1218,12 +1229,12 @@ export default function SocialScreen() {
           </View>
         </View>
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
+  container: { flex: 1, paddingHorizontal: 20 },
   title: { fontSize: 30, fontFamily: FontFamilies.display },
   tabSwitcher: { flexDirection: 'row', borderRadius: 24, padding: 4, marginTop: 20 },
   switcherButton: { flex: 1, borderRadius: 20, paddingVertical: 10, alignItems: 'center' },

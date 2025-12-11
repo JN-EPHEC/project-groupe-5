@@ -29,15 +29,18 @@ export default function StreakCalendar() {
   const todayIndex = (new Date().getDay() + 6) % 7;
   const weekCount = week.reduce((acc, d) => acc + (activities[d.toISOString().slice(0,10)] ? 1 : 0), 0);
   const isLight = mode === "light";
-  const gradientColors = isLight ? [colors.cardAlt, colors.card] : [colors.surfaceAlt, colors.surface];
-  const borderColor = isLight ? "rgba(255,255,255,0.12)" : colors.surfaceAlt;
+  const darkCardGradient = ["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"] as const;
+  const gradientColors = isLight
+    ? ([colors.cardAlt, colors.card] as const)
+    : darkCardGradient;
+  const borderColor = isLight ? "rgba(255,255,255,0.12)" : "rgba(0, 151, 178, 0.3)";
   const titleColor = isLight ? colors.cardText : colors.text;
   const mutedColor = isLight ? colors.cardMuted : colors.mutedText;
   const pillBackground = isLight ? colors.cardAlt : colors.pill;
   const pillBorder = isLight ? "rgba(255,255,255,0.12)" : colors.accent;
   const flameTextColor = isLight ? colors.cardText : colors.text;
   const flameIconColor = isLight ? colors.cardText : colors.accent;
-  const circleBorder = isLight ? colors.cardAlt : colors.surfaceAlt;
+  const circleBorder = isLight ? colors.cardAlt : "rgba(0, 151, 178, 0.3)";
   const circleTextColor = isLight ? colors.cardText : colors.text;
 
   return (

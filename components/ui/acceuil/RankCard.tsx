@@ -15,8 +15,10 @@ export function RankCard({ value, label, style, active = false }: RankCardProps)
   const { colors, mode } = useThemeMode();
   const isLight = mode === "light";
   const gradientColors = isLight
-    ? (active ? [colors.card, colors.cardAlt] : [colors.cardAlt, colors.card])
-    : (active ? [colors.surfaceAlt, colors.surface] : [colors.surface, colors.surfaceAlt]);
+    ? (active ? ([colors.card, colors.cardAlt] as const) : ([colors.cardAlt, colors.card] as const))
+    : (active
+        ? ([colors.surfaceAlt, colors.surface] as const)
+        : ([colors.surface, colors.surfaceAlt] as const));
   const borderColor = isLight ? "rgba(255,255,255,0.12)" : colors.surfaceAlt;
   const valueColor = isLight ? colors.cardText : colors.text;
   const labelColor = isLight ? colors.cardMuted : colors.mutedText;

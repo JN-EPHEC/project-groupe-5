@@ -8,12 +8,14 @@ import { Image, StyleSheet, Text, View } from "react-native";
 export function ChallengeHistoryList() {
   const { colors, mode } = useThemeMode();
   const isLight = mode === "light";
-  const gradient = isLight ? [colors.cardAlt, colors.card] : [colors.surfaceAlt, colors.surface];
+  const gradient = isLight
+    ? ([colors.cardAlt, colors.card] as const)
+    : (["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"] as const);
   const { history } = useChallenges();
 
   if (history.length === 0) {
     return (
-      <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.card, { borderColor: isLight ? "rgba(255,255,255,0.12)" : colors.surfaceAlt, shadowColor: isLight ? colors.card : colors.accent }]}>
+      <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.card, { borderColor: isLight ? "rgba(255,255,255,0.12)" : "rgba(0, 151, 178, 0.3)", shadowColor: isLight ? colors.card : colors.accent }]}>
         <Text style={[styles.title, { color: isLight ? colors.cardText : colors.text }]}>Historique des défis</Text>
         <Text style={{ color: isLight ? colors.cardMuted : colors.mutedText, marginTop: 6, fontFamily: FontFamilies.body }}>
           Aucun défi validé pour le moment.
@@ -23,7 +25,7 @@ export function ChallengeHistoryList() {
   }
 
   return (
-    <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.card, { borderColor: isLight ? "rgba(255,255,255,0.12)" : colors.surfaceAlt, shadowColor: isLight ? colors.card : colors.accent }]}>
+    <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.card, { borderColor: isLight ? "rgba(255,255,255,0.12)" : "rgba(0, 151, 178, 0.3)", shadowColor: isLight ? colors.card : colors.accent }]}>
       <Text style={[styles.title, { color: isLight ? colors.cardText : colors.text }]}>Historique des défis</Text>
       {history.map((h) => {
         const dt = new Date(h.validatedAt);
@@ -35,8 +37,8 @@ export function ChallengeHistoryList() {
             style={[
               styles.entry,
               {
-                backgroundColor: isLight ? colors.cardAlt : colors.surfaceAlt,
-                borderColor: isLight ? "rgba(255,255,255,0.12)" : colors.surfaceAlt,
+                backgroundColor: isLight ? colors.cardAlt : "rgba(0, 151, 178, 0.1)",
+                borderColor: isLight ? "rgba(255,255,255,0.12)" : "rgba(0, 151, 178, 0.2)",
               },
             ]}
           >

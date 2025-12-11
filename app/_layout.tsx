@@ -1,3 +1,4 @@
+import "react-native-gesture-handler";
 import { DarkTheme, DefaultTheme } from "@react-navigation/native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -55,19 +56,17 @@ function RootNavigation() {
 
   return (
     <>
-      <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
-        <Stack>
-          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="amis-plus" options={{ headerShown: false }} />
-          <Stack.Screen name="change-password" options={{ headerShown: false }} />
-          <Stack.Screen name="calendar" options={{ headerShown: false }} />
-          <Stack.Screen name="camera" options={{ headerShown: false }} />
-          <Stack.Screen name="commentaire" options={{ headerShown: false }} />
-          <Stack.Screen name="premium" options={{ headerShown: false }} />
-          <Stack.Screen name="validation" options={{ headerShown: false }} />
-        </Stack>
-      </SafeAreaView>
+      <Stack>
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="amis-plus" options={{ headerShown: false }} />
+        <Stack.Screen name="change-password" options={{ headerShown: false }} />
+        <Stack.Screen name="calendar" options={{ headerShown: false }} />
+        <Stack.Screen name="camera" options={{ headerShown: false }} />
+        <Stack.Screen name="commentaire" options={{ headerShown: false }} />
+        <Stack.Screen name="premium" options={{ headerShown: false }} />
+        <Stack.Screen name="validation" options={{ headerShown: false }} />
+      </Stack>
 
       <StatusBar style={mode === "dark" ? "light" : "dark"} />
     </>

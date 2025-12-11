@@ -25,6 +25,8 @@ function ensureNotificationHandler() {
             shouldShowAlert: false,
             shouldPlaySound: false,
             shouldSetBadge: false,
+            shouldShowBanner: false,
+            shouldShowList: false,
           };
         }
       } catch (error) {
@@ -35,6 +37,8 @@ function ensureNotificationHandler() {
         shouldShowAlert: true,
         shouldPlaySound: true,
         shouldSetBadge: false,
+        shouldShowBanner: true,
+        shouldShowList: true,
       };
     },
   });
@@ -76,6 +80,7 @@ async function scheduleInternalReminder() {
       body: "N'oublie pas de faire ton défi aujourd'hui !",
     },
     trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
       hour: 20,
       minute: 0,
       repeats: true,

@@ -1,10 +1,14 @@
 import { useThemeMode } from "@/hooks/theme-context";
+import { useUser } from "@/hooks/user-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Redirect, Tabs } from "expo-router";
-import { onAuthStateChanged } from "firebase/auth";
-import React, { useEffect, useRef, useState } from "react";
-import { Animated } from "react-native";
-import { auth } from "../../firebaseConfig";
+import React, { useEffect } from "react";
+import { ActivityIndicator, View } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 
 // Couleurs constantes
 const BG_DARK = "#0B1412";
@@ -22,38 +26,40 @@ function CircleIcon({
   focused: boolean;
   light?: boolean;
 }) {
-  const scale = useRef(new Animated.Value(focused ? 1 : 0.9)).current;
-  const opacity = useRef(new Animated.Value(focused ? 1 : 0.6)).current;
+  const scale = useSharedValue(focused ? 1 : 0.9);
+  const opacity = useSharedValue(focused ? 1 : 0.6);
 
-  Animated.timing(scale, {
-    toValue: focused ? 1 : 0.9,
-    duration: 220,
-    useNativeDriver: true,
-  }).start();
-  Animated.timing(opacity, {
-    toValue: focused ? 1 : 0.6,
-    duration: 220,
-    useNativeDriver: true,
-  }).start();
+  useEffect(() => {
+    scale.value = withTiming(focused ? 1 : 0.9, { duration: 220 });
+    opacity.value = withTiming(focused ? 1 : 0.6, { duration: 220 });
+  }, [focused, scale, opacity]);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: scale.value }],
+      opacity: opacity.value,
+    };
+  });
 
   return (
     <Animated.View
-      style={{
-        width: 46,
-        height: 46,
-        borderRadius: 23,
-        justifyContent: "center",
-        alignItems: "center",
-        backgroundColor: focused
-          ? light
-            ? "#FFFFFF"
-            : "#E3F9F1"
-          : "transparent",
-        borderWidth: focused && light ? 2 : 0,
-        borderColor: light ? "#19D07D" : "transparent",
-        transform: [{ scale }],
-        opacity,
-      }}
+      style={[
+        {
+          width: 46,
+          height: 46,
+          borderRadius: 23,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: focused
+            ? light
+              ? "#FFFFFF"
+              : "#E3F9F1"
+            : "transparent",
+          borderWidth: focused && light ? 2 : 0,
+          borderColor: light ? "#19D07D" : "transparent",
+        },
+        animatedStyle,
+      ]}
     >
       <Ionicons
         name={name}
@@ -66,20 +72,16 @@ function CircleIcon({
 
 export default function TabLayout() {
   const { colors, mode } = useThemeMode();
-  const [user, setUser] = useState<any>(undefined);
+  const { user, loading } = useUser();
 
-  // Firebase auth guard
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
-    return unsub;
-  }, []);
-
-  // Still checking auth state
-  if (user === undefined) {
-    return null;
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.accent} />
+      </View>
+    );
   }
 
-  // Not logged in → go to login
   if (!user) {
     return <Redirect href="/(auth)/login" />;
   }
@@ -91,22 +93,7 @@ export default function TabLayout() {
         headerShown: false,
         tabBarShowLabel: true,
         tabBarStyle: {
-          position: "absolute",
-          bottom: 16,
-          left: 16,
-          right: 16,
-          height: 74,
-          paddingHorizontal: 6,
           backgroundColor: mode === "dark" ? "rgba(20,26,24,0.92)" : "#E6E9E8",
-          borderRadius: 28,
-          borderTopWidth: 0,
-          borderWidth: mode === "light" ? 2 : 0,
-          borderColor: mode === "light" ? "#0F3327" : "transparent",
-          elevation: 8,
-          shadowColor: "#000",
-          shadowOpacity: 0.25,
-          shadowRadius: 12,
-          shadowOffset: { width: 0, height: 6 },
         },
         tabBarItemStyle: {
           marginTop: 6,

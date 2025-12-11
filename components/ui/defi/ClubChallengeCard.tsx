@@ -16,11 +16,11 @@ type Props = {
 export function ClubChallengeCard({ challenge, participating, onParticipate, onCancel }: Props) {
   const { colors, mode } = useThemeMode();
   const isLight = mode === "light";
-  const cardBackground = isLight ? colors.card : colors.surface;
-  const cardAlt = isLight ? colors.cardAlt : colors.surfaceAlt;
+  const cardBackground = colors.card;
+  const cardAlt = colors.cardAlt;
   const cardText = isLight ? colors.cardText : colors.text;
   const cardMuted = isLight ? colors.cardMuted : colors.mutedText;
-  const category = CATEGORY_CONFIG[challenge.category];
+  const category = CATEGORY_CONFIG[challenge.category as keyof typeof CATEGORY_CONFIG];
   const [confirmVisible, setConfirmVisible] = useState(false);
   const { current, reviewCompleted, reviewRequiredCount } = useChallenges();
 
@@ -60,7 +60,14 @@ export function ClubChallengeCard({ challenge, participating, onParticipate, onC
 
   return (
     shouldHide ? null : (
-    <View style={[styles.card, { backgroundColor: cardBackground }]}> 
+    <View style={[
+      styles.card, 
+      { 
+        backgroundColor: colors.glass, 
+        borderColor: colors.glassBorder,
+        borderWidth: 1,
+      }
+    ]}> 
       <View style={styles.header}>
         <View style={[styles.categoryPill, { backgroundColor: cardAlt }]}> 
           <Ionicons name={category.icon} size={16} color="#7DCAB0" />
@@ -150,6 +157,7 @@ const styles = StyleSheet.create({
   participateBtn: { borderRadius: 18, paddingVertical: 12, alignItems: 'center' },
   participateText: { color: '#0F3327', fontWeight: '700' },
   ongoingPill: { backgroundColor: '#142822', borderWidth: 1, borderColor: '#7DCAB0', borderRadius: 18, paddingVertical: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  ongoingText: { color: '#7DCAB0', fontWeight: '700' },
   cancelBtn: { backgroundColor: '#2A171A', borderWidth: 1, borderColor: '#F45B69', borderRadius: 18, paddingVertical: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   cancelText: { color: '#F45B69', fontWeight: '700' },
   timerPill: { marginTop: 12, borderWidth: 1, borderRadius: 16, paddingVertical: 8, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },

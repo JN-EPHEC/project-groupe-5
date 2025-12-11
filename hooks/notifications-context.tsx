@@ -4,6 +4,8 @@ import {
     notificationsSupported,
     setNotificationPreferenceEnabled,
 } from "@/services/notifications";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Notifications from "expo-notifications";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { Alert, Platform } from "react-native";
 
@@ -11,14 +13,19 @@ interface NotificationsContextValue {
   enabled: boolean;
   loading: boolean;
   setEnabled: (next: boolean) => Promise<boolean>;
+  unread: number;
+  resetUnread: () => Promise<void>;
 }
 
 const NotificationsContext = createContext<NotificationsContextValue | undefined>(undefined);
+
+const UNREAD_KEY = "unread_notifications";
 
 export function NotificationsProvider({ children }: { children: React.ReactNode }) {
   const [enabled, setEnabledState] = useState(false);
   const [loading, setLoading] = useState(true);
   const [prompted, setPrompted] = useState(false);
+  const [unread, setUnread] = useState(0);
 
   const requestInitialConsent = useCallback(() => {
     if (!notificationsSupported()) {
@@ -58,6 +65,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 
   useEffect(() => {
     let mounted = true;
+    let listener: any | null = null;
 
     if (!notificationsSupported()) {
       setEnabledState(false);
@@ -74,6 +82,30 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         currentEnabled = await initializeNotificationSystem();
       }
 
+      try {
+        const raw = await AsyncStorage.getItem(UNREAD_KEY);
+        if (raw) {
+          const parsed = parseInt(raw, 10);
+          if (!isNaN(parsed) && mounted) setUnread(parsed);
+        }
+      } catch (e) {
+        // ignore
+      }
+
+      // Listen to incoming notifications and increment unread counter
+      if (notificationsSupported()) {
+        listener = Notifications.addNotificationReceivedListener(async () => {
+          try {
+            const prevRaw = await AsyncStorage.getItem(UNREAD_KEY);
+            const prev = prevRaw ? parseInt(prevRaw, 10) || 0 : 0;
+            const next = prev + 1;
+            await AsyncStorage.setItem(UNREAD_KEY, String(next));
+            if (mounted) setUnread(next);
+          } catch (e) {
+            console.warn("[notifications] failed to update unread", e);
+          }
+        });
+      }
       if (!mounted) {
         return;
       }
@@ -89,6 +121,10 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 
     return () => {
       mounted = false;
+      if (listener) {
+        try { listener.remove && listener.remove(); } catch {};
+        listener = null;
+      }
     };
   }, [prompted, requestInitialConsent]);
 
@@ -108,13 +144,24 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     return result;
   }, []);
 
+  const resetUnread = useCallback(async () => {
+    try {
+      await AsyncStorage.setItem(UNREAD_KEY, "0");
+      setUnread(0);
+    } catch (e) {
+      console.warn("[notifications] failed to reset unread", e);
+    }
+  }, []);
+
   const value = useMemo(
     () => ({
       enabled,
       loading,
       setEnabled,
+      unread,
+      resetUnread,
     }),
-    [enabled, loading, setEnabled]
+    [enabled, loading, setEnabled, unread, resetUnread]
   );
 
   return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>;

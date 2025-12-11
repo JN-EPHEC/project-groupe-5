@@ -1,3 +1,4 @@
+import NotificationBell from "@/components/ui/common/NotificationBell";
 import { ChallengeHistoryList } from "@/components/ui/profil/ChallengeHistoryList";
 import { Header } from "@/components/ui/profil/Header";
 import { SettingsSection } from "@/components/ui/profil/SettingsSection";
@@ -17,6 +18,7 @@ import { useRouter } from "expo-router";
 import { addDoc, collection, onSnapshot } from "firebase/firestore";
 import { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ProfilScreen() {
   const { colors, mode } = useThemeMode();
@@ -79,107 +81,136 @@ export default function ProfilScreen() {
     return `#${position || 1}`;
   }, [joinedClub, members, myPoints]);
 
-  const neonGradient = isLight ? [colors.cardAlt, colors.card] : [colors.surfaceAlt, colors.surface];
+  const darkBg = "#021114";
+  const darkCardGradient = ["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"] as const;
+
+  const neonGradient = isLight
+    ? ([colors.cardAlt, colors.card] as const)
+    : darkCardGradient;
   const primaryButtonText = isLight ? colors.cardText : colors.text;
   const sectionSpacing = { marginBottom: 17 } as const;
 
+  // Defensive checks for imports that may be undefined (prevents React "element type is invalid")
+  const hasHeader = typeof Header !== "undefined";
+  const hasStatCard = typeof StatCard !== "undefined";
+  const hasChallengeHistory = typeof ChallengeHistoryList !== "undefined";
+  const hasSettingsSection = typeof SettingsSection !== "undefined";
+  const hasShareQR = typeof ShareQRModal !== "undefined";
+  const hasPremiumCard = typeof PremiumCard !== "undefined";
+
+  if (!hasHeader) console.warn("Missing Header import (undefined)");
+  if (!hasStatCard) console.warn("Missing StatCard import (undefined)");
+  if (!hasChallengeHistory) console.warn("Missing ChallengeHistoryList import (undefined)");
+  if (!hasSettingsSection) console.warn("Missing SettingsSection import (undefined)");
+  if (!hasShareQR) console.warn("Missing ShareQRModal import (undefined)");
+  if (!hasPremiumCard) console.warn("Missing PremiumCard import (undefined)");
+
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={{ paddingBottom: 160 }}
-    >
-      <View style={styles.titleRow}>
-        <Text style={[styles.titleText, { color: colors.text }]}>Profil</Text>
-      </View>
-
-      <Header />
-
-      <View style={[sectionSpacing, styles.firstBlockMargin]}>
-        <View style={styles.actionRow}>
-          <LinearGradient
-            colors={neonGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={{ flex: 1, borderRadius: 18 }}
-          >
-            <TouchableOpacity
-              style={styles.primaryBtn}
-              onPress={() => router.push("/edit-profile")}
-              activeOpacity={0.85}
-            >
-              <Text style={[styles.primaryBtnText, { color: primaryButtonText }]}>Modifier mon profil</Text>
-            </TouchableOpacity>
-          </LinearGradient>
-
-          <LinearGradient
-            colors={neonGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={{ flex: 1, borderRadius: 18 }}
-          >
-            <TouchableOpacity
-              style={styles.primaryBtn}
-              onPress={() => setShowQR(true)}
-              activeOpacity={0.85}
-            >
-              <Text style={[styles.primaryBtnText, { color: primaryButtonText }]}>Partager mon profil</Text>
-            </TouchableOpacity>
-          </LinearGradient>
+    <SafeAreaView style={{ flex: 1, backgroundColor: isLight ? colors.background : darkBg }}>
+      <ScrollView
+        style={[styles.container]}
+        contentContainerStyle={{ paddingBottom: 160 }}
+      >
+        <View style={styles.titleRow}>
+          <Text style={[styles.titleText, { color: colors.text }]}>Profil</Text>
+          <View style={{ position: 'absolute', right: 16, top: 8 }}>
+            <NotificationBell />
+          </View>
         </View>
-      </View>
 
-      <View style={sectionSpacing}>
-        <View style={styles.row}>
-          <StatCard icon="person-outline" label="Classement entre amis" value={friendRankLabel} />
+        {hasHeader ? <Header /> : <Text style={{ color: isLight ? colors.text : "#fff" }}>Profil indisponible</Text>}
+
+        <View style={[sectionSpacing, styles.firstBlockMargin]}>
+          <View style={styles.actionRow}>
+            <LinearGradient
+              colors={neonGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{ flex: 1, borderRadius: 18 }}
+            >
+              <TouchableOpacity
+                style={styles.primaryBtn}
+                onPress={() => router.push("/edit-profile")}
+                activeOpacity={0.85}
+              >
+                <Text style={[styles.primaryBtnText, { color: primaryButtonText }]}>Modifier mon profil</Text>
+              </TouchableOpacity>
+            </LinearGradient>
+
+            <LinearGradient
+              colors={neonGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{ flex: 1, borderRadius: 18 }}
+            >
+              <TouchableOpacity
+                style={styles.primaryBtn}
+                onPress={() => setShowQR(true)}
+                activeOpacity={0.85}
+              >
+                <Text style={[styles.primaryBtnText, { color: primaryButtonText }]}>Partager mon profil</Text>
+              </TouchableOpacity>
+            </LinearGradient>
+          </View>
+        </View>
+
+        <View style={sectionSpacing}>
+          <View style={styles.row}>
+            <StatCard icon="person-outline" label="Classement entre amis" value={friendRankLabel} />
+            <TouchableOpacity
+              style={{ flex: 1 }}
+              activeOpacity={0.8}
+              onPress={() => router.push("/social?tab=clubs&view=clubRanking")}
+            >
+              <StatCard icon="people" label="Classement club" value={clubRankLabel ?? "—"} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={sectionSpacing}>
+          {hasPremiumCard ? <PremiumCard onSubscribe={startSubscription} /> : <Text style={{ color: isLight ? colors.text : "#fff" }}>Premium indisponible</Text>}
+        </View>
+
+        <View style={sectionSpacing}>
+          {hasChallengeHistory ? <ChallengeHistoryList /> : <Text style={{ color: isLight ? colors.text : "#fff" }}>Historique indisponible</Text>}
+        </View>
+
+        <View style={[sectionSpacing, styles.tighterSpacing]}>
+          {hasSettingsSection ? <SettingsSection /> : <Text style={{ color: isLight ? colors.text : "#fff" }}>Paramètres indisponibles</Text>}
+        </View>
+
+        {user?.isAdmin && (
           <TouchableOpacity
-            style={{ flex: 1 }}
-            activeOpacity={0.8}
-            onPress={() => router.push("/social?tab=clubs&view=clubRanking")}
+            onPress={() => router.push("../(admin)")}
+            style={{
+              backgroundColor: colors.accent,
+              paddingVertical: 12,
+              paddingHorizontal: 16,
+              borderRadius: 14,
+              marginTop: 20,
+            }}
           >
-            <StatCard icon="people" label="Classement club" value={clubRankLabel ?? "—"} />
+            <Text style={{ color: "#fff", textAlign: "center", fontFamily: FontFamilies.heading }}>
+              Accéder à l’espace administrateur
+            </Text>
           </TouchableOpacity>
-        </View>
-      </View>
+        )}
 
-      <View style={sectionSpacing}>
-        <PremiumCard onSubscribe={startSubscription} />
-      </View>
-
-      <View style={sectionSpacing}>
-        <ChallengeHistoryList />
-      </View>
-
-      <View style={[sectionSpacing, styles.tighterSpacing]}>
-        <SettingsSection />
-      </View>
-
-      {user?.isAdmin && (
-        <TouchableOpacity
-          onPress={() => router.push("../(admin)")}
-          style={{
-            backgroundColor: colors.accent,
-            paddingVertical: 12,
-            paddingHorizontal: 16,
-            borderRadius: 14,
-            marginTop: 20,
-          }}
-        >
-          <Text style={{ color: "#fff", textAlign: "center", fontFamily: FontFamilies.heading }}>
-            Accéder à l’espace administrateur
-          </Text>
-        </TouchableOpacity>
-      )}
-
-      <ShareQRModal
-        visible={showQR}
-        onClose={() => setShowQR(false)}
-        title="Partager mon profil"
-        subtitle="Scanne pour voir mon profil"
-        qrValue={`app://user/${encodeURIComponent(fullName)}`}
-        shareText={`Voici mon profil sur l'app : app://user/${encodeURIComponent(fullName)}`}
-        accentColor={colors.accent}
-      />
-    </ScrollView>
+        {hasShareQR ? (
+          <ShareQRModal
+            visible={showQR}
+            onClose={() => setShowQR(false)}
+            title="Partager mon profil"
+            subtitle="Scanne pour voir mon profil"
+            qrValue={`app://user/${encodeURIComponent(fullName)}`}
+            shareText={`Voici mon profil sur l'app : app://user/${encodeURIComponent(fullName)}`}
+            accentColor={colors.accent}
+          />
+        ) : showQR ? (
+          <Text style={{ color: isLight ? colors.text : "#fff", textAlign: "center", marginTop: 12 }}>QR indisponible</Text>
+        ) : null}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -188,7 +219,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", justifyContent: "space-between" },
   firstBlockMargin: { marginTop: 10 },
   tighterSpacing: { marginTop: -4 },
-  titleRow: { alignItems: "center", justifyContent: "center", marginTop: 18, marginBottom: 16 },
+  titleRow: { alignItems: "center", justifyContent: "center", marginTop: 18, marginBottom: 16, position: 'relative' },
   titleText: { fontSize: 30, fontFamily: FontFamilies.display },
   primaryBtn: { flex: 1, paddingVertical: 12, paddingHorizontal: 16, borderRadius: 18, alignItems: "center" },
   primaryBtnText: { fontFamily: FontFamilies.heading, textAlign: "center" },

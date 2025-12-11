@@ -32,7 +32,14 @@ export const ClubCard: React.FC<ClubCardProps> = ({ club, onJoin, onMembers, onR
   const cardMuted = isLight ? colors.cardMuted : colors.mutedText;
 
   return (
-    <View style={[styles.card, { backgroundColor: isLight ? colors.card : colors.surface }]}> 
+    <View style={[
+      styles.card, 
+      { 
+        backgroundColor: colors.glass, 
+        borderColor: colors.glassBorder,
+        borderWidth: 1,
+      }
+    ]}> 
       <View style={styles.headerRow}>
         {club.photoUri ? (
           <Image source={{ uri: club.photoUri }} style={styles.avatar} />

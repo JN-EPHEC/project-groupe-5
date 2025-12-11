@@ -21,3 +21,8 @@ export type Challenge = {
   audience: string;
   timeLeft: string;
 };
+
+export type ClubChallenge = Challenge & {
+  participants: number;
+  goalParticipants: number;
+};
