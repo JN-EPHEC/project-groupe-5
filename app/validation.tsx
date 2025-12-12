@@ -1,7 +1,8 @@
 import { auth, db } from '@/firebaseConfig';
+import { useChallenges } from "@/hooks/challenges-context";
 import { useThemeMode } from '@/hooks/theme-context';
 import { Ionicons } from '@expo/vector-icons';
-import { collection, doc, DocumentData, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,17 +10,34 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function ValidationScreen() {
   const { colors } = useThemeMode();
   const [items, setItems] = useState<any[]>([]);
+  const { current } = useChallenges();
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
-    const q = query(collection(db, 'preuves'), where('assignedValidators', 'array-contains', uid), where('status', '==', 'pending'));
+
+    // Important: determine the user's current difficulty
+    let difficulty = "facile"; // default
+    if (current?.difficulty === "Moyen") difficulty = "moyen";
+    if (current?.difficulty === "Difficile") difficulty = "difficile";
+
+    const q = query(
+      collection(db, "preuves"),
+      where("status", "==", "pending"),
+      where("difficulty", "==", difficulty)
+    );
+
     const unsub = onSnapshot(q, (snap) => {
-      const arr = snap.docs.map((d) => ({ id: d.id, ...(d.data() as DocumentData) }));
+      const arr = snap.docs
+        .map((d) => ({ id: d.id, ...(d.data() as any) }))
+        .filter((p) => p.userId !== uid); // exclude own proof
+
       setItems(arr);
     });
+
     return unsub;
-  }, []);
+  }, [current]);
+
 
   const vote = async (id: string, approve: boolean) => {
     const uid = auth.currentUser?.uid;
