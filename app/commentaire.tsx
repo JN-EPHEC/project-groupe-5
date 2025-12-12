@@ -39,32 +39,28 @@ export default function CommentaireScreen() {
   }
 
   async function sendProof() {
-  // ✅ Runtime + TypeScript safety
-  if (!current || !photoUri) {
-    // Something went wrong with the navigation / state → go back safely
-    router.replace("/(tabs)/defi");
-    return;
+    if (!current || !photoUri) {
+      router.replace("/(tabs)/defi");
+      return;
+    }
+
+    const trimmedComment = comment.trim();
+
+    try {
+      // 1. Create proof and get the ID
+      const { id: proofId } = await submitProof(current.firestoreId!, photoUri, trimmedComment);
+
+      // 2. Update active défi → now includes proofId
+      await validateWithPhoto(photoUri, trimmedComment, proofId);
+
+      // 3. Optional local sync (not necessary anymore but harmless)
+      await setPhotoComment(trimmedComment);
+
+      router.replace("/(tabs)/defi");
+    } catch (e) {
+      console.log("❌ Error submitting proof:", e);
+    }
   }
-
-  const trimmedComment = comment.trim();
-
-  try {
-    // 1. Create proof in Firestore
-    await submitProof(current.firestoreId, photoUri, trimmedComment);
-
-    // 2. Update active défi → pendingValidation (local + Firestore)
-    await validateWithPhoto(photoUri, trimmedComment);
-
-    // 3. Save comment locally on the active défi
-    await setPhotoComment(trimmedComment);
-
-    // 4. Back to défi screen → gating phase starts
-    router.replace("/(tabs)/defi");
-  } catch (e) {
-    console.log("❌ Error submitting proof:", e);
-  }
-}
-
 
   return (
     <SafeAreaView

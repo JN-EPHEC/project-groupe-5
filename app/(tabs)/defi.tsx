@@ -6,13 +6,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -20,6 +20,8 @@ import { ChallengeCard } from "@/components/ui/defi/ChallengeCard";
 import { TabSwitcher } from "@/components/ui/defi/TabSwitcher";
 import { ValidationCard } from "@/components/ui/defi/ValidationCard";
 import { useChallenges } from "@/hooks/challenges-context";
+import { useValidationQueue } from "@/hooks/useValidationQueue";
+import { voteOnProof } from "@/services/proofs";
 import * as ImagePicker from "expo-image-picker";
 
 import { Challenge, TabKey } from "@/components/ui/defi/types";
@@ -68,47 +70,16 @@ export default function DefiScreen() {
   
 
   const [rotatingChallenges, setRotatingChallenges] = useState<Challenge[]>([]);
-  const [validationQueue, setValidationQueue] = useState([
-    {
-      id: 101,
-      title: "Recycler des bouteilles",
-      description: "Preuve de recyclage",
-      category: "Recyclage" as any,
-      difficulty: "Facile" as const,
-      points: 10,
-      audience: "Membre" as const,
-      timeLeft: "—",
-      userName: "Alex",
-      photoUrl:
-        "https://images.unsplash.com/photo-1582407947304-fd86f028f716?q=80&w=800&auto=format&fit=crop",
-    },
-    {
-      id: 102,
-      title: "Aller au marché local",
-      description: "Panier local",
-      category: "Local" as any,
-      difficulty: "Moyen" as const,
-      points: 20,
-      audience: "Membre" as const,
-      timeLeft: "—",
-      userName: "Lina",
-      photoUrl:
-        "https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=800&auto=format&fit=crop",
-    },
-    {
-      id: 103,
-      title: "Défi compost maison",
-      description: "Compost",
-      category: "Tri" as any,
-      difficulty: "Difficile" as const,
-      points: 30,
-      audience: "Membre" as const,
-      timeLeft: "—",
-      userName: "Marie",
-      photoUrl:
-        "https://images.unsplash.com/photo-1615485737651-6f6c4110fc94?q=80&w=800&auto=format&fit=crop",
-    },
-  ]);
+  const difficultyKey = current
+    ? (
+        current.difficulty.toLowerCase() === "facile" ? "facile" :
+        current.difficulty.toLowerCase() === "moyen" ? "moyen" :
+        "difficile"
+      )
+    : null;
+  const { queue: validationQueue, removeFromQueue } = useValidationQueue(
+    difficultyKey as any
+  );
 
   // 🔥 Load 3 rotation challenges from Firestore (FIFO per difficulty)
   useEffect(() => {
@@ -183,22 +154,15 @@ export default function DefiScreen() {
 
   // 🔁 Activate or cancel a challenge
   const toggleOngoing = (id: number) => {
-  console.log("TOGGLE CALLED WITH ID:", id);
-
   if (current && current.id === id) {
-    console.log("→ Cancelling active challenge via stop()");
     stop(); // stop does not need the id
     return;
   }
 
   const challenge = rotatingChallenges.find((c) => c.id === id);
-  console.log("FOUND CHALLENGE:", challenge);
   if (!challenge) {
-    console.log("⚠️ No challenge found for id", id);
     return;
   }
-
-  console.log("→ Starting challenge", challenge.title);
   start(challenge);
 };
 
@@ -322,20 +286,32 @@ export default function DefiScreen() {
                   Aucun défi à valider.
                 </Text>
               ) : (
-                validationQueue.map((item) => (
+                validationQueue.map((p) => (
                   <ValidationCard
-                    key={item.id}
-                    item={item}
-                    onValidate={() => {
-                      setValidationQueue((q) =>
-                        q.filter((x) => x.id !== item.id)
-                      );
+                    key={p.id}
+                    item={{
+                      id: p.id,
+                      title: "Preuve à valider",
+                      description: "",
+                      category: "Recyclage",   // temporary placeholder
+                      difficulty:
+                        current?.difficulty ?? "Facile",
+                      points: current?.points ?? 10,
+                      audience: "Membre",
+                      timeLeft: "",
+                      userName: "Utilisateur",
+                      photoUrl: p.photoUrl,
+                      comment: p.commentaire,
+                    }}
+                    onValidate={async () => {
+                      await voteOnProof(p.id, true);
+                      removeFromQueue(p.id);
                       incrementReview();
                     }}
-                    onReject={() => {
-                      setValidationQueue((q) =>
-                        q.filter((x) => x.id !== item.id)
-                      );
+
+                    onReject={async () => {
+                      await voteOnProof(p.id, false);
+                      removeFromQueue(p.id);
                       incrementReview();
                     }}
                   />
@@ -345,8 +321,6 @@ export default function DefiScreen() {
             {/* Normal challenge cards (3 rotation + maybe current) */}
             {!gatingActive &&
               challengesToDisplay.map((challenge: any) => {
-                console.log("🔍 CHALLENGES TO DISPLAY:", challengesToDisplay);
-
                 return (
                   <ChallengeCard
                     key={challenge.id}

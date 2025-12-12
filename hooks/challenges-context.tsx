@@ -1,11 +1,11 @@
 // hooks/challenges-context.ts
 import React, {
-    createContext,
-    useCallback,
-    useContext,
-    useEffect,
-    useMemo,
-    useState,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
 } from "react";
 
 import { Challenge } from "@/components/ui/defi/types";
@@ -13,11 +13,11 @@ import { auth, db } from "@/firebaseConfig";
 import { usePoints } from "@/hooks/points-context";
 import { markDefiDone } from "@/services/notifications";
 import {
-    collection,
-    deleteDoc,
-    doc,
-    getDoc,
-    updateDoc
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  updateDoc
 } from "firebase/firestore";
 
 // ------------------------------------------------------------
@@ -57,7 +57,7 @@ type ChallengesContextType = {
   current: ActiveChallenge | null;
   start: (challenge: Challenge) => void;
   stop: (id?: number) => void;
-  validateWithPhoto: (photoUri: string, comment?: string) => void;
+  validateWithPhoto: (photoUri: string, comment: string | undefined, proofId: string) => void;
   approveCurrent: () => void;
   activities: Record<string, Challenge["category"]>;
   canceledIds: number[]; // ← FIX
@@ -67,6 +67,7 @@ type ChallengesContextType = {
   setFeedback: (rating: number, comment: string) => void;
   history: ChallengeHistoryEntry[];
   setPhotoComment: (comment: string) => void;
+  setReviewRequiredCount: (n: number) => void;
 };
 
 // ------------------------------------------------------------
@@ -85,7 +86,7 @@ export function ChallengesProvider({
 }) {
   const [current, setCurrent] = useState<ActiveChallenge | null>(null);
   const [reviewCompleted, setReviewCompleted] = useState(0);
-  const reviewRequiredCount = 3;
+  const [reviewRequiredCount, setReviewRequiredCount] = useState(3);
   const { addPoints } = usePoints();
   const [history, setHistory] = useState<ChallengeHistoryEntry[]>([]);
   const [activities, setActivities] = useState<Record<string, Challenge["category"]>>({});
@@ -241,16 +242,18 @@ export function ChallengesProvider({
 
 
   // ------------------------------------------------------------
-  // SUBMIT PHOTO → pendingValidation
+  // SUBMIT PHOTO → pendingValidation + attach draftProofId
   // ------------------------------------------------------------
   const validateWithPhoto = useCallback(
-    async (photoUri: string, comment?: string) => {
+    async (photoUri: string, comment: string | undefined, proofId: string) => {
       if (!current || !activeDefiRef) return;
 
       await updateDoc(activeDefiRef, {
         photoUri,
         photoComment: comment ?? "",
         status: "pendingValidation",
+        draftProofId: proofId,
+        proofSubmitted: true,
       });
 
       setCurrent((p) =>
@@ -260,6 +263,8 @@ export function ChallengesProvider({
               status: "pendingValidation",
               photoUri,
               photoComment: comment ?? "",
+              proofId,
+              proofSubmitted: true,
             }
           : p
       );
@@ -268,6 +273,7 @@ export function ChallengesProvider({
     },
     [current, activeDefiRef]
   );
+
 
   // ------------------------------------------------------------
   // APPROVE (AFTER GATING)
@@ -359,8 +365,9 @@ export function ChallengesProvider({
   // GATING
   // ------------------------------------------------------------
   const incrementReview = useCallback(() => {
-    setReviewCompleted((p) => (p < reviewRequiredCount ? p + 1 : p));
-  }, []);
+    setReviewCompleted((p) => Math.min(p + 1, reviewRequiredCount));
+  }, [reviewRequiredCount]);
+
 
   // ------------------------------------------------------------
   // VALUE
@@ -380,6 +387,7 @@ export function ChallengesProvider({
       setFeedback,
       setPhotoComment,
       history,
+      setReviewRequiredCount,
     }),
     [
       current,
