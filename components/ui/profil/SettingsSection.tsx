@@ -1,12 +1,16 @@
 import { FontFamilies } from "@/constants/fonts";
 import { useNotificationsSettings } from "@/hooks/notifications-context";
 import { useThemeMode } from "@/hooks/theme-context";
+import { useUser } from "@/hooks/user-context";
 import { Ionicons } from "@expo/vector-icons";
+import { Camera } from "expo-camera";
 import { useRouter } from "expo-router";
 import { signOut } from "firebase/auth";
-import React, { useState } from "react";
-import { Alert, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
-import { auth } from "../../../firebaseConfig";
+import { collection, deleteDoc, doc, getDocs, query, updateDoc, where } from "firebase/firestore";
+import { deleteObject, ref as storageRef } from "firebase/storage";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, Alert, Linking, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { auth, db, storage } from "../../../firebaseConfig";
 import { SettingSwitch } from "./SettingSwitch";
 
 export const SettingsSection = () => {
@@ -17,9 +21,196 @@ export const SettingsSection = () => {
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showAccountDetails, setShowAccountDetails] = useState(false);
+  const [showDevicePermissions, setShowDevicePermissions] = useState(false);
+  const [cameraEnabled, setCameraEnabled] = useState(false);
+  const [cameraLoading, setCameraLoading] = useState(false);
+  const { user } = useUser();
+  const [accountEditing, setAccountEditing] = useState(false);
+  const [accountDeleteVisible, setAccountDeleteVisible] = useState(false);
+
+  // Account edit states
+  const [editingFirstName, setEditingFirstName] = useState("");
+  const [editingLastName, setEditingLastName] = useState("");
+  const [editingPostal, setEditingPostal] = useState("");
+  const [editingBirth, setEditingBirth] = useState("");
+  const [savingAccount, setSavingAccount] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{ [k: string]: boolean }>({});
+
+  useEffect(() => {
+    if (!user) return;
+    setEditingFirstName(user.firstName ?? "");
+    setEditingLastName(user.lastName ?? "");
+    setEditingPostal(user.postalCode ?? "");
+    setEditingBirth(user.birthDate ?? "");
+  }, [user]);
+
+  function validateBelgianPostal(code: string) {
+    if (!code || typeof code !== "string") return false;
+    const digits = code.trim();
+    if (!/^\d{4}$/.test(digits)) return false;
+    const n = parseInt(digits, 10);
+    if (n < 1000 || n > 9999) return false;
+    return true;
+  }
+
+  function validateBirthDate(input: string) {
+    const parts = input.split("/");
+    if (parts.length !== 3) return false;
+    const d = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    const y = parseInt(parts[2], 10);
+    if (isNaN(d) || isNaN(m) || isNaN(y)) return false;
+    if (y < 1900 || y > new Date().getFullYear()) return false;
+    if (m < 1 || m > 12) return false;
+    const maxDay = new Date(y, m, 0).getDate();
+    if (d < 1 || d > maxDay) return false;
+    const birth = new Date(y, m - 1, d);
+    const minDate = new Date();
+    minDate.setFullYear(minDate.getFullYear() - 13);
+    if (birth > minDate) return false;
+    return true;
+  }
+
+  function formatBirthInput(raw: string) {
+    const digits = raw.replace(/[^0-9]/g, "");
+    let out = digits.slice(0, 8);
+    if (out.length >= 5) {
+      out = `${out.slice(0,2)}/${out.slice(2,4)}/${out.slice(4)}`;
+    } else if (out.length >= 3) {
+      out = `${out.slice(0,2)}/${out.slice(2)}`;
+    }
+    return out;
+  }
+
+  async function saveAccountChanges() {
+    if (!user) return;
+    const errors: { [k: string]: boolean } = {};
+    if (!editingFirstName || editingFirstName.trim().length < 2) errors.firstName = true;
+    if (!editingLastName || editingLastName.trim().length < 2) errors.lastName = true;
+    if (!validateBelgianPostal(editingPostal)) errors.postal = true;
+    if (!validateBirthDate(editingBirth)) errors.birthDate = true;
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
+    setSavingAccount(true);
+    try {
+      const ref = doc(db, "users", user.uid);
+      await updateDoc(ref, {
+        firstName: editingFirstName.trim(),
+        lastName: editingLastName.trim(),
+        postalCode: editingPostal.trim(),
+        birthDate: editingBirth.trim(),
+        updatedAt: new Date(),
+      });
+      Alert.alert("Profil mis à jour", "Vos informations ont été enregistrées.");
+      setAccountEditing(false);
+      setShowAccountDetails(false);
+    } catch (err) {
+      console.warn("Failed to update profile", err);
+      Alert.alert("Erreur", "Impossible de mettre à jour le profil. Réessayez plus tard.");
+    } finally {
+      setSavingAccount(false);
+    }
+  }
+
+  async function handleDeleteAccount() {
+    // Open modal confirmation (handled below)
+    setAccountDeleteVisible(true);
+  }
+
+  async function performDeleteAccount() {
+    if (!auth.currentUser || !user) {
+      Alert.alert("Erreur", "Utilisateur non connecté.");
+      return;
+    }
+
+    const uid = user.uid;
+    try {
+      // 1) Delete user's proofs (storage + firestore)
+      try {
+        const pq = query(collection(db, "preuves"), where("userId", "==", uid));
+        const ps = await getDocs(pq);
+        for (const d of ps.docs) {
+          const pid = d.id;
+          try {
+            const imgRef = storageRef(storage, `preuves/${pid}/image.jpg`);
+            await deleteObject(imgRef);
+          } catch (e) {
+            // ignore missing files
+          }
+          try { await deleteDoc(doc(db, "preuves", pid)); } catch(e) { /* ignore */ }
+        }
+      } catch (e) {
+        console.warn("Error deleting proofs:", e);
+      }
+
+      // 2) Delete user's subcollections: friends, friendRequests
+      try {
+        const friendsSnap = await getDocs(collection(db, "users", uid, "friends"));
+        for (const f of friendsSnap.docs) {
+          try { await deleteDoc(doc(db, "users", uid, "friends", f.id)); } catch (e) {}
+        }
+      } catch (e) {}
+      try {
+        const reqSnap = await getDocs(collection(db, "users", uid, "friendRequests"));
+        for (const r of reqSnap.docs) {
+          try { await deleteDoc(doc(db, "users", uid, "friendRequests", r.id)); } catch (e) {}
+        }
+      } catch (e) {}
+
+      // 3) Delete customer checkout sessions under customers/{uid}/checkout_sessions
+      try {
+        const csSnap = await getDocs(collection(db, "customers", uid, "checkout_sessions"));
+        for (const s of csSnap.docs) {
+          try { await deleteDoc(doc(db, "customers", uid, "checkout_sessions", s.id)); } catch (e) {}
+        }
+      } catch (e) {}
+
+      // 4) Delete user document
+      try { await deleteDoc(doc(db, "users", uid)); } catch (e) { console.warn("delete user doc", e); }
+
+      // 5) Delete Firebase Auth user
+      try {
+        await auth.currentUser.delete();
+      } catch (err: any) {
+        console.warn("Auth deletion error", err);
+        if (err && err.code && err.code.includes("requires-recent-login")) {
+          Alert.alert("Action requise", "Pour supprimer votre compte, reconnectez-vous puis réessayez. Réauthentifiez-vous et réessayez la suppression.");
+          return;
+        } else {
+          Alert.alert("Erreur", "Impossible de supprimer l'utilisateur. Contactez contact@greenup-app.com");
+          return;
+        }
+      }
+
+      try { await auth.signOut(); } catch(e){}
+      Alert.alert("Compte supprimé", "Votre compte et vos données ont été supprimés.");
+      try { router.replace("/login"); } catch(e){}
+    } catch (e) {
+      console.error("Account deletion failed", e);
+      Alert.alert("Erreur", "La suppression a échoué. Réessayez plus tard.");
+    } finally {
+      setAccountDeleteVisible(false);
+    }
+  }
 
   const [email, setEmail] = useState(false);
   const [sound, setSound] = useState(true);
+
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const perm = await Camera.getCameraPermissionsAsync();
+        if (!mounted) return;
+        setCameraEnabled(perm.status === "granted");
+      } catch (e) {
+        // ignore
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -44,34 +235,72 @@ export const SettingsSection = () => {
       <View
         style={[styles.container, { backgroundColor: cardBackground, borderColor: dividerColor, borderWidth: 1 }]}
       >
-        {/* Notifications */}
-        <TouchableOpacity style={[styles.row, { borderColor: dividerColor }]} onPress={() => setShowNotifications(!showNotifications)} activeOpacity={0.85}>
-          <Ionicons name="notifications-outline" size={22} color={titleColor} />
-          <Text style={[styles.text, { color: titleColor }]}>Notifications</Text>
+        {/* (Notifications section removed per request) */}
+
+        {/* Device permissions */}
+        <TouchableOpacity style={[styles.row, { borderColor: dividerColor }]} onPress={() => setShowDevicePermissions(!showDevicePermissions)} activeOpacity={0.85}>
+          <Ionicons name="shield-checkmark-outline" size={22} color={titleColor} />
+          <Text style={[styles.text, { color: titleColor }]}>Autorisations de l'appareil</Text>
           <Ionicons
-            name={showNotifications ? "chevron-down" : "chevron-forward"}
+            name={showDevicePermissions ? "chevron-down" : "chevron-forward"}
             size={18}
             color={mutedColor}
           />
         </TouchableOpacity>
 
-        {showNotifications && (
-          <View
-            style={[styles.subMenu, { backgroundColor: isLight ? colors.cardAlt : colors.cardAlt }]}
-          >
+        {showDevicePermissions && (
+          <View style={[styles.subMenu, { backgroundColor: isLight ? colors.cardAlt : colors.cardAlt }]}>
             <SettingSwitch
-              label="Notifications Push"
+              label="Notifications (système)"
               value={pushEnabled}
               onValueChange={async (next) => {
                 await setPushEnabled(next);
               }}
               disabled={notificationsLoading}
             />
-            <SettingSwitch label="Emails" value={email} onValueChange={setEmail} />
-            <SettingSwitch label="Sons" value={sound} onValueChange={setSound} />
+            <SettingSwitch
+              label="Caméra"
+              value={cameraEnabled}
+              onValueChange={async (next) => {
+                setCameraLoading(true);
+                try {
+                  if (next) {
+                    const { status } = await Camera.requestCameraPermissionsAsync();
+                    if (status === 'granted') {
+                      setCameraEnabled(true);
+                    } else {
+                      setCameraEnabled(false);
+                      Alert.alert(
+                        'Permission caméra',
+                        "Autorise l'accès à la caméra dans les réglages de ton appareil pour utiliser cette fonctionnalité.",
+                        [
+                          { text: 'Ouvrir réglages', onPress: () => Linking.openSettings() },
+                          { text: 'Fermer', style: 'cancel' },
+                        ]
+                      );
+                    }
+                  } else {
+                    // Cannot programmatically revoke; guide user to settings
+                    setCameraEnabled(false);
+                    Alert.alert(
+                      'Désactiver la caméra',
+                      "Pour révoquer l'accès à la caméra, ouvre les réglages de ton appareil.",
+                      [
+                        { text: 'Ouvrir réglages', onPress: () => Linking.openSettings() },
+                        { text: 'Fermer', style: 'cancel' },
+                      ]
+                    );
+                  }
+                } catch (err) {
+                  console.warn('Camera permission error', err);
+                } finally {
+                  setCameraLoading(false);
+                }
+              }}
+              disabled={cameraLoading}
+            />
           </View>
         )}
-
         {/* Theme */}
         <View style={[styles.row, { borderColor: dividerColor }]}>
           <Ionicons name="moon-outline" size={22} color={titleColor} />
@@ -103,13 +332,147 @@ export const SettingsSection = () => {
               { backgroundColor: isLight ? colors.cardAlt : colors.cardAlt },
             ]}
           >
-            <TouchableOpacity style={styles.subRow} activeOpacity={0.8} onPress={() => router.push("/change-password")}>
+            <TouchableOpacity style={styles.subRow} activeOpacity={0.8} onPress={() => setShowAccountDetails(!showAccountDetails)}>
               <View style={styles.subRowLeft}>
-                <Ionicons name="lock-closed-outline" size={20} color={mutedColor} style={{ marginRight: 10 }} />
-                <Text style={[styles.subText, { color: titleColor }]}>Modifier le mot de passe</Text>
+                <Ionicons name="person-circle-outline" size={20} color={mutedColor} style={{ marginRight: 10 }} />
+                <Text style={[styles.subText, { color: titleColor }]}>Compte</Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color={mutedColor} />
+              <Ionicons name={showAccountDetails ? "chevron-down" : "chevron-forward"} size={16} color={mutedColor} />
             </TouchableOpacity>
+
+            {showAccountDetails && (
+              <View style={{ paddingLeft: 8, paddingVertical: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8 }}>
+                  <Text style={[{ fontSize: 15, fontFamily: FontFamilies.heading, marginBottom: 6, color: titleColor }]}>Informations personnelles</Text>
+                  {!accountEditing ? (
+                    <TouchableOpacity onPress={() => setAccountEditing(true)} style={{ padding: 6 }}>
+                      <Text style={{ color: colors.accent, fontFamily: FontFamilies.bodyStrong }}>Modifier</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity onPress={() => setAccountEditing(false)} style={{ padding: 6 }}>
+                      <Text style={{ color: colors.mutedText, fontFamily: FontFamilies.body }}>Annuler</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <View style={{ paddingHorizontal: 8, marginTop: 6 }}>
+                  {!accountEditing ? (
+                    <View>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 }}>
+                        <Text style={{ color: mutedColor }}>Nom</Text>
+                        <Text style={{ color: titleColor }}>{user?.lastName ?? ""}</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 }}>
+                        <Text style={{ color: mutedColor }}>Prénom</Text>
+                        <Text style={{ color: titleColor }}>{user?.firstName ?? ""}</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 }}>
+                        <Text style={{ color: mutedColor }}>Date de naissance</Text>
+                        <Text style={{ color: titleColor }}>{user?.birthDate ?? ""}</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 }}>
+                        <Text style={{ color: mutedColor }}>Code postal</Text>
+                        <Text style={{ color: titleColor }}>{user?.postalCode ?? ""}</Text>
+                      </View>
+                    </View>
+                  ) : (
+                    <View>
+                      <Text style={[styles.fieldLabel, { color: titleColor }]}>Nom</Text>
+                      <TextInput
+                        value={editingLastName}
+                        onChangeText={(t) => { setEditingLastName(t); setFieldErrors((s) => ({ ...s, lastName: false })); }}
+                        style={[styles.inputInline, fieldErrors.lastName && { borderColor: "#FF4D4F" }]}
+                        placeholder="Nom"
+                        placeholderTextColor={isLight ? colors.cardMuted : colors.mutedText}
+                      />
+
+                      <Text style={[styles.fieldLabel, { color: titleColor, marginTop: 8 }]}>Prénom</Text>
+                      <TextInput
+                        value={editingFirstName}
+                        onChangeText={(t) => { setEditingFirstName(t); setFieldErrors((s) => ({ ...s, firstName: false })); }}
+                        style={[styles.inputInline, fieldErrors.firstName && { borderColor: "#FF4D4F" }]}
+                        placeholder="Prénom"
+                        placeholderTextColor={isLight ? colors.cardMuted : colors.mutedText}
+                      />
+
+                      <Text style={[styles.fieldLabel, { color: titleColor, marginTop: 8 }]}>Date de naissance (JJ/MM/AAAA)</Text>
+                      <TextInput
+                        value={editingBirth}
+                        onChangeText={(t) => { const f = formatBirthInput(t); setEditingBirth(f); setFieldErrors((s) => ({ ...s, birthDate: false })); }}
+                        style={[styles.inputInline, fieldErrors.birthDate && { borderColor: "#FF4D4F" }]}
+                        placeholder="JJ/MM/AAAA"
+                        placeholderTextColor={isLight ? colors.cardMuted : colors.mutedText}
+                        keyboardType="numeric"
+                      />
+
+                      <Text style={[styles.fieldLabel, { color: titleColor, marginTop: 8 }]}>Code postal</Text>
+                      <TextInput
+                        value={editingPostal}
+                        onChangeText={(t) => { setEditingPostal(t); setFieldErrors((s) => ({ ...s, postal: false })); }}
+                        style={[styles.inputInline, fieldErrors.postal && { borderColor: "#FF4D4F" }]}
+                        placeholder="Code postal"
+                        placeholderTextColor={isLight ? colors.cardMuted : colors.mutedText}
+                        keyboardType="numeric"
+                      />
+
+                      <View style={{ marginTop: 12, flexDirection: 'row', gap: 10 }}>
+                        <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.accent }]} onPress={saveAccountChanges} disabled={savingAccount}>
+                          {savingAccount ? <ActivityIndicator color="#fff" /> : <Text style={[styles.saveBtnText]}>Enregistrer</Text>}
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.cancelBtn]} onPress={() => {
+                          // revert
+                          setEditingFirstName(user?.firstName ?? "");
+                          setEditingLastName(user?.lastName ?? "");
+                          setEditingPostal(user?.postalCode ?? "");
+                          setEditingBirth(user?.birthDate ?? "");
+                          setFieldErrors({});
+                          setAccountEditing(false);
+                        }}>
+                          <Text style={[styles.cancelBtnText]}>Annuler</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+                </View>
+
+                <TouchableOpacity style={styles.subRow} activeOpacity={0.8} onPress={() => router.push("/change-password")}>
+                  <View style={styles.subRowLeft}>
+                    <Text style={[styles.subText, { color: titleColor }]}>Modifier mot de passe</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={mutedColor} />
+                </TouchableOpacity>
+                {accountDeleteVisible && (
+                  <View style={styles.modalOverlay}>
+                    <View style={[styles.modalCard, { backgroundColor: colors.surface }]}> 
+                      <Text style={[styles.modalTitle, { color: colors.text }]}>Supprimer mon compte</Text>
+                      <Text style={{ color: colors.mutedText, marginTop: 6 }}>
+                        Êtes-vous sûr de vouloir supprimer votre compte ? Cette action est irréversible.
+                      </Text>
+                      <View style={styles.modalButtons}>
+                        <TouchableOpacity
+                          style={[styles.modalBtn, { backgroundColor: colors.accent }]}
+                          onPress={() => setAccountDeleteVisible(false)}
+                        >
+                          <Text style={{ color: '#0F3327', fontFamily: FontFamilies.heading }}>Rester</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.modalBtn, { backgroundColor: '#D93636' }]}
+                          onPress={performDeleteAccount}
+                        >
+                          <Text style={{ color: '#fff', fontFamily: FontFamilies.heading }}>Supprimer</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                )}
+
+                <TouchableOpacity style={styles.subRow} activeOpacity={0.8} onPress={() => setAccountDeleteVisible(true)}>
+                  <View style={styles.subRowLeft}>
+                    <Text style={[styles.subText, { color: "#F26767" }]}>Supprimer mon compte</Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            )}
 
             <TouchableOpacity style={styles.subRow} activeOpacity={0.8} onPress={() => router.push("/conditions-generales")}>
               <View style={styles.subRowLeft}>
@@ -193,4 +556,15 @@ const styles = StyleSheet.create({
   langText: { fontSize: 14, fontFamily: FontFamilies.bodyRegular },
   subText: { fontSize: 14, fontFamily: FontFamilies.body },
   logoutRow: { borderBottomWidth: 0 },
+  fieldLabel: { fontSize: 13, fontWeight: '700', marginBottom: 6 },
+  inputInline: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 6, fontFamily: FontFamilies.body },
+  saveBtn: { paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12 },
+  saveBtnText: { color: '#fff', fontWeight: '700' },
+  cancelBtn: { paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1, borderColor: '#ccc', marginLeft: 8 },
+  cancelBtnText: { fontWeight: '700' },
+  modalOverlay: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' },
+  modalCard: { width: '88%', borderRadius: 14, padding: 16 },
+  modalTitle: { fontSize: 18, fontFamily: FontFamilies.heading, marginBottom: 8 },
+  modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16, gap: 10 },
+  modalBtn: { paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10 },
 });

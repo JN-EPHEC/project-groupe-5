@@ -6,47 +6,36 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-nati
 
 const sections = [
   {
+    title: "CONDITIONS GÉNÉRALES D'UTILISATION (CGU) – GREENUP",
+    body: "Dernière mise à jour : Décembre 2025",
+  },
+  {
     title: "1. Objet",
-    body: "GreenUp est une application permettant de réaliser des défis écologiques, valider par photo et obtenir des points via un classement.",
+    body: "L'application GreenUp (ci-après \"l'Application\"), développée dans le cadre d'un projet académique à l'UCLouvain, a pour objet de permettre aux utilisateurs de réaliser des défis écologiques, de valider ces actions par des preuves photo, de partager leurs progrès sur un fil d'actualité et d'obtenir des récompenses virtuelles ou physiques via des partenaires locaux.",
   },
   {
-    title: "2. Création de compte",
-    body: "L’utilisateur doit fournir une adresse email valide. Il doit accepter la Politique de Confidentialité.",
+    title: "2. Accès et Inscription",
+    body: "L'accès à l'Application nécessite la création d'un compte. L'utilisateur doit fournir une adresse email valide et créer un mot de passe ou utiliser une authentification tierce. Lors de l'inscription, l'utilisateur doit obligatoirement accepter les présentes CGU et la Politique de Confidentialité. L'Application distingue clairement les données obligatoires (nécessaires au service) des données facultatives (profil, bio).",
   },
   {
-    title: "3. Fonctionnement des défis",
-    body: [
-      "- 1 défi par jour",
-      "- Preuve photo obligatoire",
-      "- Validation communautaire par votes",
-      "- Points attribués automatiquement",
-    ].join("\n"),
+    title: "3. Fonctionnement des Défis et Preuves",
+    body: "Défis : L'utilisateur reçoit des défis quotidiens.\n\nPreuve Photo : La validation s'effectue par l'envoi d'une photo. L'utilisateur reconnaît que cette photo sert de preuve technique.\n\nVisibilité : Lors du chargement d'une photo, l'utilisateur choisit son niveau de visibilité (Privé : uniquement pour validation / Public : visible sur le fil d'actualité des amis ou de la communauté).\n\nValidation : Les points sont attribués après validation automatique ou communautaire.",
   },
   {
-    title: "4. Règles de comportement",
-    body: [
-      "Interdictions :",
-      "- Photos de personnes reconnaissables sans consentement",
-      "- Photos illégales, choquantes, violentes",
-      "- Fraude, triche, harcèlement",
-      "- Spam ou votes organisés frauduleux",
-    ].join("\n"),
+    title: "4. Règles de Comportement et Contenus Interdits",
+    body: "L'utilisateur s'engage à ne publier que des contenus dont il détient les droits. Sont strictement interdits :\n\n- Les photos permettant d'identifier des personnes tierces sans leur consentement explicite (Droit à l'image strict).\n\n- Les contenus illégaux, haineux, violents, pornographiques ou choquants.\n\n- Toute tentative de fraude (fausses preuves, manipulation des votes, spam). GreenUp se réserve le droit de supprimer sans préavis tout contenu litigieux et de suspendre le compte de l'utilisateur concerné.",
   },
   {
-    title: "5. Sanctions",
-    body: "GreenUp peut suspendre ou supprimer un compte en cas d’abus.",
+    title: "5. Propriété Intellectuelle et Licence",
+    body: "L'utilisateur reste propriétaire de ses photos. Toutefois, en publiant une photo en mode \"Public\", l'utilisateur concède à GreenUp une licence non exclusive, gratuite et mondiale d'hébergement et d'affichage de ce contenu sur l'Application pour la durée de l'inscription.",
   },
   {
-    title: "6. Récompenses",
-    body: "Les récompenses n’ont pas de valeur monétaire. Elles peuvent être modifiées ou retirées.",
+    title: "6. Responsabilité",
+    body: "GreenUp est un projet étudiant fourni \"en l'état\" sans garantie de disponibilité continue. L'équipe décline toute responsabilité en cas de :\n\n- Perte de données ou bugs techniques.\n- Utilisation frauduleuse du compte par un tiers.\n- Contenus publiés par les utilisateurs (GreenUp agit en tant qu'hébergeur).",
   },
   {
-    title: "7. Responsabilité",
-    body: "GreenUp n’est pas responsable des contenus publiés par les utilisateurs. L’utilisateur est responsable des photos qu’il soumet.",
-  },
-  {
-    title: "8. Suppression du compte",
-    body: "Possible à tout moment depuis l’application. Les données seront supprimées sous 30 jours.",
+    title: "7. Suppression du Compte",
+    body: "L'utilisateur peut supprimer son compte à tout moment via les paramètres de l'Application. Cette action entraîne la suppression ou l'anonymisation irréversible de ses données personnelles et photos associées sous un délai maximum de 30 jours.",
   },
 ];
 
