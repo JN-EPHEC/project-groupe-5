@@ -4,7 +4,7 @@ import { addDoc, collection, onSnapshot } from "firebase/firestore";
 import React from "react";
 import { Alert, Button, View } from "react-native";
 
-const PREMIUM_PRICE_ID = "price_1SZwHCCh6MpiIMZkbiSw63ty";
+const PREMIUM_PRICE_ID = "price_1Se0BDCh6MpiIMZkio91hT1d";
 
 export default function PremiumScreen() {
   const startSubscription = async () => {
@@ -56,7 +56,7 @@ export default function PremiumScreen() {
 
   return (
     <View style={{ marginTop: 40, padding: 20 }}>
-      <Button title="Passer Premium (4,99€/mois)" onPress={startSubscription} />
+      <Button title="Passer Premium (1,99€/mois)" onPress={startSubscription} />
     </View>
   );
 }

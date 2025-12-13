@@ -629,7 +629,7 @@ export default function SocialScreen() {
   return (
     <SafeAreaView style={[
       styles.container,
-      { backgroundColor: isLight ? colors.background : darkBg, paddingBottom: 100 },
+      { backgroundColor: isLight ? colors.background : darkBg },
     ]}> 
       <Text style={[styles.title, { color: colors.text }]}>Social</Text>
       <View style={[styles.tabSwitcher, { backgroundColor: isLight ? colors.surfaceAlt : "rgba(0, 151, 178, 0.1)" }]}>
@@ -1263,36 +1263,96 @@ export default function SocialScreen() {
               data={membersPreview}
               keyExtractor={(item) => String(item.id)}
               renderItem={({ item, index }) => {
-                const role = joinedClub?.ownerId === item.id ? 'Chef' : (joinedClub?.officers || []).includes(item.id) ? 'Adjoint' : 'Membre';
-                const displayRank = index + 1;
-                const showTrash = canDeleteMember(currentUid || null, item.id, joinedClub ?? null);
+                const role = joinedClub?.ownerId === item.id 
+                  ? 'Chef' 
+                  : (joinedClub?.officers || []).includes(item.id) 
+                  ? 'Adjoint' 
+                  : 'Membre';
+                const canDelete = canDeleteMember(currentUid || null, item.id, joinedClub ?? null);
+
                 return (
-                  <View style={[styles.memberCard, { backgroundColor: colors.surface }]}> 
-                    <Text style={{ width: 36, textAlign: 'center', color: colors.mutedText, fontFamily: FontFamilies.headingMedium }}>#{displayRank}</Text>
+                  <View style={{
+                    backgroundColor: colors.surface,
+                    borderRadius: 16,
+                    padding: 12,
+                    marginBottom: 10,
+                    flexDirection: 'row',
+                    alignItems: 'center'
+                  }}>
+                    <Text style={{
+                      fontFamily: FontFamilies.heading,
+                      fontSize: 16,
+                      color: colors.mutedText,
+                      marginRight: 12,
+                      width: 32,
+                      textAlign: 'center',
+                    }}>
+                      #{index + 1}
+                    </Text>
+
                     {item.avatar ? (
-                      <Image source={{ uri: item.avatar }} style={styles.memberAvatar} />
+                      <Image
+                        source={{ uri: item.avatar }}
+                        style={{ width: 40, height: 40, borderRadius: 20, marginRight: 12 }}
+                      />
                     ) : (
-                      <View style={[styles.memberAvatarFallback, { backgroundColor: colors.pill }]}> 
-                        <Text style={[styles.memberInitial, { color: '#fff' }]}>{(item.name || item.id || '?').toString().charAt(0).toUpperCase()}</Text>
+                      <View style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 20,
+                        marginRight: 12,
+                        backgroundColor: colors.pill,
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <Text style={{ color: colors.text, fontFamily: FontFamilies.heading }}>
+                          {(item.name || '?').charAt(0).toUpperCase()}
+                        </Text>
                       </View>
                     )}
-                    <View style={{ flex: 1, marginLeft: 8 }}>
-                      <Text style={[styles.memberName, { color: colors.text }]}>{item.name || item.id}</Text>
-                      <Text style={{ color: colors.mutedText, fontSize: 12 }}>{role}</Text>
+
+                    <View style={{ flex: 1, marginRight: 8 }}>
+                      <Text
+                        style={{
+                          color: colors.text,
+                          fontFamily: FontFamilies.headingMedium,
+                          fontSize: 15,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {item.name || item.id}
+                      </Text>
+                      <Text style={{
+                        color: colors.mutedText,
+                        fontSize: 12,
+                        marginTop: 2
+                      }}>
+                        {role}
+                      </Text>
                     </View>
-                    <View style={{ alignItems: 'flex-end', marginRight: 8 }}>
-                      <Text style={{ color: colors.accent, fontFamily: FontFamilies.bodyStrong }}>{item.points || 0} pts</Text>
-                    </View>
-                    {showTrash ? (
-                      <TouchableOpacity onPress={() => {
-                        Alert.alert('Supprimer le membre', 'Es-tu sûr de vouloir supprimer ce membre ?', [
-                          { text: 'Annuler', style: 'cancel' },
-                          { text: 'Supprimer', style: 'destructive', onPress: () => handleRemoveMember(item.id) },
-                        ]);
-                      }} style={{ marginLeft: 8, padding: 8, borderRadius: 10, backgroundColor: '#D93636' }}>
-                        <Ionicons name="trash-outline" size={18} color="#fff" />
+
+                    <Text style={{
+                      color: colors.accent,
+                      fontFamily: FontFamilies.bodyStrong,
+                      fontSize: 14,
+                      marginRight: canDelete ? 8 : 0,
+                    }}>
+                      {item.points || 0} pts
+                    </Text>
+                    
+                    {canDelete && (
+                      <TouchableOpacity 
+                        onPress={() => {
+                          Alert.alert('Supprimer le membre', 'Êtes-vous sûr de vouloir supprimer ce membre ?', [
+                            { text: 'Annuler', style: 'cancel' },
+                            { text: 'Supprimer', style: 'destructive', onPress: () => handleRemoveMember(item.id) },
+                          ]);
+                        }} 
+                        style={{ padding: 4 }}
+                      >
+                        <Ionicons name="trash-outline" size={20} color="#D93636" />
                       </TouchableOpacity>
-                    ) : null}
+                    )}
                   </View>
                 );
               }}

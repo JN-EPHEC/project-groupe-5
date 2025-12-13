@@ -40,7 +40,7 @@ export function PremiumCard({ onSubscribe }: Props) {
       <Text style={[styles.title, { color: textPrimary }]}>Premium Green+</Text>
       <Text style={[styles.subtitle, { color: textMuted }]}>Masque les publicités et reroll tes défis quotidiens </Text>
 
-      <Text style={[styles.price, { color: priceColor }]}>4,90€ / mois</Text>
+      <Text style={[styles.price, { color: priceColor }]}>1,99€ / mois</Text>
       <Text style={[styles.caption, { color: textMuted }]}>Annulable à tout moment</Text>
 
       <TouchableOpacity onPress={onSubscribe} activeOpacity={0.9} style={styles.button}>

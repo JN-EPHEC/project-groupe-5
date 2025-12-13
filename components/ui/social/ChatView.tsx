@@ -10,6 +10,7 @@ import {
     Alert,
     FlatList,
     Image,
+    Keyboard,
     KeyboardAvoidingView,
     Platform,
     StyleSheet,
@@ -130,6 +131,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
         photoURL: auth.currentUser?.photoURL || user?.photoURL || "",
       });
       setInput("");
+      Keyboard.dismiss();
     } catch (error) {
       console.error("[ChatView] send message failed", error);
     } finally {
@@ -151,19 +153,18 @@ export const ChatView: React.FC<ChatViewProps> = ({
     } catch {}
   };
 
-  const keyboardVerticalOffset = Platform.OS === "ios" ? tabBarHeight + insets.bottom : 0;
+  const keyboardVerticalOffset = 120;
   const composerBaseHeight = 72;
   const listPaddingBottom = composerBaseHeight + tabBarHeight + insets.bottom + 8;
-  const inputPaddingBottom = Math.max(insets.bottom, 12) + (Platform.OS === "android" ? 20 : 0);
+  const inputPaddingBottom = 20;
   const borderTone = mode === "light" ? "rgba(15,51,39,0.14)" : "rgba(255,255,255,0.08)";
   const chatSurfaceBackground = mode === "light" ? "rgba(255,255,255,0.9)" : "rgba(0, 151, 178, 0.1)";
-  const composerBackground = mode === "light" ? "rgba(255,255,255,0.92)" : "rgba(9, 40, 30, 0.7)";
+  const composerBackground = "transparent";
   const inputBackground = mode === "light" ? "#ffffff" : "rgba(255,255,255,0.06)";
-  const containerBottomPadding = tabBarHeight + insets.bottom + 16 + (Platform.OS === "android" ? 50 : 0);
 
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: colors.background, paddingBottom: containerBottomPadding }]}
+      style={[styles.container, { backgroundColor: colors.background, paddingBottom: tabBarHeight }]}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={keyboardVerticalOffset}
     >
@@ -198,6 +199,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
           data={messages}
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
           renderItem={({ item }) => {
           const isMe = item.userId === auth.currentUser?.uid;
           const avatarUri = isMe ? currentUserAvatar : item.photoURL || defaultOtherAvatar;
@@ -312,6 +315,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
           multiline
         />
         <TouchableOpacity
+          onPress={() => Keyboard.dismiss()}
+          style={styles.dismiss}
+        >
+          <Ionicons name="chevron-down" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <TouchableOpacity
           onPress={send}
           disabled={sending || !input.trim().length}
           style={[
@@ -350,6 +359,7 @@ const styles = StyleSheet.create({
   input: { flex: 1, borderRadius: 20, padding: 10, fontSize: 14, borderWidth: StyleSheet.hairlineWidth },
   attach: { marginRight: 8, borderRadius: 20, padding: 10 },
   send: { marginLeft: 8, borderRadius: 20, padding: 10 },
+  dismiss: { marginLeft: 8, padding: 10 },
   avatar: { width: 36, height: 36, borderRadius: 18 },
   avatarTouch: { marginHorizontal: 8 },
   avatarPlaceholder: { alignItems: "center", justifyContent: "center" },
