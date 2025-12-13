@@ -1,9 +1,10 @@
+// app/(tabs)/defi.tsx
 import { useClub } from "@/hooks/club-context";
 import { useFriends } from "@/hooks/friends-context";
 import { usePoints } from "@/hooks/points-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   Image,
@@ -43,6 +44,7 @@ type DefiDoc = {
 
 export default function DefiScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ view?: string }>();
   const { colors, mode } = useThemeMode();
   const { friends } = useFriends();
   const { points } = usePoints();
@@ -53,14 +55,17 @@ export default function DefiScreen() {
 
   const [activeTab, setActiveTab] = useState<TabKey>("perso");
   const [viewMode, setViewMode] = useState<"defis" | "classement">("defis");
-
+  const [persoRanking, setPersoRanking] = useState<any[] | null>(null);
   const {
     current,
+    goToClassement,
+    setGoToClassement,
     start,
     stop,
     canceledIds,
     reviewCompleted,
     reviewRequiredCount,
+    //validationPhaseDone, => if code works will need to be removed
     incrementReview,
     setFeedback,
   } = useChallenges();
@@ -137,12 +142,89 @@ export default function DefiScreen() {
     loadRotatingDefis();
   }, []);
 
+  // 👇 NEW: react to /defi?view=classement
+  useEffect(() => {
+    const raw = params.view;
+    const v = Array.isArray(raw) ? raw[0] : raw;
+
+    if (v === "classement") {
+      setViewMode("classement");
+    } else if (v === "defis") {
+      setViewMode("defis");
+    }
+  }, [params.view]);
+
+  useEffect(() => {
+    if (goToClassement) {
+      setViewMode("classement");
+      setGoToClassement(false); // reset so it doesn't repeat
+    }
+  }, [goToClassement]);
+
+  // 🏆 Build perso classement ONCE (avoid random changes on every render)
+  useEffect(() => {
+    if (persoRanking) return; // already built → do nothing
+
+    const base: any[] = [];
+
+    // 1️⃣ Friends
+    friends.forEach((f: any) => {
+      base.push({
+        name: f.name ?? "Ami",
+        pts: f.points || 0,
+        avatar: f.avatar,
+      });
+    });
+
+    // 2️⃣ Me
+    base.push({
+      name: "Aymeric",
+      pts: points,
+      avatar: "https://i.pravatar.cc/100?u=me",
+    });
+
+    // 3️⃣ Fill with fake users (only once)
+    const mockNames = [
+      "Arthur",
+      "Camille",
+      "Yanis",
+      "Inès",
+      "Léa",
+      "Lucas",
+      "Maël",
+      "Nina",
+      "Noah",
+      "Sofia",
+    ];
+
+    while (base.length < 50) {
+      const n =
+        mockNames[base.length % mockNames.length] +
+        " " +
+        (Math.floor(Math.random() * 90) + 10);
+
+      base.push({
+        name: n,
+        pts: Math.floor(Math.random() * 800),
+        avatar: `https://i.pravatar.cc/100?u=${encodeURIComponent(n)}`,
+      });
+    }
+
+    // 4️⃣ Sort once
+    const sorted = base.sort((a, b) => b.pts - a.pts).slice(0, 50);
+
+    setPersoRanking(sorted);
+  }, [friends, points]);
+  
+
+
   // If user already has an ongoing challenge, only show that one.
   const gatingActive =
     current?.status === "pendingValidation" &&
-    reviewCompleted < reviewRequiredCount;
+    reviewCompleted < reviewRequiredCount; 
+    //&& !validationPhaseDone; // => if code works will need to be removed
 
-  const hideAfterFeedback =
+    const hideAfterFeedback =
     current?.status === "pendingValidation" &&
     reviewCompleted >= reviewRequiredCount &&
     current?.feedbackSubmitted;
@@ -280,23 +362,21 @@ export default function DefiScreen() {
             {/* Validation cards phase */}
             {gatingActive &&
               (validationQueue.length === 0 ? (
-                <Text
-                  style={[styles.emptyText, { color: colors.mutedText }]}
-                >
+                <Text style={[styles.emptyText, { color: colors.mutedText }]}>
                   Aucun défi à valider.
                 </Text>
               ) : (
-                validationQueue.map((p) => (
+                validationQueue.map((p, index) => (
                   <ValidationCard
                     key={p.id}
                     item={{
-                      id: p.id,
+                      // 🔢 purely UI id, numeric => TS happy
+                      id: index + 1,
                       title: "Preuve à valider",
                       description: "",
                       category: "Recyclage",   // temporary placeholder
-                      difficulty:
-                        current?.difficulty ?? "Facile",
-                      points: current?.points ?? 10,
+                      difficulty: current?.difficulty ?? "Facile",
+                      points: typeof current?.points === "number" ? current.points : 10,
                       audience: "Membre",
                       timeLeft: "",
                       userName: "Utilisateur",
@@ -308,7 +388,6 @@ export default function DefiScreen() {
                       removeFromQueue(p.id);
                       incrementReview();
                     }}
-
                     onReject={async () => {
                       await voteOnProof(p.id, false);
                       removeFromQueue(p.id);
@@ -470,44 +549,92 @@ export default function DefiScreen() {
                     </View>
                   </View>
                 </View>
-                {(() => {
-                  // Build 50-person ranking using friends data, padding with mock profiles
-                  const base = friends.map((f:any) => ({ name: f.name ?? 'Ami', pts: f.points || 0, avatar: f.avatar }));
-                  base.push({ name: 'Aymeric', pts: points, avatar: 'https://i.pravatar.cc/100?u=me' });
-                  const mockNames = ['Arthur Dubois', 'Camille', 'Yanis', 'Inès B.', 'Léa', 'Lucas', 'Maël', 'Nina', 'Noah', 'Sofia'];
-                  while (base.length < 50) {
-                    const n = mockNames[(base.length) % mockNames.length] + ' ' + (Math.floor(Math.random()*90)+10);
-                    base.push({ name: n, pts: Math.floor(Math.random()*800), avatar: `https://i.pravatar.cc/100?u=${encodeURIComponent(n)}` });
-                  }
-                  const sorted = base.sort((a,b) => b.pts - a.pts).slice(0,50);
-                  const myIndex = sorted.findIndex(x => x.name === 'Aymeric');
-                  return (
-                    <View style={{ marginTop: 12 }}>
-                      {sorted.map((x, idx) => {
-                        const isMe = myIndex === idx;
-                        const rankColor = idx === 0 ? '#52D192' : idx === 1 ? '#F6D365' : idx === 2 ? '#F45B69' : colors.surfaceAlt;
-                        return (
-                          <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 14, marginBottom: 8, backgroundColor: isMe ? '#1A2F28' : colors.surfaceAlt }}>
-                            <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: rankColor, alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
-                              <Text style={{ color: '#0F3327', fontWeight: '800' }}>{idx+1}</Text>
-                            </View>
-                            <Image source={{ uri: x.avatar || `https://i.pravatar.cc/100?u=${encodeURIComponent(x.name)}` }} style={{ width: 28, height: 28, borderRadius: 14, marginRight: 10 }} />
-                            <View style={{ flex: 1 }}>
-                              <Text style={{ color: colors.text, fontWeight: isMe ? '800' : '600' }}>{x.name}</Text>
-                              {isMe && <Text style={{ color: colors.mutedText, fontSize: 12 }}>Ta position</Text>}
-                            </View>
-                            <View style={{ backgroundColor: '#D4F7E7', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6 }}>
-                              <Text style={{ color: '#0F3327', fontWeight: '800' }}>{x.pts} pts</Text>
-                            </View>
+                {persoRanking && (
+                  <View style={{ marginTop: 12 }}>
+                    {persoRanking.map((x, idx) => {
+                      const isMe = x.name === "Aymeric";
+
+                      const rankColor =
+                        idx === 0
+                          ? "#52D192"
+                          : idx === 1
+                          ? "#F6D365"
+                          : idx === 2
+                          ? "#F45B69"
+                          : colors.surfaceAlt;
+
+                      return (
+                        <View
+                          key={idx}
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            paddingVertical: 10,
+                            paddingHorizontal: 12,
+                            borderRadius: 14,
+                            marginBottom: 8,
+                            backgroundColor: isMe ? "#1A2F28" : colors.surfaceAlt,
+                          }}
+                        >
+                          <View
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: 14,
+                              backgroundColor: rankColor,
+                              alignItems: "center",
+                              justifyContent: "center",
+                              marginRight: 10,
+                            }}
+                          >
+                            <Text style={{ color: "#0F3327", fontWeight: "800" }}>
+                              {idx + 1}
+                            </Text>
                           </View>
-                        );
-                      })}
-                      <View style={{ marginTop: 8, borderTopWidth: 1, borderColor: colors.surfaceAlt, paddingTop: 8 }}>
-                        <Text style={{ color: colors.text, fontWeight: '700' }}>Ta position: {myIndex >= 0 ? myIndex + 1 : '—'}</Text>
-                      </View>
-                    </View>
-                  );
-                })()}
+
+                          <Image
+                            source={{
+                              uri:
+                                x.avatar ||
+                                `https://i.pravatar.cc/100?u=${encodeURIComponent(x.name)}`,
+                            }}
+                            style={{ width: 28, height: 28, borderRadius: 14, marginRight: 10 }}
+                          />
+
+                          <View style={{ flex: 1 }}>
+                            <Text
+                              style={{
+                                color: colors.text,
+                                fontWeight: isMe ? "800" : "600",
+                              }}
+                            >
+                              {x.name}
+                            </Text>
+                            {isMe && (
+                              <Text style={{ color: colors.mutedText, fontSize: 12 }}>
+                                Ta position
+                              </Text>
+                            )}
+                          </View>
+
+                          <View
+                            style={{
+                              backgroundColor: "#D4F7E7",
+                              borderRadius: 12,
+                              paddingHorizontal: 10,
+                              paddingVertical: 6,
+                            }}
+                          >
+                            <Text style={{ color: "#0F3327", fontWeight: "800" }}>
+                              {x.pts} pts
+                            </Text>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+
               </View>
             )}
 

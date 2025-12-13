@@ -10,13 +10,16 @@ import React, {
 
 import { Challenge } from "@/components/ui/defi/types";
 import { auth, db } from "@/firebaseConfig";
+import { useGlobalPopup } from "@/hooks/global-popup-context";
 import { usePoints } from "@/hooks/points-context";
 import { markDefiDone } from "@/services/notifications";
+import { finalizeProof } from "@/services/proofs";
+import { useRouter } from "expo-router";
 import {
   collection,
   deleteDoc,
   doc,
-  getDoc,
+  onSnapshot,
   updateDoc
 } from "firebase/firestore";
 
@@ -36,6 +39,12 @@ export type ActiveChallenge = Challenge & {
   feedbackRating?: number | null;
   feedbackComment?: string | null;
   feedbackSubmitted?: boolean;
+  finalStatus?: "validated" | "rejected" | null;
+  readyToClaim?: boolean;
+  readyToRetry?: boolean;
+  popupPending?: boolean;
+  finalProofId?: string | null;
+  validationPhaseDone?: boolean;
 };
 
 export type ChallengeHistoryEntry = {
@@ -68,6 +77,10 @@ type ChallengesContextType = {
   history: ChallengeHistoryEntry[];
   setPhotoComment: (comment: string) => void;
   setReviewRequiredCount: (n: number) => void;
+  goToClassement: boolean;
+  setGoToClassement: (v: boolean) => void;
+  validationPhaseDone: boolean;
+  setValidationPhaseDone: (v: boolean) => void;
 };
 
 // ------------------------------------------------------------
@@ -85,7 +98,9 @@ export function ChallengesProvider({
   children: React.ReactNode;
 }) {
   const [current, setCurrent] = useState<ActiveChallenge | null>(null);
+  const [goToClassement, setGoToClassement] = useState(false);
   const [reviewCompleted, setReviewCompleted] = useState(0);
+  const [validationPhaseDone, setValidationPhaseDone] = useState(false);
   const [reviewRequiredCount, setReviewRequiredCount] = useState(3);
   const { addPoints } = usePoints();
   const [history, setHistory] = useState<ChallengeHistoryEntry[]>([]);
@@ -95,6 +110,9 @@ export function ChallengesProvider({
   const activeDefiRef = uid
     ? doc(collection(doc(db, "users", uid), "activeDefi"), "perso")
     : null;
+  const { showPopup } = useGlobalPopup();
+  const router = useRouter();
+
 
   // ------------------------------------------------------------
   // LOAD ACTIVE DEFI ON APP START
@@ -102,15 +120,23 @@ export function ChallengesProvider({
   useEffect(() => {
     if (!activeDefiRef) return;
 
-    const load = async () => {
-      const snap = await getDoc(activeDefiRef);
-      if (!snap.exists()) return;
+    const unsub = onSnapshot(activeDefiRef, (snap) => {
+      if (!snap.exists()) {
+        setCurrent(null);
+        return;
+      }
 
       const data = snap.data();
+
+      // 🔄 entering / re-entering pendingValidation → unlock validation decision
+      if (data.status === "pendingValidation") {
+        setValidationPhaseDone(false);
+      }
+
+
       setCurrent({
         firestoreId: data.defiId,
-        id: Date.now(), // any number; just to have a key, it doesn't need to match rotatingChallenges
-
+        id: data.defiId,
         title: data.titre,
         description: data.description,
         category: data.categorie ?? "Recyclage",
@@ -125,8 +151,8 @@ export function ChallengesProvider({
         timeLeft: "Aujourd'hui",
 
         status: data.status,
-        startedAt: data.startedAt?.toDate?.() ?? undefined,
-        expiresAt: data.expiresAt?.toDate?.() ?? undefined,
+        startedAt: data.startedAt?.toDate?.(),
+        expiresAt: data.expiresAt?.toDate?.(),
         photoUri: data.photoUri ?? null,
         photoComment: data.photoComment ?? null,
         proofId: data.proofId ?? null,
@@ -134,11 +160,98 @@ export function ChallengesProvider({
         feedbackRating: data.feedbackRating ?? null,
         feedbackComment: data.feedbackComment ?? null,
         feedbackSubmitted: data.feedbackSubmitted ?? false,
+        finalStatus: data.finalStatus ?? null,
+        readyToClaim: data.readyToClaim ?? false,
+        readyToRetry: data.readyToRetry ?? false,
+        popupPending: data.popupPending ?? false,
+        finalProofId: data.finalProofId ?? null,
       });
-    };
+    });
 
-    load();
-  }, [uid]);
+    return () => unsub();
+  }, [activeDefiRef]);
+
+
+  // ------------------------------------------------------------
+  // POPUP WHEN PROOF IS VALIDATED / REJECTED
+  // ------------------------------------------------------------
+  useEffect(() => {
+    if (!current) return;
+    if (!current.popupPending) return;
+    if (!current.finalStatus) return;
+
+    const isSuccess = current.finalStatus === "validated";
+
+    showPopup({
+      variant: isSuccess ? "success" : "error",
+      title: isSuccess ? "Défi validé 🎉" : "Preuve refusée",
+      description: isSuccess
+        ? `Tu as gagné ${current.points} points dans le classement.`
+        : "Ta preuve a été refusée. Tu peux réessayer avec un autre défi.",
+      primaryLabel: isSuccess ? "Voir le classement" : "Choisir un défi",
+      secondaryLabel: "Fermer",
+      onPrimary: () => {
+        if (isSuccess) {
+          // ✅ Validated → go to classement
+          setGoToClassement(true);
+        } else {
+          // ❌ Rejected → reset everything and go back to step 1
+          stop();
+        }
+      },
+      onSecondary: () => {
+        // Just close popup, user stays where they are
+      },
+    });
+
+    // Mark popup as consumed (so it doesn't show again)
+    if (activeDefiRef) {
+      updateDoc(activeDefiRef, { popupPending: false }).catch((err) =>
+        console.warn("[challenges] failed to clear popupPending:", err)
+      );
+    }
+
+    setCurrent((prev) =>
+      prev ? { ...prev, popupPending: false } : prev
+    );
+  }, [current?.popupPending, current?.finalStatus]);
+
+
+  // ------------------------------------------------------------
+  // AUTO-FINALISATION: listen to the proof’s vote counters
+  // ------------------------------------------------------------
+  useEffect(() => {
+    // no current challenge → nothing to watch
+    if (!current) return;
+
+    // if there is no proofId yet, we don't start the listener
+    if (!current.proofId) return;
+
+    // optional: only watch while pending
+    if (current.status !== "pendingValidation") return;
+
+    const proofRef = doc(db, "preuves", current.proofId);
+
+    const unsub = onSnapshot(proofRef, (snap) => {
+      if (!snap.exists()) return;
+
+      const data = snap.data() as any;
+      const votesFor = data.votesFor ?? 0;
+      const votesAgainst = data.votesAgainst ?? 0;
+
+      if (votesFor >= 3 || votesAgainst >= 3) {
+        if (current.proofId) {
+          finalizeProof(current.proofId).catch((err) => {
+            console.warn("[finalizeProof error]", err);
+          });
+        }
+      }
+    });
+
+    return () => unsub();
+  }, [current?.proofId, current?.status]);
+
+
 
   // ------------------------------------------------------------
   // START A DEFI (WRITE TO FIRESTORE)
@@ -213,6 +326,8 @@ export function ChallengesProvider({
     });
 
     setReviewCompleted(0);
+    setValidationPhaseDone(false);
+    console.log("[CH] start -> new cycle", { uid: auth.currentUser?.uid, defiId: challenge.firestoreId });
   }, []);
 
 
@@ -220,14 +335,11 @@ export function ChallengesProvider({
   // STOP (CANCEL)
   // ------------------------------------------------------------
   const stop = useCallback(async () => {
-    console.log("STOP() CALLED");
 
     if (!activeDefiRef) {
       console.log("❌ activeDefiRef is NULL");
       return;
     }
-
-    console.log("Deleting from Firestore path:", activeDefiRef.path);
 
     try {
       await deleteDoc(activeDefiRef);
@@ -235,6 +347,11 @@ export function ChallengesProvider({
     } catch (err) {
       console.log("❌ FAILED deleting Firestore doc:", err);
     }
+
+    setReviewCompleted(0);
+setReviewRequiredCount(3);
+setValidationPhaseDone(false);
+console.log("[CH] stop -> reset cycle", { uid: auth.currentUser?.uid });
 
     setCurrent(null);
     console.log("✔ local state current = null");
@@ -256,6 +373,14 @@ export function ChallengesProvider({
         proofSubmitted: true,
       });
 
+      console.log("[CH] validateWithPhoto -> pendingValidation", {
+  uid: auth.currentUser?.uid,
+  proofId,
+});
+
+      // 🔥 RESET validation cycle HERE
+      setValidationPhaseDone(false);
+
       setCurrent((p) =>
         p
           ? {
@@ -270,6 +395,7 @@ export function ChallengesProvider({
       );
 
       setReviewCompleted(0);
+
     },
     [current, activeDefiRef]
   );
@@ -365,7 +491,15 @@ export function ChallengesProvider({
   // GATING
   // ------------------------------------------------------------
   const incrementReview = useCallback(() => {
-    setReviewCompleted((p) => Math.min(p + 1, reviewRequiredCount));
+    setReviewCompleted((p) => {
+      const next = Math.min(p + 1, reviewRequiredCount);
+
+      if (next >= reviewRequiredCount) {
+        setValidationPhaseDone(true);
+      }
+
+      return next;
+    });
   }, [reviewRequiredCount]);
 
 
@@ -388,6 +522,10 @@ export function ChallengesProvider({
       setPhotoComment,
       history,
       setReviewRequiredCount,
+      goToClassement,
+      setGoToClassement,
+      validationPhaseDone,
+      setValidationPhaseDone,
     }),
     [
       current,

@@ -1,9 +1,9 @@
-import "react-native-gesture-handler";
+import { GlobalPopupProvider } from "@/hooks/global-popup-context"; // ✅ ADDED IMPORT
 import { DarkTheme, DefaultTheme } from "@react-navigation/native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import "react-native-gesture-handler";
 import "react-native-reanimated";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ChallengesProvider } from "@/hooks/challenges-context";
 import { ClubProvider } from "@/hooks/club-context";
@@ -16,15 +16,15 @@ import { ThemeProviderCustom, useThemeMode } from "@/hooks/theme-context";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { UserProvider } from "@/hooks/user-context";
 import {
-    Baloo2_400Regular,
-    Baloo2_500Medium,
-    Baloo2_600SemiBold,
+  Baloo2_400Regular,
+  Baloo2_500Medium,
+  Baloo2_600SemiBold,
 } from "@expo-google-fonts/baloo-2";
 import { FredokaOne_400Regular } from "@expo-google-fonts/fredoka-one";
 import {
-    Quicksand_400Regular,
-    Quicksand_500Medium,
-    Quicksand_600SemiBold,
+  Quicksand_400Regular,
+  Quicksand_500Medium,
+  Quicksand_600SemiBold,
 } from "@expo-google-fonts/quicksand";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
@@ -119,7 +119,9 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProviderCustom>
+  <ThemeProviderCustom>
+    <GlobalPopupProvider>     {/* ✅ ADDED HERE */}
+
       <NotificationsProvider>
         <UserProvider>
           <PointsProvider>
@@ -128,9 +130,11 @@ export default function RootLayout() {
                 <ChallengesProvider>
                   <FriendsProvider>
                     <SubscriptionsProvider>
+
                       <RootNavigation />
+
                     </SubscriptionsProvider>
-                    {Platform.OS === 'web' && (
+                    {Platform.OS === "web" && (
                       <style>{`
                         html, body, #root, #__next { -ms-overflow-style: none; scrollbar-width: none; }
                         html::-webkit-scrollbar, body::-webkit-scrollbar, div::-webkit-scrollbar { display: none; }
@@ -143,6 +147,9 @@ export default function RootLayout() {
           </PointsProvider>
         </UserProvider>
       </NotificationsProvider>
-    </ThemeProviderCustom>
+
+    </GlobalPopupProvider>   {/* ✅ END */}
+  </ThemeProviderCustom>
   );
+
 }

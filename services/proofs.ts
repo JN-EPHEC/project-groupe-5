@@ -2,13 +2,14 @@
 import { auth, db, storage } from "@/firebaseConfig";
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
   increment,
   serverTimestamp,
   setDoc,
-  updateDoc
+  updateDoc,
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
@@ -32,6 +33,7 @@ export type ProofDoc = {
   // 🔥 NEW: counters for the future “3 votes” system
   votesFor?: number;
   votesAgainst?: number;
+  voters?: Record<string, boolean>;
 };
 
 // ----------------------------
@@ -125,6 +127,7 @@ export async function submitProof(
     // nouveaux compteurs, initialisés à 0
     votesFor: 0,
     votesAgainst: 0,
+    voters: {},
   };
 
   await setDoc(preuveRef, payload);
@@ -165,20 +168,28 @@ export async function voteOnProof(proofId: string, approve: boolean) {
     return;
   }
 
-  // 🔥 Build update payload
+  // 🔥 Build update payload (1 vote)
   const updatePayload: any = {
-    [`voters.${uid}`]: true,                // register the vote
-    votesFor: approve ? increment(1) : data.votesFor || 0,
-    votesAgainst: approve ? (data.votesAgainst || 0) : increment(1),
+    [`voters.${uid}`]: true,
   };
 
+  if (approve) {
+    updatePayload.votesFor = increment(1);
+  } else {
+    updatePayload.votesAgainst = increment(1);
+  }
+
+  // 1️⃣ apply the vote
   await updateDoc(ref, updatePayload);
+
+  // 2️⃣ try to finalise (if we just reached 3)
+  await finalizeProof(proofId);
 }
 
 
 
 // ----------------------------
-// 6. Finalize proof (full workflow)
+// 6. Finalize proof (cleanup + activeDefi update)
 // ----------------------------
 export async function finalizeProof(proofId: string) {
   const ref = doc(db, "preuves", proofId);
@@ -187,33 +198,23 @@ export async function finalizeProof(proofId: string) {
 
   const data = snap.data();
   const uid = data.userId;
+
   const validated = data.votesFor >= 3;
   const rejected = data.votesAgainst >= 3;
 
   if (!validated && !rejected) return;
 
-  // Write final status
-  await updateDoc(ref, {
-    status: validated ? "validated" : "rejected",
-    decidedAt: serverTimestamp(),
-  });
-
-  // Path to user's active défi
+  // Update activeDefi
   const activeRef = doc(db, "users", uid, "activeDefi", "perso");
 
-  if (validated) {
-    // Mark ready to claim
-    await updateDoc(activeRef, {
-      readyToClaim: true,
-      readyToRetry: false,
-      finalProofId: proofId,
-    });
-  } else {
-    // Mark ready to retry
-    await updateDoc(activeRef, {
-      readyToRetry: true,
-      readyToClaim: false,
-      finalProofId: proofId,
-    });
-  }
+  await updateDoc(activeRef, {
+    finalStatus: validated ? "validated" : "rejected",
+    finalProofId: proofId,
+    popupPending: true,     // <-- important for global popup
+    readyToClaim: validated,
+    readyToRetry: rejected,
+  });
+
+  // Clean database: delete the proof
+  await deleteDoc(ref);
 }

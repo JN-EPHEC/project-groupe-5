@@ -9,9 +9,20 @@ import {
     query,
     where,
 } from "firebase/firestore";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-// Type of what we return to the UI (DefiScreen)
+// =========================
+// Debug (LOW NOISE)
+// =========================
+const VQ_DEBUG = true;
+const log = (msg: string, data?: any) => {
+  if (!VQ_DEBUG) return;
+  console.log(`[VQ] ${msg}`, data ?? "");
+};
+
+// =========================
+// Types
+// =========================
 export type ValidationProof = {
   id: string;
   userId: string;
@@ -29,38 +40,47 @@ type UseValidationQueueReturn = {
   removeFromQueue: (id: string) => void;
 };
 
+// =========================
+// Hook
+// =========================
 export function useValidationQueue(
   difficulty: "facile" | "moyen" | "difficile" | null
 ): UseValidationQueueReturn {
-  const { current, setReviewRequiredCount } = useChallenges();
+  const {
+    current,
+    setReviewRequiredCount,
+    //validationPhaseDone, => if code works will need to be removed
+    //setValidationPhaseDone,=> if code works will need to be removed
+  } = useChallenges();
+
   const [queue, setQueue] = useState<ValidationProof[]>([]);
+  const hasDecidedRef = useRef(false); // 🔒 FINAL decision flag
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;
-    console.log("[queue] effect START", {
-      uid,
-      currentStatus: current?.status,
-      currentDifficulty: current?.difficulty,
-      difficultyProp: difficulty,
-    });
-    // 🛑 If not logged in, no current défi, not in gating, or no difficulty → nothing to do
+
+    // ---------- HARD EXITS ----------
     if (!uid) {
-    setQueue([]);
-    setReviewRequiredCount(0);
-    return;
+      setQueue([]);
+      setReviewRequiredCount(0);
+      return;
     }
 
     if (!current || current.status !== "pendingValidation") {
-    setQueue([]);
-    setReviewRequiredCount(0);
-    return;
+      setQueue([]);
+      setReviewRequiredCount(0);
+      hasDecidedRef.current = false; // reset for next challenge
+      return;
     }
 
     if (!difficulty) {
-    setQueue([]);
-    setReviewRequiredCount(0);
-    return;
+      setQueue([]);
+      setReviewRequiredCount(0);
+      return;
     }
+
+    // ---------- SUBSCRIBE ----------
+    log("subscribe", { difficulty });
 
     const q = query(
       collection(db, "preuves"),
@@ -69,80 +89,64 @@ export function useValidationQueue(
       limit(5)
     );
 
-    const unsub = onSnapshot(
-        q,
-        (snap) => {
-            console.log("[queue] snapshot received, docs =", snap.docs.length);
-            const all = snap.docs.map((d) => {
-            const data = d.data() as DocumentData;
+    const unsub = onSnapshot(q, (snap) => {
+      if (hasDecidedRef.current) return; // extra safety
 
-            return {
-                id: d.id,
-                userId: data.userId,
-                defiId: data.defiId,
-                difficulty: data.difficulty,
-                photoUrl: data.photoUrl,
-                commentaire: data.commentaire ?? "",
-                status: data.status,
-                votesFor: data.votesFor ?? 0,
-                votesAgainst: data.votesAgainst ?? 0,
-            } as ValidationProof;
-            });
-            console.log("[queue] raw docs:", all);
-            console.log(">>> difficulty EXACT VALUE:", JSON.stringify(all[0]?.difficulty));
+      const raw = snap.docs.map((d) => {
+        const data = d.data() as DocumentData;
+        return {
+          id: d.id,
+          userId: data.userId,
+          defiId: data.defiId,
+          difficulty: data.difficulty,
+          photoUrl: data.photoUrl,
+          commentaire: data.commentaire ?? "",
+          status: data.status,
+          votesFor: data.votesFor ?? 0,
+          votesAgainst: data.votesAgainst ?? 0,
+        } as ValidationProof;
+      });
 
-            // ❌ Never show user's own proofs
-            // ❌ Never show proofs already decided (>=3 votes)
-            const filtered = all.filter((p) => {
-                console.log("FILTER CHECK →", {
-                    proofId: p.id,
-                    proofUserId: p.userId,
-                    currentUid: uid,
-                    votesFor: p.votesFor,
-                    votesAgainst: p.votesAgainst
-                });
+      // filter own + decided
+      const filtered = raw.filter((p) => {
+        if (p.userId === uid) return false;
+        if ((p.votesFor ?? 0) >= 3) return false;
+        if ((p.votesAgainst ?? 0) >= 3) return false;
+        return true;
+      });
 
-                if (p.userId === uid) {
-                    console.log(" → FILTERED OUT (own proof)");
-                    return false;
-                }
+      log("snapshot", {
+        raw: raw.length,
+        visible: filtered.length,
+      });
 
-                const decided =
-                    (p.votesFor ?? 0) >= 3 || (p.votesAgainst ?? 0) >= 3;
+      // ---------- DECISION POINT ----------
+      if (filtered.length === 0) {
+        log("decision: skip validation");
 
-                if (decided) {
-                    console.log(" → FILTERED OUT (decided)");
-                    return false;
-                }
+        hasDecidedRef.current = true;
+        //setValidationPhaseDone(true); => if code works will need to be removed
+        setQueue([]);
+        setReviewRequiredCount(0);
+        return;
+      }
 
-                console.log(" → INCLUDED");
-                return true;
-                });
-
-            console.log("[queue] filtered docs:", filtered);
-            setQueue(filtered);
-            console.log("[queue] filtered length =", filtered.length);
-
-            // 🔥 Dynamic required count: min(#proofs, 3)
-            const nb = filtered.length;
-
-            if (nb === 0) {
-            setReviewRequiredCount(0);
-            } else {
-            setReviewRequiredCount(Math.min(nb, 3));
-            }
-        },
-        (err) => {
-            console.log("[queue] snapshot ERROR:", err);
-            setQueue([]);
-            setReviewRequiredCount(0);
-        }
-    );
+      // ---------- NORMAL VALIDATION ----------
+      setQueue(filtered);
+      setReviewRequiredCount(Math.min(filtered.length, 3));
+    });
 
     return () => {
+      log("unsubscribe");
       unsub();
     };
-  }, [current?.status, difficulty, setReviewRequiredCount]);
+  }, [
+    current?.status,
+    difficulty,
+    //validationPhaseDone, => if code works will need to be removed
+    setReviewRequiredCount,
+    //setValidationPhaseDone, => if code works will need to be removed
+  ]);
 
   const removeFromQueue = (id: string) => {
     setQueue((prev) => prev.filter((p) => p.id !== id));
