@@ -1,3 +1,5 @@
+// app/validation.tsx
+/*
 import { auth, db } from '@/firebaseConfig';
 import { useChallenges } from "@/hooks/challenges-context";
 import { useThemeMode } from '@/hooks/theme-context';
@@ -78,4 +80,4 @@ export default function ValidationScreen() {
   );
 }
 
-const styles = StyleSheet.create({});
+const styles = StyleSheet.create({});*/

@@ -128,6 +128,12 @@ export function ChallengesProvider({
 
       const data = snap.data();
 
+      // 🔄 entering / re-entering pendingValidation → unlock validation decision
+      if (data.status === "pendingValidation") {
+        setValidationPhaseDone(false);
+      }
+
+
       setCurrent({
         firestoreId: data.defiId,
         id: data.defiId,

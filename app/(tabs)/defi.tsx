@@ -1,3 +1,4 @@
+// app/(tabs)/defi.tsx
 import { useClub } from "@/hooks/club-context";
 import { useFriends } from "@/hooks/friends-context";
 import { usePoints } from "@/hooks/points-context";
