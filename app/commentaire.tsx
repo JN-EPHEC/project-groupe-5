@@ -20,6 +20,8 @@ export default function CommentaireScreen() {
   const { current, validateWithPhoto, setPhotoComment } = useChallenges();
   const router = useRouter();
   const params = useLocalSearchParams();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
 
   const photoUri = params.photoUri as string | undefined;
 
@@ -39,6 +41,9 @@ export default function CommentaireScreen() {
   }
 
   async function sendProof() {
+    if (isSubmitting) return;   // ⛔ block double tap
+    setIsSubmitting(true);
+
     if (!current || !photoUri) {
       router.replace("/(tabs)/defi");
       return;
@@ -47,20 +52,23 @@ export default function CommentaireScreen() {
     const trimmedComment = comment.trim();
 
     try {
-      // 1. Create proof and get the ID
-      const { id: proofId } = await submitProof(current.firestoreId!, photoUri, trimmedComment);
+      const { id: proofId } = await submitProof(
+        current.firestoreId!,
+        photoUri,
+        trimmedComment
+      );
 
-      // 2. Update active défi → now includes proofId
       await validateWithPhoto(photoUri, trimmedComment, proofId);
-
-      // 3. Optional local sync (not necessary anymore but harmless)
       await setPhotoComment(trimmedComment);
 
       router.replace("/(tabs)/defi");
     } catch (e) {
       console.log("❌ Error submitting proof:", e);
+    } finally {
+      setIsSubmitting(false);
     }
   }
+
 
   return (
     <SafeAreaView
@@ -113,11 +121,15 @@ export default function CommentaireScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            disabled={!canSend}
+            disabled={!canSend || isSubmitting}
             onPress={sendProof}
             style={[
               styles.btn,
-              { backgroundColor: canSend ? colors.accent : "#2A3431" },
+              {
+                backgroundColor:
+                  canSend && !isSubmitting ? colors.accent : "#2A3431",
+                opacity: isSubmitting ? 0.6 : 1,
+              },
             ]}
           >
             <Text

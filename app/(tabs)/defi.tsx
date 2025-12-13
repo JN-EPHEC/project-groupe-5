@@ -65,7 +65,7 @@ export default function DefiScreen() {
     canceledIds,
     reviewCompleted,
     reviewRequiredCount,
-    validationPhaseDone,
+    //validationPhaseDone, => if code works will need to be removed
     incrementReview,
     setFeedback,
   } = useChallenges();
@@ -221,8 +221,8 @@ export default function DefiScreen() {
   // If user already has an ongoing challenge, only show that one.
   const gatingActive =
     current?.status === "pendingValidation" &&
-    reviewCompleted < reviewRequiredCount &&
-    !validationPhaseDone;
+    reviewCompleted < reviewRequiredCount; 
+    //&& !validationPhaseDone; // => if code works will need to be removed
 
     const hideAfterFeedback =
     current?.status === "pendingValidation" &&

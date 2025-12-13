@@ -49,8 +49,8 @@ export function useValidationQueue(
   const {
     current,
     setReviewRequiredCount,
-    validationPhaseDone,
-    setValidationPhaseDone,
+    //validationPhaseDone, => if code works will need to be removed
+    //setValidationPhaseDone,=> if code works will need to be removed
   } = useChallenges();
 
   const [queue, setQueue] = useState<ValidationProof[]>([]);
@@ -74,14 +74,6 @@ export function useValidationQueue(
     }
 
     if (!difficulty) {
-      setQueue([]);
-      setReviewRequiredCount(0);
-      return;
-    }
-
-    // 🔒 If validation already decided → NEVER subscribe again
-    if (validationPhaseDone || hasDecidedRef.current) {
-      log("blocked: validation already decided");
       setQueue([]);
       setReviewRequiredCount(0);
       return;
@@ -133,7 +125,7 @@ export function useValidationQueue(
         log("decision: skip validation");
 
         hasDecidedRef.current = true;
-        setValidationPhaseDone(true);
+        //setValidationPhaseDone(true); => if code works will need to be removed
         setQueue([]);
         setReviewRequiredCount(0);
         return;
@@ -151,9 +143,9 @@ export function useValidationQueue(
   }, [
     current?.status,
     difficulty,
-    validationPhaseDone,
+    //validationPhaseDone, => if code works will need to be removed
     setReviewRequiredCount,
-    setValidationPhaseDone,
+    //setValidationPhaseDone, => if code works will need to be removed
   ]);
 
   const removeFromQueue = (id: string) => {
