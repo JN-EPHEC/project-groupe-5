@@ -7,7 +7,7 @@ import React from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
 
 export const Header = () => {
-  const { user } = useUser();
+  const { user, loading } = useUser();
   const { joinedClub } = useClub();
   const { colors, mode } = useThemeMode();
   const isLight = mode === "light";
@@ -16,6 +16,11 @@ export const Header = () => {
     : (["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"] as const);
   const primaryText = isLight ? colors.cardText : colors.text;
   const secondaryText = isLight ? colors.cardMuted : colors.mutedText;
+  
+  // Guard against loading or missing profile
+  if (loading || !user) {
+    return null;
+  }
   
   const displayName = (user?.username ?? `${user?.firstName ?? ""} ${user?.lastName ?? ""}`).trim() || "Invité";
   const initials = displayName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);

@@ -4,17 +4,16 @@ import { useRouter } from "expo-router";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import React, { useMemo, useState } from "react";
 import {
-    Alert,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
 import { auth } from "../../firebaseConfig";
 
@@ -45,10 +44,14 @@ export default function Login() {
   const [email, setEmail] = useState(DEV_MODE ? DEV_EMAIL : "");
   const [password, setPassword] = useState(DEV_MODE ? DEV_PASSWORD : "");
   const [loading, setLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState(false);
+  const [emailError, setEmailError] = useState(false);
+  const [authErrorMessage, setAuthErrorMessage] = useState<string | null>(null);
   const [rememberMe, setRememberMe] = useState(false);
 
   const canSubmit = useMemo(
-    () => email.trim().length > 3 && password.length >= 6,
+    // button enabled as soon as both fields contain at least one character
+    () => email.trim().length >= 1 && password.length >= 1,
     [email, password]
   );
 
@@ -56,11 +59,13 @@ export default function Login() {
     if (!canSubmit || loading) return;
     setLoading(true);
     try {
-      const res = await signInWithEmailAndPassword(auth, email.trim(), password);
-      Alert.alert("✅ Logged in", res.user?.email ?? "Succès");
-      router.replace("/(tabs)");
+      await signInWithEmailAndPassword(auth, email.trim(), password);
+      // The redirect is now handled by the AuthLayout guard.
     } catch (e: any) {
-      Alert.alert("❌ Login error", e?.code ?? e?.message ?? String(e));
+      // On any auth failure, mark both fields invalid and show inline message
+      setEmailError(true);
+      setPasswordError(true);
+      setAuthErrorMessage("Adresse e‑mail ou mot de passe invalide.");
     } finally {
       setLoading(false);
     }
@@ -78,14 +83,18 @@ export default function Login() {
         >
           <View style={styles.logoRow}>
             <Image
-              source={require("../../assets/images/greenup-logo.png")}
-              style={styles.logo}
+              source={
+                isLight
+                  ? require("../../assets/images/logo_Green_UP_noir_degradé-removebg-preview.png")
+                  : require("../../assets/images/logo_fond_vert_degradé__1_-removebg-preview.png")
+              }
+              style={{ width: 340, height: 152 }}
               resizeMode="contain"
             />
           </View>
 
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
-            <View style={[styles.inputRow, { backgroundColor: colors.surfaceAlt }]}>
+            <View style={[styles.inputRow, { backgroundColor: colors.surfaceAlt }, emailError && { borderColor: "#FF4D4F", backgroundColor: "rgba(255,77,79,0.06)" }]}>
               <Ionicons
                 name="person-outline"
                 size={18}
@@ -93,18 +102,23 @@ export default function Login() {
                 style={{ marginRight: 10 }}
               />
               <TextInput
-                style={[styles.inputField, { color: colors.text }]}
+                style={[
+                  styles.inputField,
+                  { color: isLight ? colors.text : "#FFFFFF" },
+                  // Remove inner-field red border to avoid duplicate highlighting
+                  // when the whole input row is already marked in error.
+                ]}
                 placeholder="Email"
                 placeholderTextColor={colors.mutedText}
                 autoCapitalize="none"
                 keyboardType="email-address"
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(t) => { setEmail(t); if (emailError || passwordError) { setEmailError(false); setPasswordError(false); } if (authErrorMessage) setAuthErrorMessage(null); }}
                 editable={!loading}
               />
             </View>
 
-            <View style={[styles.inputRow, { backgroundColor: colors.surfaceAlt }]}>
+            <View style={[styles.inputRow, { backgroundColor: colors.surfaceAlt }, passwordError && { borderColor: "#FF4D4F", backgroundColor: "rgba(255,77,79,0.06)" }]}>
               <Ionicons
                 name="lock-closed-outline"
                 size={18}
@@ -112,12 +126,17 @@ export default function Login() {
                 style={{ marginRight: 10 }}
               />
               <TextInput
-                style={[styles.inputField, { color: colors.text }]}
+                style={[
+                  styles.inputField,
+                  { color: isLight ? colors.text : "#FFFFFF" },
+                  // Inner field should not show its own red border; the
+                  // parent `inputRow` handles the error styling.
+                ]}
                 placeholder="Mot de passe"
                 placeholderTextColor={colors.mutedText}
                 secureTextEntry
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(t) => { setPassword(t); if (emailError || passwordError) { setEmailError(false); setPasswordError(false); } if (authErrorMessage) setAuthErrorMessage(null); }}
                 editable={!loading}
               />
             </View>
@@ -144,6 +163,10 @@ export default function Login() {
                 <Text style={[styles.linkMuted, { color: colors.mutedText }]}>Mot de passe oublié ?</Text>
               </Pressable>
             </View>
+
+            {authErrorMessage ? (
+              <Text style={[styles.errorText, { color: "#FF4D4F", marginBottom: 10 }]}>{authErrorMessage}</Text>
+            ) : null}
 
             <Pressable
               style={[styles.primaryBtn, { backgroundColor: colors.accent }, (!canSubmit || loading) && styles.primaryBtnDisabled]}
@@ -243,6 +266,7 @@ const styles = StyleSheet.create({
   primaryBtnText: {
     fontSize: 16,
     fontWeight: "700",
+    color: "#00231A",
   },
   footerRow: {
     flexDirection: "row",
@@ -252,6 +276,10 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 12,
+  },
+  errorText: {
+    fontSize: 13,
+    fontWeight: "600",
   },
   footerLink: {
     fontSize: 12,
