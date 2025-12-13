@@ -7,6 +7,7 @@ import {
     deleteDoc,
     doc,
     getDoc,
+    runTransaction,
     serverTimestamp,
     setDoc,
     updateDoc
@@ -31,7 +32,8 @@ export async function createClub(
   name: string,
   city: string,
   description: string,
-  photoUri?: string
+  photoUri?: string,
+  isPrivate: boolean = false
 ) {
   const user = auth.currentUser;
   if (!user) throw new Error("Utilisateur non connecté.");
@@ -53,6 +55,7 @@ export async function createClub(
     createdAt: serverTimestamp(),
     members: [user.uid],
     officers: [],
+    isPrivate: !!isPrivate,
   };
 
   await setDoc(clubRef, payload);
@@ -71,16 +74,78 @@ export async function createClub(
 export async function joinClub(clubId: string) {
   const uid = auth.currentUser?.uid;
   if (!uid) throw new Error("Non connecté.");
-
   const clubRef = doc(db, "clubs", clubId);
+  // read minimal data to determine privacy
+  const snap = await getDoc(clubRef);
+  if (!snap.exists()) throw new Error("Club introuvable.");
+  const data: any = snap.data();
+  const isPrivate = Boolean(data?.isPrivate);
 
-  await updateDoc(clubRef, {
-    members: arrayUnion(uid),
-  });
+  try {
+    if (isPrivate) {
+      // Private club: create only the join request doc
+      const reqRef = doc(db, "clubs", clubId, "joinRequests", uid);
+      await setDoc(reqRef, {
+        userId: uid,
+        userName: auth.currentUser?.displayName || null,
+        photoUrl: auth.currentUser?.photoURL || null,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+      });
+      return;
+    }
 
-  await updateDoc(doc(db, "users", uid), {
-    clubId: clubId,
+    // Public club: update ONLY the members array
+    await updateDoc(clubRef, {
+      members: arrayUnion(uid),
+    });
+  } catch (err: any) {
+    // rethrow with clearer message while keeping original error attached
+    const message = err?.message || String(err);
+    throw new Error(`joinClub failed: ${message}`);
+  }
+}
+
+// Request to join a private club: create a joinRequests doc under club
+export async function requestJoinClub(clubId: string) {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error("Non connecté.");
+  const reqRef = doc(db, "clubs", clubId, "joinRequests", uid);
+  await setDoc(reqRef, {
+    userId: uid,
+    userName: auth.currentUser?.displayName || null,
+    photoUrl: auth.currentUser?.photoURL || null,
+    status: 'pending',
+    createdAt: serverTimestamp(),
   });
+}
+
+export async function cancelJoinRequest(clubId: string) {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error("Non connecté.");
+  try {
+    await deleteDoc(doc(db, "clubs", clubId, "joinRequests", uid));
+  } catch (e) {
+    // ignore
+  }
+}
+
+export async function acceptJoinRequest(clubId: string, userId: string) {
+  const clubRef = doc(db, "clubs", clubId);
+  const reqRef = doc(db, "clubs", clubId, "joinRequests", userId);
+
+  await runTransaction(db, async (tx) => {
+    const clubSnap = await tx.get(clubRef as any);
+    if (!clubSnap.exists()) throw new Error("Club introuvable.");
+    // add user to members
+    tx.update(clubRef, { members: arrayUnion(userId) });
+    // remove join request
+    tx.delete(reqRef);
+  });
+}
+
+export async function rejectJoinRequest(clubId: string, userId: string) {
+  try { await deleteDoc(doc(db, "clubs", clubId, "joinRequests", userId)); } catch (e) {}
 }
 
 // -------------------------------------------------------------
@@ -138,11 +203,12 @@ export async function getClub(clubId: string) {
   return snap.exists() ? snap.data() : null;
 }
 
-export async function updateClubFirebase(clubId: string, data: { name?: string; description?: string; city?: string; photoUri?: string }) {
+export async function updateClubFirebase(clubId: string, data: { name?: string; description?: string; city?: string; photoUri?: string; isPrivate?: boolean }) {
   const updates: any = {};
   if (data.name !== undefined) updates.name = data.name;
   if (data.description !== undefined) updates.description = data.description;
   if (data.city !== undefined) updates.city = data.city;
+  if (data.isPrivate !== undefined) updates.isPrivate = !!data.isPrivate;
   if (data.photoUri) {
     const url = await uploadClubPhoto(data.photoUri, clubId);
     updates.photoUrl = url;
@@ -176,5 +242,39 @@ export async function transferOwnership(clubId: string, newOwnerId: string) {
     ownerId: newOwnerId,
     members: arrayUnion(newOwnerId),
     officers: arrayRemove(newOwnerId),
+  });
+}
+
+// -------------------------------------------------------------
+// REMOVE A MEMBER
+// -------------------------------------------------------------
+export async function removeMember(clubId: string, targetUid: string) {
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error("Non connecté.");
+
+  const clubRef = doc(db, "clubs", clubId);
+  const snapshot = await getDoc(clubRef);
+  if (!snapshot.exists()) throw new Error("Club introuvable.");
+
+  const data = snapshot.data() as any;
+  const ownerId = data.ownerId;
+  const officers: string[] = Array.isArray(data.officers) ? data.officers : [];
+
+  const isAdmin = ownerId === currentUser.uid || officers.includes(currentUser.uid);
+  if (!isAdmin) throw new Error("Permissions insuffisantes.");
+
+  if (targetUid === ownerId) {
+    throw new Error("Impossible de supprimer le chef du club.");
+  }
+
+  const targetIsOfficer = officers.includes(targetUid);
+  if (targetIsOfficer && currentUser.uid !== ownerId) {
+    throw new Error("Un adjoint ne peut être supprimé que par le chef. Rétrogradez-le d'abord.");
+  }
+
+  // Safe update: remove from members and officers arrays (if present)
+  await updateDoc(clubRef, {
+    members: arrayRemove(targetUid),
+    officers: arrayRemove(targetUid),
   });
 }

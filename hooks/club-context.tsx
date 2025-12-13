@@ -1,25 +1,25 @@
 // hooks/club-context.tsx
 import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
+    createContext,
+    useContext,
+    useEffect,
+    useRef,
+    useState,
 } from "react";
 
 import { db } from "@/firebaseConfig";
-import { doc, onSnapshot } from "firebase/firestore";
+import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 
 import { useUser } from "@/hooks/user-context";
 import {
-  createClub,
-  deleteClub as deleteClubService,
-  demoteOfficer,
-  joinClub,
-  leaveClub as leaveClubService,
-  promoteOfficer,
-  transferOwnership as transferOwnershipService,
-  updateClubFirebase,
+    createClub,
+    deleteClub as deleteClubService,
+    demoteOfficer,
+    joinClub,
+    leaveClub as leaveClubService,
+    promoteOfficer,
+    transferOwnership as transferOwnershipService,
+    updateClubFirebase,
 } from "@/services/clubs";
 
 // -------------------------------------------------------------
@@ -197,8 +197,34 @@ export const ClubProvider = ({ children }: { children: React.ReactNode }) => {
     if (user.clubId) {
       unsubscribeClub = subscribeToClub(user.clubId);
     } else {
+      // If no explicit clubId on user, watch clubs collection for a club that contains this user
       setJoinedClub(null);
       cleanupMemberListeners();
+      const q = query(collection(db, 'clubs'), where('members', 'array-contains', user.uid));
+      const unsubQuery = onSnapshot(q, (snap) => {
+        if (snap.docs.length > 0) {
+          const clubId = snap.docs[0].id;
+          // unsubscribe previous club listener if any
+          if (unsubscribeClub) unsubscribeClub();
+          unsubscribeClub = subscribeToClub(clubId);
+        } else {
+          if (unsubscribeClub) {
+            unsubscribeClub();
+            unsubscribeClub = undefined;
+          }
+          setJoinedClub(null);
+          cleanupMemberListeners();
+        }
+      });
+
+      // ensure we clean the query listener on unmount
+      const origUnsub = unsubscribeClub;
+      const wrappedUnsubscribe = () => {
+        try { unsubQuery(); } catch (e) {}
+        try { if (origUnsub) origUnsub(); } catch (e) {}
+      };
+      // replace unsubscribeClub with wrapped so outer return() will call it
+      unsubscribeClub = wrappedUnsubscribe;
     }
 
     return () => {
@@ -229,7 +255,7 @@ export const ClubProvider = ({ children }: { children: React.ReactNode }) => {
         city: data.city,
         photoUri: data.photoUrl,
         ownerId: data.ownerId,
-        visibility: data.visibility,
+        visibility: data.isPrivate ? 'private' : 'public',
         officers: data.officers || [],
         participants: memberIds.length,
         logo: data.logo,
@@ -251,12 +277,13 @@ export const ClubProvider = ({ children }: { children: React.ReactNode }) => {
     members,
 
     createClub: async (c) => {
-      // services/clubs.ts → createClub(name, city, description, photoUri?)
+      // services/clubs.ts → createClub(name, city, description, photoUri?, isPrivate?)
       const created = await createClub(
         c.name,
         c.city,
         c.desc,
-        c.photoUri
+        c.photoUri,
+        (c.visibility === 'private')
       );
       // created has same shape as payload + id
       return {
@@ -283,6 +310,7 @@ export const ClubProvider = ({ children }: { children: React.ReactNode }) => {
         description: data.desc,   // FIXED HERE
         city: data.city,
         photoUri: data.photoUri,
+        isPrivate: (data as any).visibility === 'private' || (data as any).isPrivate,
       });
     },
 

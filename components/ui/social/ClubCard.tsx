@@ -23,6 +23,7 @@ interface ClubCardProps {
   onMembers: () => void;
   onRanking?: () => void;
   totalPoints?: number;
+  requestPending?: boolean;
 }
 
 export const ClubCard: React.FC<ClubCardProps> = ({ club, onJoin, onMembers, onRanking, totalPoints }) => {
@@ -64,7 +65,13 @@ export const ClubCard: React.FC<ClubCardProps> = ({ club, onJoin, onMembers, onR
             <Text style={[styles.joinText, { color: "#fff" }]}>Quitter ❌</Text>
           </TouchableOpacity>
         ) : (
-          <GradientButton label="Rejoindre" onPress={onJoin} style={{ flex: 1, borderRadius: 12 }} />
+          (club as any).requestPending ? (
+            <View style={[styles.joinBtn, { backgroundColor: colors.surfaceAlt, justifyContent: 'center', alignItems: 'center' }]}>
+              <Text style={{ color: colors.mutedText }}>Demande envoyée</Text>
+            </View>
+          ) : (
+            <GradientButton label="Rejoindre" onPress={onJoin} style={{ flex: 1, borderRadius: 12 }} />
+          )
         )}
 
         <TouchableOpacity
