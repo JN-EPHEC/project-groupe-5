@@ -6,69 +6,40 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-nati
 
 const sections = [
   {
-    title: "1. Responsable du traitement",
-    body: "GreenUp (projet étudiant), contact : contact@greenup-app.com",
+    title: "POLITIQUE DE CONFIDENTIALITÉ – GREENUP",
+    body: "Dernière mise à jour : Décembre 2025",
   },
   {
-    title: "2. Données collectées",
-    body: [
-      "- Nom, email (création de compte)",
-      "- Identifiants Firebase",
-      "- Photos envoyées pour valider des défis",
-      "- Historique de défis, points, classement",
-      "- Métadonnées techniques (crash, usage, analytics – avec consentement)",
-    ].join("\n"),
+    title: "1. Responsable du Traitement",
+    body: "Le traitement des données est assuré par l'équipe projet GreenUp (UCLouvain). Contact pour toute demande RGPD : contact@greenup-app.com",
   },
   {
-    title: "3. Finalités",
-    body: [
-      "- Gestion du compte utilisateur",
-      "- Participation aux défis et validation communautaire",
-      "- Attribution de points et classement",
-      "- Amélioration de l’application",
-      "- Sécurité et prévention de la fraude",
-    ].join("\n"),
+    title: "2. Données Collectées",
+    body: "Conformément au principe de minimisation, nous ne collectons que les données strictement nécessaires :\n\n- Données de compte : Email, pseudo, identifiant unique (User ID).\n\n- Données de preuve : Photos envoyées pour valider les défis.\n\n- Données d'activité : Historique des défis, points, logs de votes, interactions sociales.\n\n- Données de consentement : Date, heure et version des documents acceptés.\n\n- Métadonnées techniques : Logs de connexion, type d'appareil (pour la sécurité et le débogage).",
   },
   {
-    title: "4. Base légale",
-    body: [
-      "- Consentement (upload photo, analytics, notifications)",
-      "- Intérêt légitime (sécurité, lutte contre fraude)",
-    ].join("\n"),
+    title: "3. Finalités du Traitement",
+    body: "Gestion du compte utilisateur et authentification.\n\nValidation des défis et fonctionnement du classement (Leaderboard).\n\nAffichage du fil d'actualité (si l'utilisateur a choisi l'option \"Public\").\n\nSécurité, prévention de la fraude et respect des obligations légales.\n\nAmélioration du service (statistiques anonymisées).",
   },
   {
-    title: "5. Durée de conservation",
-    body: [
-      "- Photos : supprimées automatiquement après validation ou 30 jours max",
-      "- Données du compte : supprimées 30 jours après demande de suppression",
-      "- Logs techniques : 12 mois",
-    ].join("\n"),
+    title: "4. Base Légale",
+    body: "Exécution du contrat (CGU) : Pour la gestion du jeu, des points et du compte.\n\nConsentement : Pour l'utilisation de la caméra, la géolocalisation éventuelle et les cookies analytiques. Le consentement peut être retiré à tout moment dans les paramètres.\n\nIntérêt légitime : Pour la sécurité du système et la lutte contre la triche.",
   },
   {
-    title: "6. Destinataires",
-    body: [
-      "- Firebase (Google Cloud, hébergement hors UE avec clauses contractuelles types)",
-      "- Partenaires locaux (récompenses) : jamais accès aux données personnelles",
-    ].join("\n"),
+    title: "5. Durée de Conservation",
+    body: "Preuves photo (Privées) : Supprimées automatiquement après validation technique ou maximum 30 jours.\n\nPhotos publiées (Fil d'actualité) : Conservées tant que le compte est actif ou jusqu'à suppression manuelle par l'utilisateur.\n\nDonnées de compte : Supprimées 30 jours après la demande de suppression du compte.\n\nLogs techniques et preuves de consentement : Archivés pendant 12 mois pour des raisons de sécurité juridique.",
   },
   {
-    title: "7. Droits utilisateurs",
-    body: [
-      "Droit d’accès, rectification, suppression, opposition, portabilité.",
-      "Demande : contact@greenup-app.com.",
-    ].join("\n"),
+    title: "6. Destinataires et Transferts",
+    body: "Vos données sont accessibles uniquement à l'équipe technique GreenUp et à nos sous-traitants techniques (hébergeurs).\n\nHébergement : Google Firebase (Google LLC).\n\nTransfert Hors UE : Les données peuvent être traitées sur des serveurs Google hors de l'Union Européenne. Ce transfert est encadré par des Clauses Contractuelles Types (SCC) de la Commission Européenne garantissant un niveau de protection équivalent au RGPD.\n\nPartenaires : Aucune donnée personnelle n'est transmise aux partenaires commerciaux sans votre consentement explicite.",
+  },
+  {
+    title: "7. Vos Droits",
+    body: "Conformément au RGPD, vous disposez des droits suivants : accès, rectification, effacement (\"droit à l'oubli\"), limitation, opposition et portabilité (export incluant profil, historique et métadonnées). Pour exercer ces droits : contact@greenup-app.com. Vous avez également le droit d'introduire une réclamation auprès de l'Autorité de Protection des Données (APD) en Belgique.",
   },
   {
     title: "8. Sécurité",
-    body: [
-      "- Firebase Auth",
-      "- Firestore & Storage Security Rules",
-      "- Chiffrement en transit TLS",
-    ].join("\n"),
-  },
-  {
-    title: "9. Transfert hors UE",
-    body: "Les données peuvent être stockées hors UE (Google Firebase). Des mesures standard (SCC) sont appliquées.",
+    body: "Nous mettons en œuvre des mesures de sécurité techniques (chiffrement TLS, règles de sécurité Firestore) et organisationnelles (journalisation des accès administrateurs) pour protéger vos données.",
   },
 ];
 

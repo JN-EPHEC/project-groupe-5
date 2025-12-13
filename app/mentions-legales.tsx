@@ -6,26 +6,24 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-nati
 
 const sections = [
   {
-    title: "1. Éditeur",
-    body: [
-      "GreenUp – Projet académique UCLouvain",
-      "Email : contact@greenup-app.com",
-    ].join("\n"),
+    title: "MENTIONS LÉGALES – GREENUP",
+    body: "Dernière mise à jour : Décembre 2025",
+  },
+  {
+    title: "1. Éditeur du Service",
+    body: "Application GreenUp Projet étudiant réalisé dans le cadre académique de l'EPHEC (Belgique) Contact support et juridique : contact@greenup-app.com",
   },
   {
     title: "2. Hébergement",
-    body: [
-      "Google Firebase (Google LLC)",
-      "Stockage, base de données, authentification.",
-    ].join("\n"),
+    body: "L'infrastructure backend et la base de données sont hébergées par : Google Firebase (Google LLC) Siège social : 1600 Amphitheatre Parkway, Mountain View, CA 94043, USA. Le stockage des données est soumis aux règles de confidentialité de Google Cloud Platform.",
   },
   {
-    title: "3. Propriété intellectuelle",
-    body: "Logo, nom, contenus et défis GreenUp sont protégés. Toute reproduction non autorisée est interdite.",
+    title: "3. Propriété Intellectuelle",
+    body: "L'ensemble des éléments graphiques, le logo \"GreenUp\", le code source et les concepts de défis sont la propriété exclusive de l'équipe projet, sauf mention contraire. Toute reproduction est interdite sans autorisation.",
   },
   {
-    title: "4. Contact",
-    body: "contact@greenup-app.com",
+    title: "4. Droit Applicable",
+    body: "Les présentes conditions sont régies par le droit belge. Tout litige relatif à l'utilisation de l'application sera soumis à la compétence des tribunaux de l'arrondissement judiciaire du Brabant wallon.",
   },
 ];
 
