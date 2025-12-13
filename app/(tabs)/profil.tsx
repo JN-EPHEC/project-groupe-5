@@ -42,7 +42,7 @@ export default function ProfilScreen() {
       const sessionRef = await addDoc(
         collection(db, "customers", current.uid, "checkout_sessions"),
         {
-          price: "price_1SZwHCCh6MpiIMZkbiSw63ty",
+          price: "price_1Se0BDCh6MpiIMZkio91hT1d",
           mode: "subscription",
           success_url: "https://example.com/success",
           cancel_url: "https://example.com/cancel",

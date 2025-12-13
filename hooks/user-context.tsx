@@ -1,6 +1,6 @@
 // Keep this context independent of routing
 import { User as FirebaseUser, onAuthStateChanged } from "firebase/auth";
-import { doc, onSnapshot } from "firebase/firestore";
+import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 import React, {
     createContext,
     useContext,
@@ -31,6 +31,7 @@ export type UserProfile = {
 type UserContextType = {
   user: UserProfile;
   loading: boolean;
+  userClub: { id: string; name: string; isPrivate?: boolean } | null;
 };
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -40,6 +41,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userClub, setUserClub] = useState<{ id: string; name: string; isPrivate?: boolean } | null>(null);
 
   // 1️⃣ Listen to Firebase Auth state
   useEffect(() => {
@@ -95,11 +97,52 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     return unsub;
   }, [firebaseUser]);
 
+  // 3️⃣ Listen to clubs that contain the current user in their members array.
+  // This allows detecting membership even when `users/{uid}.clubId` is not set.
+  useEffect(() => {
+    if (!firebaseUser) {
+      setUserClub(null);
+      return;
+    }
+
+    const q = query(collection(db, "clubs"), where("members", "array-contains", firebaseUser.uid));
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        if (snap.docs.length > 0) {
+          const d = snap.docs[0];
+          const data: any = d.data();
+          const club = { id: d.id, name: data.name ?? "Club", isPrivate: Boolean(data.isPrivate) };
+          setUserClub(club);
+          // update in-memory userProfile.clubId so other parts of the app react
+          setUserProfile((prev) => {
+            if (!prev) return prev;
+            if (prev.clubId === club.id) return prev;
+            return { ...prev, clubId: club.id };
+          });
+        } else {
+          setUserClub(null);
+          setUserProfile((prev) => {
+            if (!prev) return prev;
+            if (prev.clubId === null) return prev;
+            return { ...prev, clubId: null };
+          });
+        }
+      },
+      (err) => {
+        console.error("Firestore club-members listener error:", err);
+      }
+    );
+
+    return unsub;
+  }, [firebaseUser]);
+
   // Memoized context value
   const value = useMemo(
     () => ({
       user: userProfile as UserProfile,
       loading,
+      userClub,
     }),
     [userProfile, loading]
   );
