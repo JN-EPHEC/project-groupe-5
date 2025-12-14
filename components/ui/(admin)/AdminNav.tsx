@@ -42,9 +42,10 @@ export function AdminNav() {
           color={activeHere ? "#fff" : colors.text}
         />
         <Text
+          numberOfLines={1}
           style={{
             color: activeHere ? "#fff" : colors.text,
-            fontSize: 12,
+            fontSize: 10, // Réduit légèrement la taille pour que "Signalements" rentre
             marginTop: 2,
           }}
         >
@@ -68,13 +69,19 @@ export function AdminNav() {
         <Btn icon="home-outline" label="Accueil" route="/(admin)/" />
         <Btn
           icon="add-circle-outline"
-          label="Créer défi"
+          label="Créer"
           route="/(admin)/create-defi"
         />
         <Btn
           icon="list-outline"
-          label="Liste défis"
+          label="Liste"
           route="/(admin)/list-defis"
+        />
+        {/* NOUVEAU BOUTON */}
+        <Btn
+          icon="alert-circle-outline"
+          label="Signalements"
+          route="/(admin)/reports"
         />
       </View>
     </View>
@@ -95,9 +102,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     borderRadius: 22,
     paddingVertical: 8,
-    paddingHorizontal: 10,
+    paddingHorizontal: 6, // Réduit un peu le padding horizontal
     flexDirection: "row",
-    justifyContent: "space-around",
+    justifyContent: "space-between", // Changé de space-around à space-between pour mieux répartir
     alignItems: "center",
     elevation: 10,
     shadowOpacity: 0.15,
@@ -106,9 +113,10 @@ const styles = StyleSheet.create({
   },
   btn: {
     alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingHorizontal: 4,
     borderRadius: 16,
-    width: 90,
+    width: "23%", // Utilisation de pourcentage au lieu de fixe pour s'adapter
   },
 });

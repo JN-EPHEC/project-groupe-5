@@ -3,7 +3,8 @@ import { DeleteConfirmModal } from "@/components/ui/(admin)/DeleteConfirmModal";
 import { db } from "@/firebaseConfig";
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
+import { Stack, useRouter } from "expo-router";
 import { collection, deleteDoc, doc, getDocs } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import {
@@ -30,14 +31,14 @@ type Defi = {
   preuve?: string;
 };
 
-// Enable layout animation on Android
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
 export default function ListDefisScreen() {
-  const { colors } = useThemeMode();
+  const { colors, theme } = useThemeMode();
   const router = useRouter();
+  const isDark = theme === "dark";
 
   const [defis, setDefis] = useState<Defi[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -69,43 +70,68 @@ export default function ListDefisScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <ScrollView
-        style={[styles.container, { backgroundColor: colors.background }]}
-      >
-        <Text style={[styles.title, { color: colors.text }]}>Liste des défis</Text>
+      <Stack.Screen options={{ headerShown: false }} />
 
-        {/* SEARCH */}
-        <TextInput
-          style={[
-            styles.search,
-            { backgroundColor: colors.surface, color: colors.text },
-          ]}
-          placeholder="Rechercher un défi..."
-          placeholderTextColor={colors.mutedText}
-          value={search}
-          onChangeText={setSearch}
-        />
+       {/* 🟢 BACKGROUND LIQUIDE */}
+       <LinearGradient
+        colors={isDark ? [colors.background, "#0f2027", "#203a43"] : ["#d1fae5", "#cffafe", "#ffffff"]}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      />
+
+      <View style={styles.headerContainer}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          Catalogue Défis
+        </Text>
+      </View>
+
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
+      >
+        {/* SEARCH BAR */}
+        <View style={[styles.searchContainer, { 
+            backgroundColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.6)",
+            borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.5)"
+        }]}>
+          <Ionicons name="search" size={20} color={colors.mutedText} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder="Rechercher un défi..."
+            placeholderTextColor={colors.mutedText}
+            value={search}
+            onChangeText={setSearch}
+          />
+        </View>
 
         {/* FILTERS */}
         <View style={styles.filterRow}>
           {[
-            { key: "all", label: "Tous" },
-            { key: "rotation", label: "En rotation" },
-            { key: "inactive", label: "Inactif" },
+            { key: "all", label: "TOUS" },
+            { key: "rotation", label: "EN LIGNE" },
+            { key: "inactive", label: "INACTIF" },
           ].map((f) => (
             <TouchableOpacity
               key={f.key}
               style={[
                 styles.filterBtn,
-                { backgroundColor: filter === f.key ? colors.accent : colors.surfaceAlt },
+                { 
+                    backgroundColor: filter === f.key ? colors.accent : "rgba(0,0,0,0.05)",
+                    borderWidth: 1,
+                    borderColor: filter === f.key ? colors.accent : "rgba(0,0,0,0.05)"
+                },
               ]}
               onPress={() => setFilter(f.key as any)}
             >
               <Text
                 style={{
-                  color: filter === f.key ? "#fff" : colors.text,
-                  fontWeight: "600",
-                  fontSize: 12,
+                  color: filter === f.key ? "#fff" : colors.mutedText,
+                  fontWeight: "700",
+                  fontSize: 10,
                 }}
               >
                 {f.label}
@@ -115,6 +141,7 @@ export default function ListDefisScreen() {
         </View>
 
         {/* LIST */}
+        <View style={{ gap: 12 }}>
         {filtered.map((d) => {
           const isOpen = expanded === d.id;
 
@@ -122,101 +149,118 @@ export default function ListDefisScreen() {
             <TouchableOpacity
               key={d.id}
               onPress={() => {
-                LayoutAnimation.easeInEaseOut();
+                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
                 setExpanded(isOpen ? null : d.id);
               }}
-              activeOpacity={0.8}
-              style={[styles.rowItem, { backgroundColor: colors.surface }]}
+              activeOpacity={0.9}
+              style={[
+                  styles.glassCard, 
+                  { 
+                      backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.65)",
+                      borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.5)"
+                  }
+              ]}
             >
-              {/* HEADER */}
+              {/* HEADER DE LA CARD */}
               <View style={styles.rowHeader}>
-                <Text style={[styles.rowTitle, { color: colors.text }]}>
-                  {d.titre}
-                </Text>
-
-                {/* STATUS BADGE */}
-                <View
-                  style={[
-                    styles.statusBadge,
-                    {
-                      backgroundColor:
-                        d.statut === "rotation" ? "#3498DB" : "#7F8C8D",
-                    },
-                  ]}
-                >
-                  <Text style={styles.statusText}>
-                    {d.statut === "rotation" ? "En rotation" : "Inactif"}
-                  </Text>
+                
+                {/* Icône Catégorie */}
+                <View style={[styles.iconBox, { backgroundColor: d.categorie === 'club' ? "#E0F2FE" : "#F3E8FF" }]}>
+                    <Ionicons 
+                        name={d.categorie === 'club' ? "people" : "person"} 
+                        size={18} 
+                        color={d.categorie === 'club' ? "#0284C7" : "#9333EA"} 
+                    />
                 </View>
 
-                {/* EDIT BUTTON */}
-                <TouchableOpacity
-                  onPress={() =>
-                    router.push({
-                      pathname: "/(admin)/create-defi",
-                      params: { id: d.id },
-                    })
-                  }
-                  style={[styles.smallBtn, { backgroundColor: colors.accent }]}
-                >
-                  <Ionicons name="pencil" size={18} color="#fff" />
-                </TouchableOpacity>
+                <View style={{ flex: 1 }}>
+                    <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={1}>
+                        {d.titre}
+                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <View
+                            style={[
+                                styles.statusBadge,
+                                { backgroundColor: d.statut === "rotation" ? "#3498DB" : "#94A3B8" },
+                            ]}
+                            >
+                            <Text style={styles.statusText}>
+                                {d.statut === "rotation" ? "ACTIF" : "OFF"}
+                            </Text>
+                        </View>
+                        <Text style={{ fontSize: 11, color: colors.mutedText }}>• {d.points} pts</Text>
+                    </View>
+                </View>
 
-                {/* DELETE BUTTON */}
-                <TouchableOpacity
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    setDeleteTargetId(d.id);
-                    setDeleteModalVisible(true);
-                  }}
-                  style={[styles.smallBtn, { backgroundColor: "#B00020" }]}
-                >
-                  <Ionicons name="trash-outline" size={18} color="#fff" />
-                </TouchableOpacity>
+                {/* Bouton Chevron */}
+                <Ionicons 
+                    name={isOpen ? "chevron-up" : "chevron-down"} 
+                    size={20} 
+                    color={colors.mutedText} 
+                />
               </View>
 
-              {/* EXPANDED */}
+              {/* CONTENU ÉTENDU */}
               {isOpen && (
-                <View style={styles.expanded}>
-                  <Text style={{ color: colors.mutedText }}>
+                <View style={styles.expandedContent}>
+                  <View style={styles.divider} />
+                  
+                  <Text style={{ color: colors.text, lineHeight: 20 }}>
                     {d.description}
                   </Text>
 
-                  <Text style={{ color: colors.mutedText, marginTop: 6 }}>
-                    Catégorie : {d.categorie}
-                  </Text>
-
-                  <Text style={{ color: colors.mutedText }}>
-                    Durée : {d.duree} jour(s)
-                  </Text>
-
-                  <Text
-                    style={{
-                      color: difficultyColor(d.difficulte),
-                      marginTop: 4,
-                      fontWeight: "700",
-                    }}
-                  >
-                    Difficulté : {d.difficulte}
-                  </Text>
-
-                  <Text style={{ color: colors.mutedText }}>
-                    Points : {d.points}
-                  </Text>
+                  <View style={styles.metaRow}>
+                    <View style={styles.metaItem}>
+                        <Text style={styles.metaLabel}>DIFFICULTÉ</Text>
+                        <Text style={{ color: difficultyColor(d.difficulte), fontWeight: "700" }}>
+                            {d.difficulte.toUpperCase()}
+                        </Text>
+                    </View>
+                    <View style={styles.metaItem}>
+                        <Text style={styles.metaLabel}>DURÉE</Text>
+                        <Text style={{ color: colors.text }}>{d.duree} jour(s)</Text>
+                    </View>
+                  </View>
 
                   {d.preuve && (
-                    <Text style={{ color: colors.mutedText }}>
-                      Preuve : {d.preuve}
-                    </Text>
+                     <View style={[styles.preuveBox, { backgroundColor: isDark ? "rgba(0,0,0,0.3)" : "rgba(255,255,255,0.5)" }]}>
+                        <Text style={{ fontSize: 12, color: colors.mutedText, fontStyle: 'italic' }}>
+                            <Ionicons name="camera-outline" /> Preuve : {d.preuve}
+                        </Text>
+                     </View>
                   )}
+
+                  {/* ACTIONS */}
+                  <View style={styles.actionRow}>
+                    <TouchableOpacity
+                        onPress={() => router.push({ pathname: "/(admin)/create-defi", params: { id: d.id } })}
+                        style={[styles.actionBtn, { backgroundColor: colors.accent }]}
+                    >
+                        <Ionicons name="pencil" size={16} color="#fff" />
+                        <Text style={styles.actionBtnText}>Modifier</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        onPress={(e) => {
+                            e.stopPropagation();
+                            setDeleteTargetId(d.id);
+                            setDeleteModalVisible(true);
+                        }}
+                        style={[styles.actionBtn, { backgroundColor: "#EF4444" }]}
+                    >
+                        <Ionicons name="trash-outline" size={16} color="#fff" />
+                        <Text style={styles.actionBtnText}>Supprimer</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
             </TouchableOpacity>
           );
         })}
+        </View>
       </ScrollView>
 
-      {/* DELETE CONFIRM MODAL */}
+      {/* DELETE MODAL */}
       <DeleteConfirmModal
         visible={deleteModalVisible}
         onCancel={() => {
@@ -233,36 +277,133 @@ export default function ListDefisScreen() {
         }}
       />
 
-      {/* BOTTOM NAV */}
       <AdminNav />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20 },
-  title: { fontSize: 26, fontWeight: "700", marginBottom: 14 },
-  search: { padding: 12, borderRadius: 12, marginBottom: 16 },
-  filterRow: { flexDirection: "row", gap: 10, marginBottom: 16 },
-  filterBtn: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 10 },
-  rowItem: { borderRadius: 14, marginBottom: 12, padding: 12 },
+  headerContainer: {
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 15,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 1,
+    marginBottom: 20,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 10,
+    fontSize: 16,
+  },
+  filterRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 20,
+  },
+  filterBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+  },
+  glassCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 16,
+    overflow: 'hidden'
+  },
   rowHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 12,
   },
-  rowTitle: { flex: 1, fontSize: 15, fontWeight: "600" },
+  iconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rowTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 2,
+  },
   statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
-  statusText: { color: "#fff", fontSize: 11, fontWeight: "600" },
-  smallBtn: { padding: 6, borderRadius: 8 },
-  expanded: {
-    marginTop: 10,
-    paddingTop: 6,
-    borderTopWidth: 1,
-    borderTopColor: "#ffffff22",
+  statusText: {
+    color: "#fff",
+    fontSize: 9,
+    fontWeight: "800",
   },
+  expandedContent: {
+    marginTop: 12,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "rgba(0,0,0,0.05)",
+    marginBottom: 12,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    marginTop: 12,
+    gap: 20,
+  },
+  metaItem: {
+    gap: 2
+  },
+  metaLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#9CA3AF'
+  },
+  preuveBox: {
+    marginTop: 12,
+    padding: 10,
+    borderRadius: 10,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+    marginTop: 16,
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    gap: 6
+  },
+  actionBtnText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700'
+  }
 });

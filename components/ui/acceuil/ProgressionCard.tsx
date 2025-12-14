@@ -1,7 +1,5 @@
-// Import ProgressCircle depuis un module commun UI
 import { FontFamilies } from "@/constants/fonts";
 import { useThemeMode } from "@/hooks/theme-context";
-import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import ProgressCircle from "../common/ProgressCircle";
@@ -14,58 +12,76 @@ export type ProgressionCardProps = {
   title?: string;
 };
 
-export function ProgressionCard({ done, total, pointsText, streakText, title = "Progression de la semaine" }: ProgressionCardProps) {
-  const { colors, mode } = useThemeMode();
+// NOUVEAU THEME "Camaïeu de Verts"
+const greenTheme = {
+  cardTitle: "#15803D", // Vert Forêt moderne
+  statText: "#0F172A", // Gris Foncé
+  mutedText: "#64748B", // Gris
+};
+
+export function ProgressionCard({
+  done,
+  total,
+  pointsText,
+  streakText,
+  title = "Progression de la semaine",
+}: ProgressionCardProps) {
+  const { mode } = useThemeMode();
   const isLight = mode === "light";
-  const darkCardGradient = ["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"] as const;
-  const lightCardGradient = [
-    "#99E2B4",
-    "#88D4AB",
-    "#78C6A3",
-    "#67B99A",
-    "#56AB91",
-    "#469D89",
-    "#358F80",
-    "#248277",
-    "#14746F",
-  ];
-  const gradientColors = isLight ? lightCardGradient : darkCardGradient;
-  const borderColor = isLight ? "rgba(255,255,255,0.12)" : "rgba(0, 151, 178, 0.3)";
-  const titleColor = isLight ? "#FFFFFF" : colors.text;
-  const mutedColor = isLight ? "rgba(255, 255, 255, 0.7)" : colors.mutedText;
+
+  // En mode light, on utilise le nouveau thème vert. Le mode dark reste inchangé pour l'instant.
+  if (!isLight) {
+    // Fallback pour le mode sombre (non modifié pour l'instant)
+    const { colors } = useThemeMode();
+    const darkCardGradient = ["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"] as const;
+    return (
+        <View style={[styles.card, { backgroundColor: '#021114'}]}>
+            <Text style={[styles.title, { color: '#FFFFFF' }]}>{title}</Text>
+            <View style={styles.row}>
+                <ProgressCircle done={done} total={total} />
+                <View style={{ marginLeft: 16 }}>
+                    <Text style={[styles.points, { color: '#FFFFFF' }]}>{pointsText}</Text>
+                    <Text style={[styles.streak, { color: 'rgba(255, 255, 255, 0.7)' }]}>{streakText}</Text>
+                </View>
+            </View>
+        </View>
+    );
+  }
+
   return (
-    <LinearGradient
-      colors={gradientColors}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 0 }}
-      style={[styles.card, { borderColor, shadowColor: isLight ? colors.card : colors.accent }]}
-    >
-      <Text style={[styles.title, { color: titleColor }]}>{title}</Text>
+    <View style={styles.card}>
+      <Text style={[styles.title, { color: greenTheme.cardTitle }]}>{title}</Text>
       <View style={styles.row}>
         <ProgressCircle done={done} total={total} />
         <View style={{ marginLeft: 16 }}>
-          <Text style={[styles.points, { color: titleColor }]}>{pointsText}</Text>
-          <Text style={[styles.streak, { color: mutedColor }]}>{streakText}</Text>
+          <Text style={[styles.points, { color: greenTheme.statText }]}>{pointsText}</Text>
+          <Text style={[styles.streak, { color: greenTheme.mutedText }]}>{streakText}</Text>
         </View>
       </View>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
+    backgroundColor: '#FFFFFF',
     padding: 20,
     borderRadius: 24,
-    borderWidth: 1,
-    position: "relative",
+    shadowColor: "#64748B",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
     width: "100%",
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.18,
-    shadowRadius: 18,
-    elevation: 8,
   },
-  title: { marginBottom: 10, fontSize: 17, fontFamily: FontFamilies.heading },
+  title: { 
+    marginBottom: 16, 
+    fontSize: 14, 
+    fontFamily: FontFamilies.bodyStrong,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   row: { flexDirection: "row", alignItems: "center" },
-  points: { fontSize: 16, fontFamily: FontFamilies.heading },
-  streak: { marginTop: 6, fontFamily: FontFamilies.headingMedium },
+  points: { fontSize: 16, fontFamily: FontFamilies.heading, color: '#0F172A' },
+  streak: { marginTop: 6, fontFamily: FontFamilies.headingMedium, color: '#64748B' },
 });

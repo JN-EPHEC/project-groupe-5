@@ -1,37 +1,42 @@
-import { useThemeMode } from "@/hooks/theme-context";
+import { FontFamilies } from "@/constants/fonts";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 
+const ecoTechStyles = {
+  vertVif: "#10B981",
+  fondGris: "#F1F5F9",
+  texteVertForet: "#15803D",
+};
+
 export default function ProgressCircle({ done = 0, total = 5 }) {
-  const { colors } = useThemeMode();
   const size = 80;
-  const stroke = 8;
-  const radius = (size - stroke) / 2;
+  const strokeWidth = 8;
+  const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const progress = (done / total) * circumference;
+  const progress = total > 0 ? (done / total) * circumference : 0;
 
   return (
     <View style={styles.container}>
       <Svg width={size} height={size}>
         {/* Cercle de fond */}
         <Circle
-          stroke="#1C2A27"
+          stroke={ecoTechStyles.fondGris}
           fill="none"
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          strokeWidth={stroke}
+          strokeWidth={strokeWidth}
         />
 
         {/* Cercle progressif */}
         <Circle
-          stroke="#00C389"
+          stroke={ecoTechStyles.vertVif}
           fill="none"
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          strokeWidth={stroke}
+          strokeWidth={strokeWidth}
           strokeDasharray={circumference}
           strokeDashoffset={circumference - progress}
           strokeLinecap="round"
@@ -40,7 +45,7 @@ export default function ProgressCircle({ done = 0, total = 5 }) {
         />
       </Svg>
 
-      <Text style={[styles.progressText, { color: colors.text }]}>
+      <Text style={styles.progressText}>
         {done}/{total}
       </Text>
     </View>
@@ -54,8 +59,8 @@ const styles = StyleSheet.create({
   },
   progressText: {
     position: "absolute",
-    color: "#fff",
-    fontWeight: "700",
+    color: ecoTechStyles.texteVertForet,
+    fontFamily: FontFamilies.heading,
     fontSize: 16,
   },
 });
