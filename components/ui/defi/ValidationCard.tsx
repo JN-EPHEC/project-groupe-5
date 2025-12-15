@@ -1,21 +1,20 @@
-// components/ui/defi/ValidationCard.tsx
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
-import { Image, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import React from "react";
+import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { CATEGORY_CONFIG } from "./constants";
 
 export type ValidationItem = {
-  id: number;
+  id: number | string;
   title: string;
   description: string;
-  category: keyof typeof CATEGORY_CONFIG;
-  difficulty: "Facile" | "Moyen" | "Difficile";
+  category: string; // Simplifié pour matcher avec ce qui vient de Firebase
+  difficulty: "Facile" | "Moyen" | "Difficile" | string;
   points: number;
-  audience: "Membre";
+  audience: string;
   timeLeft: string;
-  userName: string;
-  photoUrl: string;
+  userName?: string;
+  photoUrl?: string;
   comment?: string;
 };
 
@@ -23,44 +22,43 @@ type Props = {
   item: ValidationItem;
   onValidate: () => void;
   onReject: () => void;
+  onReport?: () => void; // 👇 La fonction qui vient du parent (defi.tsx)
 };
 
-export function ValidationCard({ item, onValidate, onReject }: Props) {
+export function ValidationCard({ item, onValidate, onReject, onReport }: Props) {
   const { colors, mode } = useThemeMode();
   const isLight = mode === "light";
-  const cardBackground = isLight ? colors.card : "rgba(0, 151, 178, 0.1)";
+  
   const cardAlt = isLight ? colors.cardAlt : "rgba(0, 151, 178, 0.05)";
   const cardText = isLight ? colors.cardText : colors.text;
   const cardMuted = isLight ? colors.cardMuted : colors.mutedText;
 
-  const category = CATEGORY_CONFIG[item.category];
-  const [reported, setReported] = useState(false);
-  const [hiddenProof, setHiddenProof] = useState(false);
-  const [reportVisible, setReportVisible] = useState(false);
-  const [selectedReason, setSelectedReason] = useState<string | null>(null);
-  const [comment, setComment] = useState("");
-  const reasons = [
-    "Contenu inapproprié",
-    "Spam",
-    "Harcèlement",
-    "Contenu trompeur",
-    "Autre",
-  ];
+  // Gestion sécurisée de la catégorie (si inconnue, icône par défaut)
+  const categoryConfig = CATEGORY_CONFIG[item.category as keyof typeof CATEGORY_CONFIG] || { 
+      label: item.category, 
+      icon: "leaf-outline" 
+  };
 
   return (
     <View style={[
       styles.card, 
       { 
-        backgroundColor: colors.glass, 
-        borderColor: colors.glassBorder,
-        borderWidth: 1,
+        backgroundColor: colors.glass || colors.card, // Fallback si colors.glass n'est pas défini
+        borderColor: colors.glassBorder || "transparent",
+        borderWidth: colors.glassBorder ? 1 : 0,
+        // Ajout d'une ombre douce si pas de bordure "glass"
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
       }
     ]}> 
       {/* HEADER */}
       <View style={styles.header}>
         <View style={[styles.categoryPill, { backgroundColor: cardAlt }]}> 
-          <Ionicons name={category.icon} size={16} color="#7DCAB0" />
-          <Text style={styles.categoryText}>{category.label}</Text>
+          <Ionicons name={categoryConfig.icon as any} size={16} color="#7DCAB0" />
+          <Text style={styles.categoryText}>{categoryConfig.label}</Text>
         </View>
 
         <View style={styles.pointsBadge}>
@@ -69,97 +67,56 @@ export function ValidationCard({ item, onValidate, onReject }: Props) {
         </View>
       </View>
 
-      {/* TITRE */}
+      {/* TITRE & AUTEUR */}
       <Text style={[styles.title, { color: cardText }]}>{item.title}</Text>
-      <Text style={[styles.subtitle, { color: cardMuted }]}>Par {item.userName}</Text>
+      <Text style={[styles.subtitle, { color: cardMuted }]}>
+        Par {item.userName || "Utilisateur"}
+      </Text>
 
-      {/* Message de signalement */}
-      {reported && (
-        <View style={[styles.banner, { backgroundColor: cardAlt }]}> 
-          <Ionicons name="alert-circle" size={18} color={colors.accent} style={styles.leadingIcon} />
-          <Text style={{ color: cardText, fontWeight: '600' }}>Merci, votre signalement a été pris en compte.</Text>
-        </View>
-      )}
-
-      {/* BOÎTE DE PREUVE */}
-      {hiddenProof ? (
-        <View style={[styles.hiddenBox, { backgroundColor: cardAlt }]}> 
-          <Text style={{ color: cardMuted }}>Cette preuve est temporairement masquée en attente de vérification.</Text>
-        </View>
-      ) : (
+      {/* PHOTO DE PREUVE */}
+      {item.photoUrl && (
         <Image source={{ uri: item.photoUrl }} style={styles.photo} />
       )}
 
-      {/* Commentaire de l'auteur (s'il existe) */}
-      {item.comment && !hiddenProof && (
-        <Text style={{ color: cardText, marginTop: 10 }}>{item.comment}</Text>
+      {/* COMMENTAIRE */}
+      {item.comment && (
+        <View style={[styles.commentBox, { backgroundColor: cardAlt }]}>
+            <Text style={{ color: cardText, fontStyle: "italic", fontSize: 13 }}>
+                "{item.comment}"
+            </Text>
+        </View>
       )}
 
       {/* ACTIONS */}
       <View style={styles.actions}>
-        <TouchableOpacity style={[styles.secondaryButton, { backgroundColor: cardAlt }]}
-          onPress={onReject}
+        <TouchableOpacity 
+            style={[styles.secondaryButton, { backgroundColor: cardAlt }]}
+            onPress={onReject}
         > 
-          <Ionicons name="close-circle" size={18} color="#EBE6D3" style={styles.leadingIcon} />
-          <Text style={[styles.secondaryText, { color: "#EBE6D3" }]}>Refuser</Text>
+          <Ionicons name="close-circle" size={18} color={cardMuted} style={styles.leadingIcon} />
+          <Text style={[styles.secondaryText, { color: cardMuted }]}>Refuser</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.warnButton, { backgroundColor: '#2A2E2D', borderColor: '#D97706', borderWidth: 1 }]}
-          onPress={() => setReportVisible(true)}
+        {/* 👇 BOUTON SIGNALER CONNECTÉ À onReport */}
+        <TouchableOpacity 
+            style={[
+                styles.warnButton, 
+                { backgroundColor: isLight ? '#FEF3C7' : '#451a03', borderColor: '#D97706', borderWidth: 1 }
+            ]}
+            onPress={onReport} // Appelle la modale globale
         >
           <Ionicons name="flag-outline" size={18} color="#D97706" style={styles.leadingIcon} />
           <Text style={[styles.warnText, { color: '#D97706' }]}>Signaler</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.successButton, { backgroundColor: colors.accent }]} onPress={onValidate}>
+        <TouchableOpacity 
+            style={[styles.successButton, { backgroundColor: colors.accent }]} 
+            onPress={onValidate}
+        >
           <Ionicons name="checkmark-circle" size={18} color="#0F3327" style={styles.leadingIcon} />
           <Text style={styles.successText}>Valider</Text>
         </TouchableOpacity>
       </View>
-
-      {/* Report modal */}
-      <Modal transparent visible={reportVisible} animationType="fade" onRequestClose={() => setReportVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: colors.card }] }>
-            <Text style={[styles.modalTitle, { color: colors.cardText }]}>Signaler la preuve</Text>
-            <Text style={{ color: colors.cardMuted, marginTop: 6 }}>Sélectionnez un motif et ajoutez un commentaire facultatif.</Text>
-            <View style={{ marginTop: 12 }}>
-              {reasons.map((r) => (
-                <TouchableOpacity key={r} onPress={() => setSelectedReason(r)} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }}>
-                  <Ionicons name={selectedReason === r ? 'radio-button-on' : 'radio-button-off'} size={18} color={colors.accent} />
-                  <Text style={{ marginLeft: 8, color: colors.cardText }}>{r}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <TextInput
-              value={comment}
-              onChangeText={setComment}
-              placeholder="Commentaire (facultatif)"
-              placeholderTextColor={colors.cardMuted}
-              multiline
-              numberOfLines={3}
-              style={{ backgroundColor: colors.cardAlt, color: colors.cardText, borderRadius: 12, padding: 12, marginTop: 10, textAlignVertical: 'top' }}
-            />
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={[styles.modalBtn, { backgroundColor: colors.cardAlt }]} onPress={() => setReportVisible(false)}>
-                <Text style={{ color: colors.cardText, fontWeight: '700' }}>Annuler</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                disabled={!selectedReason}
-                style={[styles.modalBtn, { backgroundColor: selectedReason ? colors.accent : colors.cardAlt }]}
-                onPress={() => {
-                  // In a real app, send report: { reason: selectedReason, comment }
-                  setReportVisible(false);
-                  setReported(true);
-                  setHiddenProof(true);
-                }}
-              >
-                <Text style={{ color: selectedReason ? '#0F3327' : colors.cardMuted, fontWeight: '700' }}>Envoyer</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -207,74 +164,65 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     marginTop: 4,
-    marginBottom: 8,
+    marginBottom: 12,
+    fontSize: 12,
   },
   photo: {
     borderRadius: 18,
-    height: 150,
+    height: 180,
     width: "100%",
-    marginTop: 12,
+    marginBottom: 12,
+    resizeMode: "cover",
   },
-  hiddenBox: {
-    borderRadius: 18,
-    padding: 16,
-    width: '100%',
-    marginTop: 12,
-  },
-  banner: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  commentBox: {
     borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    marginTop: 8,
+    padding: 12,
+    marginBottom: 12,
   },
   actions: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 20,
+    marginTop: 8,
+    gap: 8,
   },
   secondaryButton: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 18,
     paddingVertical: 12,
-    width: "32%",
   },
   warnButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     borderRadius: 18,
     paddingVertical: 12,
-    width: '32%',
+  },
+  successButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 18,
+    paddingVertical: 12,
   },
   warnText: {
     fontWeight: '700',
+    fontSize: 12,
   },
   secondaryText: {
     fontWeight: "600",
-  },
-  successButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 18,
-    paddingVertical: 12,
-    width: "32%",
+    fontSize: 12,
   },
   successText: {
     color: "#0F3327",
     fontWeight: "700",
+    fontSize: 12,
   },
   leadingIcon: {
-    marginRight: 8,
+    marginRight: 6,
   },
-  // Reuse modal styles similar to other components
-  modalOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center', padding: 24 },
-  modalCard: { width: '100%', maxWidth: 380, borderRadius: 16, padding: 16 },
-  modalTitle: { fontSize: 18, fontWeight: '700' },
-  modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16, gap: 10 },
-  modalBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 12 },
 });

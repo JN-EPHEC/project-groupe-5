@@ -15,7 +15,10 @@ import { usePoints } from "@/hooks/points-context";
 import { markDefiDone } from "@/services/notifications";
 import { finalizeProof } from "@/services/proofs";
 import { useRouter } from "expo-router";
+// Remplace la ligne d'import existante par celle-ci :
 import {
+  addDoc // 👈 C'est ce qu'il manquait !
+  ,
   collection,
   deleteDoc,
   doc,
@@ -445,29 +448,47 @@ console.log("[CH] stop -> reset cycle", { uid: auth.currentUser?.uid });
   // ------------------------------------------------------------
   // FEEDBACK
   // ------------------------------------------------------------
-  const setFeedback = useCallback(
-    async (rating: number, comment: string) => {
-      if (!current || !activeDefiRef) return;
+const setFeedback = useCallback(
+    async (rating: number, comment: string) => {
+      if (!current || !activeDefiRef) return;
 
-      await updateDoc(activeDefiRef, {
-        feedbackRating: rating,
-        feedbackComment: comment,
-        feedbackSubmitted: true,
-      });
+      // 1. Mise à jour locale (comme avant) pour l'UI immédiate
+      await updateDoc(activeDefiRef, {
+        feedbackRating: rating,
+        feedbackComment: comment,
+        feedbackSubmitted: true,
+      });
 
-      setCurrent((prev) =>
-        prev
-          ? {
-              ...prev,
-              feedbackRating: rating,
-              feedbackComment: comment,
-              feedbackSubmitted: true,
-            }
-          : prev
-      );
-    },
-    [current, activeDefiRef]
-  );
+      // 2. 🔥 AJOUT CRUCIAL : Sauvegarde dans la collection publique "feedbacks"
+      // C'est ça qui va faire apparaître l'avis dans ta page AdminFeedback
+      try {
+        const { db, auth } = await import("@/firebaseConfig"); // Ou utilise tes imports existants
+        await addDoc(collection(db, "feedbacks"), {
+            challengeTitle: current.title || "Défi sans titre",
+            rating: rating,
+            comment: comment,
+            userId: auth.currentUser?.uid,
+            userName: "Utilisateur", // Tu pourras améliorer ça plus tard avec le vrai nom
+            createdAt: new Date(), // Timestamp pour le tri
+        });
+        console.log("✔ Avis sauvegardé publiquement");
+      } catch (error) {
+        console.error("❌ Erreur sauvegarde avis public:", error);
+      }
+
+      setCurrent((prev) =>
+        prev
+          ? {
+              ...prev,
+              feedbackRating: rating,
+              feedbackComment: comment,
+              feedbackSubmitted: true,
+            }
+          : prev
+      );
+    },
+    [current, activeDefiRef]
+  );
 
   // ------------------------------------------------------------
   // UPDATE PHOTO COMMENT

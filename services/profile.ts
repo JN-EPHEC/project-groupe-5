@@ -1,5 +1,11 @@
 import { auth, db, storage } from "@/firebaseConfig";
-import * as FileSystem from "expo-file-system";
+// 👇 CHANGEMENT ICI : On utilise des imports nommés pour éviter l'erreur "does not exist"
+import {
+  cacheDirectory,
+  EncodingType,
+  readAsStringAsync,
+  writeAsStringAsync
+} from "expo-file-system";
 import { doc, updateDoc } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { Platform } from "react-native";
@@ -23,14 +29,20 @@ async function toBlob(uri: string): Promise<Blob> {
       return await webResponse.blob();
     }
 
-    const cacheUri = `${FileSystem.cacheDirectory ?? ""}temp-profile.jpg`;
+    // 👇 Utilisation directe de cacheDirectory importé
+    const cacheUri = `${cacheDirectory ?? ""}temp-profile.jpg`;
+    
     try {
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
+      // 👇 Utilisation directe de readAsStringAsync et EncodingType
+      const base64 = await readAsStringAsync(uri, {
+        encoding: EncodingType.Base64,
       });
-      await FileSystem.writeAsStringAsync(cacheUri, base64, {
-        encoding: FileSystem.EncodingType.Base64,
+      
+      // 👇 Utilisation directe de writeAsStringAsync
+      await writeAsStringAsync(cacheUri, base64, {
+        encoding: EncodingType.Base64,
       });
+      
       normalizedUri = cacheUri;
     } catch {
       const fallbackResponse = await fetch(uri);
@@ -60,21 +72,25 @@ export async function uploadProfilePhoto(uri: string): Promise<string> {
   const storageRef = ref(storage, storagePath);
 
   try {
+    // Si blob.type est indéfini, on force "image/jpeg"
     await uploadBytes(storageRef, blob, { contentType: blob.type || "image/jpeg" });
-  } catch {
+  } catch (error) {
+    console.error(error);
     throw new Error("Échec de l'envoi de la photo de profil.");
   }
 
   let downloadURL: string;
   try {
     downloadURL = await getDownloadURL(storageRef);
-  } catch {
+  } catch (error) {
+    console.error(error);
     throw new Error("Impossible de récupérer l'URL de la photo.");
   }
 
   try {
     await updateDoc(doc(db, "users", currentUser.uid), { photoURL: downloadURL });
-  } catch {
+  } catch (error) {
+    console.error(error);
     throw new Error("Échec de la mise à jour du profil utilisateur.");
   }
 

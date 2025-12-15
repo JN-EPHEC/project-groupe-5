@@ -14,6 +14,7 @@ export default function AdminLayout() {
       <Stack.Screen name="create-defi" />
       <Stack.Screen name="list-defis" />
       <Stack.Screen name="reports" />
+      <Stack.Screen name="feedback" />
     </Stack>
   );
 }

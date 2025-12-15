@@ -1,4 +1,3 @@
-// components/ui/defi/ChallengeCard.tsx
 import { useChallenges } from "@/hooks/challenges-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,11 +7,12 @@ import { Challenge } from "./types";
 
 type Props = {
   challenge: Challenge;
-  categorie: "personnel" | "club"; // NEW: perso vs club
+  categorie: "personnel" | "club";
   isOngoing: boolean;
   onToggle: (id: number) => void;
   status?: "active" | "pendingValidation" | "validated";
   onValidatePhoto?: () => void;
+  onReport?: () => void; // 👈 C'EST CETTE LIGNE QUI MANQUAIT
 };
 
 export function ChallengeCard({
@@ -22,22 +22,15 @@ export function ChallengeCard({
   onToggle,
   status,
   onValidatePhoto,
+  onReport, // 👈 ET CELLE-CI
 }: Props) {
   const { colors, mode } = useThemeMode();
   const [confirmVisible, setConfirmVisible] = useState(false);
   const { current, reviewCompleted, reviewRequiredCount } = useChallenges();
 
-  const DIFFICULTY_GRADIENTS: Record<Challenge["difficulty"], [string, string]> = {
-    Facile: ["#52D192", "#2BB673"],
-    Moyen: ["#F6D365", "#F4C95D"],
-    Difficile: ["#F9748F", "#F45B69"],
-  };
-
-  // Top pill now: just "Perso" / "Club"
   const categoryLabel = categorie === "personnel" ? "Perso" : "Club";
   const categoryIcon = categorie === "personnel" ? "person-outline" : "people-outline";
 
-  // Hide other picked challenges once 3 validations completed
   const shouldHide = useMemo(() => {
     if (!isOngoing) return false;
     if (reviewCompleted >= reviewRequiredCount) {
@@ -54,17 +47,14 @@ export function ChallengeCard({
   const timerBackground = isLightMode ? "rgba(25, 208, 125, 0.08)" : "rgba(0, 151, 178, 0.2)";
   const timerBorder = isLightMode ? "#33d186" : "rgba(0, 151, 178, 0.4)";
 
-  // Countdown until next noon (12:00)
   const [remainingMs, setRemainingMs] = useState<number>(0);
 
   useEffect(() => {
     if (!isOngoing) return;
-
     const computeNextNoon = () => {
       const now = new Date();
       const noonToday = new Date(now);
       noonToday.setHours(12, 0, 0, 0);
-
       let target = noonToday;
       if (now.getTime() >= noonToday.getTime()) {
         const noonTomorrow = new Date(now);
@@ -72,10 +62,8 @@ export function ChallengeCard({
         noonTomorrow.setHours(12, 0, 0, 0);
         target = noonTomorrow;
       }
-      const diff = target.getTime() - now.getTime();
-      setRemainingMs(Math.max(0, diff));
+      setRemainingMs(Math.max(0, target.getTime() - now.getTime()));
     };
-
     computeNextNoon();
     const timer = setInterval(computeNextNoon, 1000);
     return () => clearInterval(timer);
@@ -86,9 +74,7 @@ export function ChallengeCard({
     const h = Math.floor(totalSeconds / 3600);
     const m = Math.floor((totalSeconds % 3600) / 60);
     const s = totalSeconds % 60;
-    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(
-      s
-    ).padStart(2, "0")}`;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   };
 
   if (shouldHide) return null;
@@ -97,22 +83,34 @@ export function ChallengeCard({
     <View style={[
       styles.card, 
       { 
-        backgroundColor: colors.glass, 
-        borderColor: colors.glassBorder,
+        backgroundColor: colors.glass || colors.card, 
+        borderColor: colors.glassBorder || "transparent",
         borderWidth: 1,
       }
     ]}> 
-      {/* HEADER PILL + POINTS */}
       <View style={styles.header}>
-        <View style={[styles.categoryPill, { backgroundColor: cardAlt }]}>
-          <Ionicons name={categoryIcon} size={16} color="#7DCAB0" />
-          <Text style={styles.categoryText}>{categoryLabel}</Text>
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+            <View style={[styles.categoryPill, { backgroundColor: cardAlt }]}>
+              <Ionicons name={categoryIcon} size={16} color="#7DCAB0" />
+              <Text style={styles.categoryText}>{categoryLabel}</Text>
+            </View>
+
+            <View style={styles.pointsBadge}>
+              <Ionicons name="leaf" size={16} color="#0F3327" />
+              <Text style={styles.pointsText}>{challenge.points} pts</Text>
+            </View>
         </View>
 
-        <View style={styles.pointsBadge}>
-          <Ionicons name="leaf" size={16} color="#0F3327" />
-          <Text style={styles.pointsText}>{challenge.points} pts</Text>
-        </View>
+        {/* 🚩 BOUTON SIGNALEMENT */}
+        {onReport && (
+            <TouchableOpacity 
+                onPress={onReport}
+                style={{ padding: 4 }}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+                <Ionicons name="flag-outline" size={16} color={cardMuted} />
+            </TouchableOpacity>
+        )}
       </View>
 
       <Text style={[styles.title, { color: cardText }]}>{challenge.title}</Text>
@@ -120,9 +118,7 @@ export function ChallengeCard({
         {challenge.description}
       </Text>
 
-      {/* Difficulty + Action Button */}
       <View style={styles.metaRow}>
-        {/* DIFFICULTY PILL */}
         <View
           style={[
             styles.metaPill,
@@ -164,7 +160,6 @@ export function ChallengeCard({
           </Text>
         </View>
 
-        {/* Action Button (only if not ongoing) */}
         {!isOngoing && (
           <TouchableOpacity
             onPress={() => onToggle(challenge.id)}
@@ -184,7 +179,6 @@ export function ChallengeCard({
         )}
       </View>
 
-      {/* ACTIONS */}
       {isOngoing && (
         <View style={styles.actionsContainer}>
           {(status === "active" || status === "pendingValidation") && (
@@ -214,7 +208,6 @@ export function ChallengeCard({
             </TouchableOpacity>
           )}
 
-          {/* Proof preview + comment above pending status */}
           {status === "pendingValidation" && current?.id === challenge.id && current?.photoUri && (
             <View style={{ marginTop: 12 }}>
               <Image source={{ uri: current.photoUri }} style={{ height: 150, width: '100%', borderRadius: 16 }} />
@@ -226,31 +219,20 @@ export function ChallengeCard({
 
           {status === "pendingValidation" && (
             <View style={styles.pendingPill}>
-              <Ionicons
-                name="hourglass"
-                size={16}
-                color="#F6D365"
-                style={{ marginRight: 6 }}
-              />
+              <Ionicons name="hourglass" size={16} color="#F6D365" style={{ marginRight: 6 }} />
               <Text style={styles.pendingText}>En attente de validation</Text>
             </View>
           )}
 
           {status === "validated" && (
             <View style={styles.validatedPill}>
-              <Ionicons
-                name="checkmark-circle"
-                size={18}
-                color="#52D192"
-                style={{ marginRight: 6 }}
-              />
+              <Ionicons name="checkmark-circle" size={18} color="#52D192" style={{ marginRight: 6 }} />
               <Text style={styles.validatedText}>Défi validé</Text>
             </View>
           )}
         </View>
       )}
 
-      {/* Cancel confirmation modal */}
       <Modal
         transparent
         visible={confirmVisible}
@@ -318,14 +300,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     marginRight: 10,
   },
-  metaPillMuted: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  metaText: { color: "#9FB9AE", marginLeft: 6, fontWeight: "600" },
   metaTextDark: { color: "#0F3327", marginLeft: 6, fontWeight: "700" },
   actionsContainer: {
     marginTop: 18,
@@ -367,8 +341,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.25,
     shadowRadius: 18,
-    elevation: 6,
-    alignSelf: "stretch",
+    elevation: 6
   },
   photoBtnText: { color: "#0F3327", fontWeight: "800", fontSize: 16, letterSpacing: 0.3 },
   pendingPill: {
