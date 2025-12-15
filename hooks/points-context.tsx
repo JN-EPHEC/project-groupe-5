@@ -1,3 +1,4 @@
+// hooks/points-context.tsx
 import { db } from "@/firebaseConfig";
 import { doc, increment, updateDoc } from "firebase/firestore";
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from "react";
