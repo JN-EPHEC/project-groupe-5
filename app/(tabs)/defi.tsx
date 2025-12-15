@@ -8,26 +8,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { addDoc, collection, getDocs, serverTimestamp } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
 import {
-  Alert // <--- AJOUTÉ ICI (règle l'erreur Alert)
-  ,
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+  Alert,
   Image,
   ScrollView,
   StyleSheet,
