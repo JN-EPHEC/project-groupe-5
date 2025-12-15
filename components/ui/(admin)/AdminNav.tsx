@@ -12,7 +12,6 @@ export function AdminNav() {
 
   const isActive = (route: string) =>
     active === route.replace("/(admin)/", "") ||
-    // when you are on / (admin root)
     (!active && route === "/(admin)/");
 
   const Btn = ({
@@ -32,7 +31,7 @@ export function AdminNav() {
         style={[
           styles.btn,
           {
-            backgroundColor: activeHere ? colors.accent : colors.surfaceAlt,
+            backgroundColor: activeHere ? colors.accent : "transparent",
           },
         ]}
       >
@@ -45,8 +44,9 @@ export function AdminNav() {
           numberOfLines={1}
           style={{
             color: activeHere ? "#fff" : colors.text,
-            fontSize: 10, // Réduit légèrement la taille pour que "Signalements" rentre
+            fontSize: 9, 
             marginTop: 2,
+            fontWeight: activeHere ? "700" : "400",
           }}
         >
           {label}
@@ -67,22 +67,10 @@ export function AdminNav() {
         ]}
       >
         <Btn icon="home-outline" label="Accueil" route="/(admin)/" />
-        <Btn
-          icon="add-circle-outline"
-          label="Créer"
-          route="/(admin)/create-defi"
-        />
-        <Btn
-          icon="list-outline"
-          label="Liste"
-          route="/(admin)/list-defis"
-        />
-        {/* NOUVEAU BOUTON */}
-        <Btn
-          icon="alert-circle-outline"
-          label="Signalements"
-          route="/(admin)/reports"
-        />
+        <Btn icon="add-circle-outline" label="Créer" route="/(admin)/create-defi" />
+        <Btn icon="list-outline" label="Liste" route="/(admin)/list-defis" />
+        <Btn icon="star-outline" label="Avis" route="/(admin)/feedback" />
+        <Btn icon="alert-circle-outline" label="Alertes" route="/(admin)/reports" />
       </View>
     </View>
   );
@@ -99,12 +87,12 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   bar: {
-    marginHorizontal: 16,
+    marginHorizontal: 10,
     borderRadius: 22,
     paddingVertical: 8,
-    paddingHorizontal: 6, // Réduit un peu le padding horizontal
+    paddingHorizontal: 4,
     flexDirection: "row",
-    justifyContent: "space-between", // Changé de space-around à space-between pour mieux répartir
+    justifyContent: "space-between",
     alignItems: "center",
     elevation: 10,
     shadowOpacity: 0.15,
@@ -115,8 +103,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 6,
-    paddingHorizontal: 4,
+    paddingHorizontal: 2,
     borderRadius: 16,
-    width: "23%", // Utilisation de pourcentage au lieu de fixe pour s'adapter
+    width: "19%", 
   },
 });

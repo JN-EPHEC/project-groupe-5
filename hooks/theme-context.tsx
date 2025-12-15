@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useColorScheme } from "react-native";
 
-type ThemeMode = "light" | "dark";
+// On garde "ThemeMode" pour compatibilité, mais on exporte aussi "Theme"
+export type ThemeMode = "light" | "dark";
+export type Theme = ThemeMode; 
 
 type Palette = {
   background: string;
@@ -14,18 +16,21 @@ type Palette = {
   cardAlt: string;
   cardText: string;
   cardMuted: string;
-  pill: string;
-  pillActive: string;
+  pill: string;       // Gardé pour social.tsx
+  pillActive: string; // Gardé pour social.tsx
   success: string;
   glass: string;
   glassBorder: string;
   border: string;
+  error: string;      // AJOUTÉ pour l'admin
 };
 
 type ThemeContextType = {
   mode: ThemeMode;
+  theme: ThemeMode;   // AJOUTÉ pour l'admin
   colors: Palette;
   toggle: () => void;
+  toggleTheme: () => void; // AJOUTÉ pour l'admin (alias de toggle)
   set: (m: ThemeMode) => void;
 };
 
@@ -49,32 +54,35 @@ const palettes: Record<ThemeMode, Palette> = {
     glass: "rgba(0, 151, 178, 0.15)",
     glassBorder: "rgba(0, 151, 178, 0.3)",
     border: "rgba(0, 151, 178, 0.3)",
+    error: "#F45B69", // Rouge sombre
   },
   light: {
-    background: "#E9EEF1",
-    text: "#4A4F54",
-    mutedText: "#9BA4AB",
-    accent: "#00D68F",
-    surface: "#FFFFFF",
-    surfaceAlt: "#F0F3F5",
+    // 🎨 NOUVEAU THÈME NATURE / BEIGE
+    background: "#FAF7F2", // Beige crème
+    text: "#3E2723",        // Brun foncé
+    mutedText: "#8D6E63",   // Brun clair
+    accent: "#10B981",      // Vert GreenUp
+    surface: "#FFFFFF",     // Blanc
+    surfaceAlt: "#F2ECE4",  // Beige plus foncé
     card: "#FFFFFF",
-    cardAlt: "#F7F9FA",
-    cardText: "#4A4F54",
-    cardMuted: "#9BA4AB",
-    pill: "#FFFFFF",
-    pillActive: "#4A4F54",
-    success: "#00D68F",
+    cardAlt: "#F2ECE4",
+    cardText: "#3E2723",
+    cardMuted: "#8D6E63",
+    pill: "#FFFFFF",        // Pour social.tsx
+    pillActive: "#3E2723",  // Pour social.tsx
+    success: "#10B981",
     glass: "rgba(255, 255, 255, 0.75)",
-    glassBorder: "rgba(255, 255, 255, 1.0)",
-    border: "#E0E0E0",
+    glassBorder: "rgba(255, 255, 255, 0.5)",
+    border: "#E7DED0",
+    error: "#EF4444",       // Rouge standard
   },
 };
 
+// On garde le nom "ThemeProviderCustom" pour ne pas casser _layout.tsx
 export function ThemeProviderCustom({ children }: { children: React.ReactNode }) {
   const systemScheme = useColorScheme();
   const [mode, setMode] = useState<ThemeMode>(systemScheme === "dark" ? "dark" : "light");
 
-  // Sync with system theme changes
   useEffect(() => {
     if (systemScheme) {
       setMode(systemScheme === "dark" ? "dark" : "light");
@@ -84,8 +92,10 @@ export function ThemeProviderCustom({ children }: { children: React.ReactNode })
   const value = useMemo(
     () => ({
       mode,
+      theme: mode, // Alias pour compatibilité
       colors: palettes[mode],
       toggle: () => setMode((prev) => (prev === "dark" ? "light" : "dark")),
+      toggleTheme: () => setMode((prev) => (prev === "dark" ? "light" : "dark")), // Alias
       set: (m: ThemeMode) => setMode(m),
     }),
     [mode]

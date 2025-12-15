@@ -128,6 +128,13 @@ export default function AdminHome() {
             route="/(admin)/reports"
             colorType="alert"
           />
+          <GlassButton
+            title="Avis & Retours"
+            subtitle="Notes et commentaires des membres"
+            icon="star-outline" // ou "chatbox-outline"
+            route="/(admin)/feedback"
+            colorType="normal" // ou un nouveau type "warning" jaune si tu veux
+/>
         </View>
       </View>
 

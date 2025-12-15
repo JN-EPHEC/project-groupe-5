@@ -1,12 +1,33 @@
-// app/(tabs)/defi.tsx
+import { ReportModal } from "@/components/ui/defi/ReportModal";
 import { useClub } from "@/hooks/club-context";
 import { useFriends } from "@/hooks/friends-context";
 import { usePoints } from "@/hooks/points-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { addDoc, collection, getDocs, serverTimestamp } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
 import {
+  Alert // <--- AJOUTÉ ICI (règle l'erreur Alert)
+  ,
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   Image,
   ScrollView,
   StyleSheet,
@@ -27,7 +48,11 @@ import * as ImagePicker from "expo-image-picker";
 
 import { Challenge, TabKey } from "@/components/ui/defi/types";
 import { db } from "@/firebaseConfig";
-import { collection, getDocs } from "firebase/firestore";
+
+// 👇 LES NOUVEAUX IMPORTS QUI MANQUAIENT 👇
+import { useUser } from "@/hooks/user-context";
+import { sendReport } from "@/services/reports";
+// 👆 ----------------------------------- 👆
 
 type DefiDoc = {
   id: string;
@@ -42,6 +67,8 @@ type DefiDoc = {
   createdAt?: { seconds: number; nanoseconds: number } | any;
 };
 
+
+
 export default function DefiScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ view?: string }>();
@@ -49,7 +76,68 @@ export default function DefiScreen() {
   const { friends } = useFriends();
   const { points } = usePoints();
   const { joinedClub, members } = useClub();
+// ... après const { joinedClub, members } = useClub();
 
+  // 👇 COLLE ÇA ICI 👇
+  const { user } = useUser(); 
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  // 1. Définir le type précis pour éviter les erreurs rouges
+type TargetReport = {
+  id: string;          // L'ID de la preuve
+  title: string;       // Le titre du défi
+  defiId: string;      // L'ID du défi parent
+  photoUrl?: string;   // Optionnel (peut être null)
+  commentaire?: string; // Optionnel
+};
+
+// 2. Utiliser ce type dans le useState
+const [targetReportId, setTargetReportId] = useState<TargetReport | null>(null);
+  // Ouvre la popup
+  // Ouvre la popup avec toutes les données requises
+  const handleOpenReport = (
+    id: string, 
+    title: string, 
+    defiId: string,        // <--- NOUVEAU : Obligatoire selon ton type
+    photoUrl?: string,     // <--- NOUVEAU : Optionnel
+    commentaire?: string   // <--- NOUVEAU : Optionnel
+  ) => {
+    setTargetReportId({ id, title, defiId, photoUrl, commentaire });
+    setReportModalVisible(true);
+  };
+
+// Envoie les données à Firebase
+ // Envoie les données à Firebase
+  const handleSubmitReport = async (reason: string) => {
+    if (!targetReportId || !user) return;
+    
+    // 1. Détermine si c'est une image ou du texte
+    const hasImage = targetReportId.photoUrl && targetReportId.photoUrl !== "";
+    const proofType = hasImage ? 'image' : 'text';
+    
+    // 2. Sécurise le contenu (évite l'erreur "undefined" avec || "")
+    const proofContent = hasImage 
+        ? (targetReportId.photoUrl || "") 
+        : (targetReportId.commentaire || "Pas de contenu");
+
+    // 3. Envoi
+    const success = await sendReport(
+        targetReportId.defiId || "inconnu", // Sécurité anti-plantage
+        targetReportId.title || "Défi signalé", 
+        targetReportId.id,          
+        proofContent,               
+        proofType,                  
+        reason,                     
+        user.uid                    
+    );
+
+    if (success) {
+        Alert.alert("Merci", "Le signalement a été envoyé.");
+        setReportModalVisible(false); // On ferme la modale
+        setTargetReportId(null);      // On nettoie
+    } else {
+        Alert.alert("Erreur", "Impossible d'envoyer le signalement. Vérifiez votre connexion.");
+    }
+  };
   const isLight = mode === "light";
   const darkBg = "#021114";
 
@@ -229,10 +317,12 @@ export default function DefiScreen() {
     reviewCompleted >= reviewRequiredCount &&
     current?.feedbackSubmitted;
 
-  const challengesToDisplay = useMemo(() => {
-    if (current && !gatingActive && !hideAfterFeedback) return [current];
+const challengesToDisplay = useMemo(() => {
+    // 🟢 CORRECTION : On affiche le défi courant tant qu'il n'y a pas de blocage (gating)
+    // On retire "!hideAfterFeedback" pour garder la carte visible après l'avis
+    if (current && !gatingActive) return [current];
     return rotatingChallenges;
-  }, [current, rotatingChallenges, gatingActive, hideAfterFeedback]);
+  }, [current, rotatingChallenges, gatingActive]);
 
   // 🔁 Activate or cancel a challenge
   const toggleOngoing = (id: number) => {
@@ -271,7 +361,36 @@ export default function DefiScreen() {
       });
     }
   };
+const handleSendFeedbackToAdmin = async () => {
+    // Sécurité : on n'envoie rien si la note est 0
+    if (feedbackRating === 0) return;
 
+    try {
+      // CORRECTION ICI : On gère le nom de l'utilisateur pour éviter l'erreur TypeScript
+      // On essaie 'name', sinon 'displayName', sinon "Membre"
+      const safeUserName = (user as any)?.name || (user as any)?.displayName || "Membre";
+
+      // 1. On prépare les données pour l'Admin
+      const feedbackData = {
+        challengeTitle: current?.title || "Défi sans titre",
+        rating: feedbackRating,
+        comment: feedbackComment.trim(),
+        userName: safeUserName, 
+        userId: user?.uid, 
+        createdAt: serverTimestamp(), // Maintenant ça va marcher car c'est importé
+      };
+
+      // 2. On écrit dans la collection "feedbacks"
+      await addDoc(collection(db, "feedbacks"), feedbackData);
+
+      console.log("Avis envoyé à l'admin avec succès !");
+    } catch (error) {
+      console.error("Erreur envoi avis admin:", error);
+    } finally {
+      // 3. Quoi qu'il arrive, on valide dans l'appli utilisateur
+      setFeedback(feedbackRating, feedbackComment.trim());
+    }
+  };
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: isLight ? colors.background : darkBg }]}>
       {/* HEADER with toggle icon */}
@@ -370,11 +489,10 @@ export default function DefiScreen() {
                   <ValidationCard
                     key={p.id}
                     item={{
-                      // 🔢 purely UI id, numeric => TS happy
                       id: index + 1,
                       title: "Preuve à valider",
                       description: "",
-                      category: "Recyclage",   // temporary placeholder
+                      category: "Recyclage",
                       difficulty: current?.difficulty ?? "Facile",
                       points: typeof current?.points === "number" ? current.points : 10,
                       audience: "Membre",
@@ -392,7 +510,15 @@ export default function DefiScreen() {
                       await voteOnProof(p.id, false);
                       removeFromQueue(p.id);
                       incrementReview();
-                    }}
+                    }} 
+                    // 👇 CORRECTION ICI 👇
+                    onReport={() => handleOpenReport(
+                      p.id, 
+                      "Preuve à vérifier", 
+                      p.defiId,       // On passe l'ID du défi parent
+                      p.photoUrl,     // On passe l'URL de la photo
+                      p.commentaire   // On passe le commentaire
+                    )}
                   />
                 ))
               ))}
@@ -401,13 +527,19 @@ export default function DefiScreen() {
             {!gatingActive &&
               challengesToDisplay.map((challenge: any) => {
                 return (
-                  <ChallengeCard
+                 <ChallengeCard
                     key={challenge.id}
                     challenge={challenge}
                     categorie="personnel"
                     isOngoing={current?.id === challenge.id}
                     status={current?.id === challenge.id ? current?.status : undefined}
                     onToggle={toggleOngoing}
+                    // 👇 CORRECTION ICI 👇
+                    onReport={() => handleOpenReport(
+                      challenge.firestoreId || String(challenge.id), 
+                      challenge.title,
+                      challenge.firestoreId || String(challenge.id) // Le defiId est l'ID du challenge lui-même
+                    )}
                     onValidatePhoto={
                       current &&
                       current.id === challenge.id &&
@@ -478,19 +610,17 @@ export default function DefiScreen() {
                     }}
                   />
                   <TouchableOpacity
-                    onPress={() =>
-                      setFeedback(feedbackRating || 0, feedbackComment.trim())
-                    }
-                    disabled={feedbackRating === 0}
-                    style={{
-                      marginTop: 14,
-                      borderRadius: 14,
-                      paddingVertical: 12,
-                      alignItems: "center",
-                      backgroundColor:
-                        feedbackRating === 0 ? "#2A3431" : colors.accent,
-                    }}
-                  >
+  onPress={handleSendFeedbackToAdmin} // <--- On utilise la nouvelle fonction
+  disabled={feedbackRating === 0}
+  style={{
+    marginTop: 14,
+    borderRadius: 14,
+    paddingVertical: 12,
+    alignItems: "center",
+    backgroundColor:
+      feedbackRating === 0 ? "#2A3431" : colors.accent,
+  }}
+>
                     <Text
                       style={{
                         color:
@@ -709,6 +839,12 @@ export default function DefiScreen() {
           </View>
         )}
       </ScrollView>
+      {/* 🔴 COLLE CE BLOC ICI (ENTRE ScrollView et SafeAreaView) 🔴 */}
+      <ReportModal
+        visible={reportModalVisible}
+        onClose={() => setReportModalVisible(false)}
+        onSubmit={handleSubmitReport}
+      />
     </SafeAreaView>
   );
 }
