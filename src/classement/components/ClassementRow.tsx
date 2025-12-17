@@ -10,63 +10,84 @@ type Props = {
 };
 
 export function ClassementRow({ user }: Props) {
-  const tierKey = getClassementTier(user.rank ?? 50);
-  const tierStyle = CLASSEMENT_TIER_STYLES[tierKey];
-
+  const rank = user.rank ?? 50;
   const isCurrentUser = user.isCurrentUser;
+  const isQualified = user.qualified === true;
 
-  const tierBorder = tierStyle.borderColor;
+  // 🎨 Rank → color identity
+  const rankColor =
+    rank === 1
+      ? { bg: "#FACC15", text: "#3B2F00" } // gold
+      : rank === 2
+      ? { bg: "#CBD5E1", text: "#1F2933" } // silver
+      : rank === 3
+      ? { bg: "#D97706", text: "#3B1F00" } // bronze
+      : null;
 
-  // Subtle background tint (same for everyone)
-  const tierBackground = `${tierBorder}14`; // ~8% opacity
+  const tierKey = getClassementTier(rank);
+  const tierBorder = CLASSEMENT_TIER_STYLES[tierKey].borderColor;
+
+  // ✅ FULL PLATE ONLY IF QUALIFIED
+  const isFullPlate = isQualified;
 
   return (
     <View
       style={{
         flexDirection: "row",
         alignItems: "center",
-        paddingVertical: 10,
-        paddingHorizontal: 12,
-        borderRadius: 14,
-        marginBottom: 8,
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        borderRadius: 16,
+        marginBottom: 10,
 
-        // ✅ Tier identity (everyone)
-        backgroundColor: tierBackground,
-        borderWidth: 1.5,
+        // 🎨 Background logic
+        backgroundColor: isFullPlate
+          ? rankColor?.bg ?? tierBorder
+          : `${tierBorder}14`,
+
+        // ❌ No border when full plate
+        borderWidth: isFullPlate ? 0 : 1.5,
         borderColor: tierBorder,
 
-        // ✅ Relief for everyone (soft, neutral)
+        // 🧱 Relief (neutral)
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
+        shadowOpacity: 0.18,
         shadowRadius: 4,
-        elevation: 2,
+        elevation: 3,
 
-        // 🌟 EXTRA glow ONLY for current user
+        // 🌟 Extra emphasis for current user
         ...(isCurrentUser && {
           shadowColor: tierBorder,
-          shadowOpacity: 0.9,
-          shadowRadius: 10,
+          shadowOpacity: 0.8,
+          shadowRadius: 8,
           elevation: 6,
         }),
       }}
     >
-      {/* Rank circle */}
+      {/* Rank */}
       <View
         style={{
           width: 28,
           height: 28,
           borderRadius: 14,
-          backgroundColor: user.isCurrentUser
-            ? tierStyle.borderColor
-            : "rgba(255,255,255,0.12)",
+          backgroundColor: isFullPlate
+            ? "rgba(0,0,0,0.15)"
+            : tierBorder,
           alignItems: "center",
           justifyContent: "center",
           marginRight: 10,
         }}
       >
-        <Text style={{ color: "#0F3327", fontWeight: "800" }}>
-          {user.rank}
+        <Text
+          style={{
+            color: isFullPlate
+              ? rankColor?.text ?? "#0F3327"
+              : "#0F3327",
+            fontWeight: "800",
+          }}
+        >
+          {rank}
         </Text>
       </View>
 
@@ -87,33 +108,37 @@ export function ClassementRow({ user }: Props) {
         }}
       />
 
-      {/* Name + reserved subtitle space */}
+      {/* Name */}
       <View style={{ flex: 1 }}>
         <Text
           style={{
-            color: isCurrentUser ? "#FFFFFF" : "#E5E7EB",
-            fontWeight: isCurrentUser ? "800" : "600",
+            color: isFullPlate
+              ? rankColor?.text ?? "#FFFFFF"
+              : "#E5E7EB",
+            fontWeight: "800",
           }}
         >
           {user.displayName}
         </Text>
 
-        {/* Always reserve height to avoid row jump */}
-        <Text
-          style={{
-            height: 14,
-            fontSize: 12,
-            color: isCurrentUser ? "#94A3B8" : "transparent",
-          }}
-        >
-          {isCurrentUser ? "Ta position" : "—"}
-        </Text>
+        {isCurrentUser && (
+          <Text
+            style={{
+              fontSize: 12,
+              color: isFullPlate
+                ? rankColor?.text ?? "#94A3B8"
+                : "#94A3B8",
+            }}
+          >
+            Ta position
+          </Text>
+        )}
       </View>
 
-      {/* Points pill (unchanged, intentional) */}
+      {/* Points */}
       <View
         style={{
-          backgroundColor: "#D4F7E7",
+          backgroundColor: "rgba(255,255,255,0.75)",
           borderRadius: 12,
           paddingHorizontal: 10,
           paddingVertical: 6,

@@ -27,6 +27,7 @@ export function useClassement() {
       return {
         ...u,
         rank,
+        qualified: u.qualified ?? false,
         isCurrentUser: u.uid === user?.uid,
         greeniesEarned:
           cycle.status === "locked" ? getGreeniesForRank(rank) : undefined,
