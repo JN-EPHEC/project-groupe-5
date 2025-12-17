@@ -15,6 +15,11 @@ export function ClassementRow({ user }: Props) {
 
   const isCurrentUser = user.isCurrentUser;
 
+  const tierBorder = tierStyle.borderColor;
+
+  // Subtle background tint (same for everyone)
+  const tierBackground = `${tierBorder}14`; // ~8% opacity
+
   return (
     <View
       style={{
@@ -25,17 +30,25 @@ export function ClassementRow({ user }: Props) {
         borderRadius: 14,
         marginBottom: 8,
 
-        // 🎨 Tier look
-        backgroundColor: tierStyle.backgroundColor,
+        // ✅ Tier identity (everyone)
+        backgroundColor: tierBackground,
         borderWidth: 1.5,
-        borderColor: tierStyle.borderColor,
+        borderColor: tierBorder,
 
-        // 🧱 Relief / pop
-        shadowColor: tierStyle.borderColor,
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: isCurrentUser ? 0.9 : 0.35,
-        shadowRadius: isCurrentUser ? 10 : 6,
-        elevation: isCurrentUser ? 6 : 3,
+        // ✅ Relief for everyone (soft, neutral)
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 4,
+        elevation: 2,
+
+        // 🌟 EXTRA glow ONLY for current user
+        ...(isCurrentUser && {
+          shadowColor: tierBorder,
+          shadowOpacity: 0.9,
+          shadowRadius: 10,
+          elevation: 6,
+        }),
       }}
     >
       {/* Rank circle */}
@@ -44,7 +57,9 @@ export function ClassementRow({ user }: Props) {
           width: 28,
           height: 28,
           borderRadius: 14,
-          backgroundColor: tierStyle.borderColor,
+          backgroundColor: user.isCurrentUser
+            ? tierStyle.borderColor
+            : "rgba(255,255,255,0.12)",
           alignItems: "center",
           justifyContent: "center",
           marginRight: 10,

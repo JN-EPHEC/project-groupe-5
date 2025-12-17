@@ -33,6 +33,7 @@ import { db } from "@/firebaseConfig";
 import { useUser } from "@/hooks/user-context";
 import { sendReport } from "@/services/reports";
 import { ClassementList } from "@/src/classement/components/ClassementList";
+import { RewardDistributionModal } from "@/src/classement/components/RewardDistributionModal";
 import { useClassement } from "@/src/classement/hooks/useClassement";
 
 
@@ -58,6 +59,7 @@ export default function DefiScreen() {
   const { friends } = useFriends();
   const { points } = usePoints();
   const { joinedClub, members } = useClub();
+  const [rewardModalVisible, setRewardModalVisible] = useState(false);
 // ... après const { joinedClub, members } = useClub();
 
   // 👇 COLLE ÇA ICI 👇
@@ -538,17 +540,17 @@ const handleSendFeedbackToAdmin = async () => {
                     }}
                   />
                   <TouchableOpacity
-  onPress={handleSendFeedbackToAdmin} // <--- On utilise la nouvelle fonction
-  disabled={feedbackRating === 0}
-  style={{
-    marginTop: 14,
-    borderRadius: 14,
-    paddingVertical: 12,
-    alignItems: "center",
-    backgroundColor:
-      feedbackRating === 0 ? "#2A3431" : colors.accent,
-  }}
->
+                    onPress={handleSendFeedbackToAdmin} // <--- On utilise la nouvelle fonction
+                    disabled={feedbackRating === 0}
+                    style={{
+                      marginTop: 14,
+                      borderRadius: 14,
+                      paddingVertical: 12,
+                      alignItems: "center",
+                      backgroundColor:
+                        feedbackRating === 0 ? "#2A3431" : colors.accent,
+                    }}
+                  >
                     <Text
                       style={{
                         color:
@@ -595,17 +597,46 @@ const handleSendFeedbackToAdmin = async () => {
         {viewMode === 'classement' && (
           <>
             {activeTab === 'perso' && (
-              <View style={{ backgroundColor: colors.surface, padding: 20, borderRadius: 24, marginBottom: 18 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ color: colors.text, fontSize: 18, fontWeight: '800' }}>Top 50 — Perso</Text>
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <View style={{ backgroundColor: '#52D19233', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 6 }}>
-                      <Text style={{ color: '#52D192', fontWeight: '700' }}>Amis</Text>
-                    </View>
-                    <View style={{ backgroundColor: '#6BCB3D33', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 6 }}>
-                      <Text style={{ color: colors.accent, fontWeight: '700' }}>Points</Text>
-                    </View>
-                  </View>
+              <View
+                style={{
+                  backgroundColor: colors.surface,
+                  padding: 20,
+                  borderRadius: 24,
+                  marginBottom: 18,
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: colors.text,
+                      fontSize: 18,
+                      fontWeight: "800",
+                    }}
+                  >
+                    Top 50 — Perso
+                  </Text>
+
+                  <TouchableOpacity
+                    onPress={() => setRewardModalVisible(true)}
+                    style={{
+                      backgroundColor: "rgba(82, 209, 146, 0.14)",
+                      borderRadius: 14,
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderWidth: 1,
+                      borderColor: "rgba(82, 209, 146, 0.22)",
+                    }}
+                  >
+                    <Text style={{ color: colors.text, fontWeight: "800" }}>
+                      Récompenses
+                    </Text>
+                  </TouchableOpacity>
                 </View>
                 {classementLoading ? (
                   <Text style={{ color: colors.mutedText, marginTop: 12 }}>
@@ -700,6 +731,10 @@ const handleSendFeedbackToAdmin = async () => {
         visible={reportModalVisible}
         onClose={() => setReportModalVisible(false)}
         onSubmit={handleSubmitReport}
+      />
+      <RewardDistributionModal
+        visible={rewardModalVisible}
+        onClose={() => setRewardModalVisible(false)}
       />
     </SafeAreaView>
   );
