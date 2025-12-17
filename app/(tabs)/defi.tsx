@@ -1,3 +1,4 @@
+//app/(tabs)/defi.tsx
 import { ReportModal } from "@/components/ui/defi/ReportModal";
 import { useClub } from "@/hooks/club-context";
 import { useFriends } from "@/hooks/friends-context";
@@ -29,11 +30,10 @@ import * as ImagePicker from "expo-image-picker";
 
 import { Challenge, TabKey } from "@/components/ui/defi/types";
 import { db } from "@/firebaseConfig";
-
-// 👇 LES NOUVEAUX IMPORTS QUI MANQUAIENT 👇
 import { useUser } from "@/hooks/user-context";
 import { sendReport } from "@/services/reports";
-// 👆 ----------------------------------- 👆
+import { useClassement } from "@/src/classement/hooks/useClassement";
+
 
 type DefiDoc = {
   id: string;
@@ -124,7 +124,6 @@ const [targetReportId, setTargetReportId] = useState<TargetReport | null>(null);
 
   const [activeTab, setActiveTab] = useState<TabKey>("perso");
   const [viewMode, setViewMode] = useState<"defis" | "classement">("defis");
-  const [persoRanking, setPersoRanking] = useState<any[] | null>(null);
   const {
     current,
     goToClassement,
@@ -138,6 +137,9 @@ const [targetReportId, setTargetReportId] = useState<TargetReport | null>(null);
     incrementReview,
     setFeedback,
   } = useChallenges();
+
+  // Classement data
+  const { users: classementUsers, loading: classementLoading } = useClassement();
 
   const [feedbackRating, setFeedbackRating] = useState<number>(0);
   const [feedbackComment, setFeedbackComment] = useState<string>("");
@@ -229,62 +231,6 @@ const [targetReportId, setTargetReportId] = useState<TargetReport | null>(null);
       setGoToClassement(false); // reset so it doesn't repeat
     }
   }, [goToClassement]);
-
-  // 🏆 Build perso classement ONCE (avoid random changes on every render)
-  useEffect(() => {
-    if (persoRanking) return; // already built → do nothing
-
-    const base: any[] = [];
-
-    // 1️⃣ Friends
-    friends.forEach((f: any) => {
-      base.push({
-        name: f.name ?? "Ami",
-        pts: f.points || 0,
-        avatar: f.avatar,
-      });
-    });
-
-    // 2️⃣ Me
-    base.push({
-      name: "Aymeric",
-      pts: points,
-      avatar: "https://i.pravatar.cc/100?u=me",
-    });
-
-    // 3️⃣ Fill with fake users (only once)
-    const mockNames = [
-      "Arthur",
-      "Camille",
-      "Yanis",
-      "Inès",
-      "Léa",
-      "Lucas",
-      "Maël",
-      "Nina",
-      "Noah",
-      "Sofia",
-    ];
-
-    while (base.length < 50) {
-      const n =
-        mockNames[base.length % mockNames.length] +
-        " " +
-        (Math.floor(Math.random() * 90) + 10);
-
-      base.push({
-        name: n,
-        pts: Math.floor(Math.random() * 800),
-        avatar: `https://i.pravatar.cc/100?u=${encodeURIComponent(n)}`,
-      });
-    }
-
-    // 4️⃣ Sort once
-    const sorted = base.sort((a, b) => b.pts - a.pts).slice(0, 50);
-
-    setPersoRanking(sorted);
-  }, [friends, points]);
-  
 
 
   // If user already has an ongoing challenge, only show that one.
@@ -660,11 +606,20 @@ const handleSendFeedbackToAdmin = async () => {
                     </View>
                   </View>
                 </View>
-                {persoRanking && (
+                {classementLoading ? (
+                  <Text style={{ color: colors.mutedText, marginTop: 12 }}>
+                    Chargement du classement...
+                  </Text>
+                ) : (
                   <View style={{ marginTop: 12 }}>
-                    {persoRanking.map((x, idx) => {
-                      const isMe = x.name === "Aymeric";
+                    {classementUsers.length === 0 && (
+                      <Text style={{ color: colors.mutedText }}>
+                        Aucun participant pour l&apos;instant.
+                      </Text>
+                    )}
 
+                    {/* 🧍‍♂️ Vrais utilisateurs */}
+                    {classementUsers.map((u, idx) => {
                       const rankColor =
                         idx === 0
                           ? "#52D192"
@@ -676,7 +631,7 @@ const handleSendFeedbackToAdmin = async () => {
 
                       return (
                         <View
-                          key={idx}
+                          key={u.uid}
                           style={{
                             flexDirection: "row",
                             alignItems: "center",
@@ -684,9 +639,10 @@ const handleSendFeedbackToAdmin = async () => {
                             paddingHorizontal: 12,
                             borderRadius: 14,
                             marginBottom: 8,
-                            backgroundColor: isMe ? "#1A2F28" : colors.surfaceAlt,
+                            backgroundColor: u.isCurrentUser ? "#1A2F28" : colors.surfaceAlt,
                           }}
                         >
+                          {/* Rank */}
                           <View
                             style={{
                               width: 28,
@@ -699,35 +655,45 @@ const handleSendFeedbackToAdmin = async () => {
                             }}
                           >
                             <Text style={{ color: "#0F3327", fontWeight: "800" }}>
-                              {idx + 1}
+                              {u.rank}
                             </Text>
                           </View>
 
+                          {/* Avatar */}
                           <Image
                             source={{
                               uri:
-                                x.avatar ||
-                                `https://i.pravatar.cc/100?u=${encodeURIComponent(x.name)}`,
+                                u.avatarUrl ??
+                                `https://i.pravatar.cc/100?u=${encodeURIComponent(
+                                  u.displayName
+                                )}`,
                             }}
-                            style={{ width: 28, height: 28, borderRadius: 14, marginRight: 10 }}
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: 14,
+                              marginRight: 10,
+                            }}
                           />
 
+                          {/* Name */}
                           <View style={{ flex: 1 }}>
                             <Text
                               style={{
                                 color: colors.text,
-                                fontWeight: isMe ? "800" : "600",
+                                fontWeight: u.isCurrentUser ? "800" : "600",
                               }}
                             >
-                              {x.name}
+                              {u.displayName}
                             </Text>
-                            {isMe && (
+                            {u.isCurrentUser && (
                               <Text style={{ color: colors.mutedText, fontSize: 12 }}>
                                 Ta position
                               </Text>
                             )}
                           </View>
 
+                          {/* Points */}
                           <View
                             style={{
                               backgroundColor: "#D4F7E7",
@@ -737,15 +703,87 @@ const handleSendFeedbackToAdmin = async () => {
                             }}
                           >
                             <Text style={{ color: "#0F3327", fontWeight: "800" }}>
-                              {x.pts} pts
+                              {u.rankingPoints} pts
                             </Text>
                           </View>
                         </View>
                       );
                     })}
+
+                    {/* 👻 Fake users pour compléter jusqu&apos;au Top 50 */}
+                    {Array.from({ length: Math.max(0, 50 - classementUsers.length) }).map(
+                      (_, i) => {
+                        const rank = classementUsers.length + i + 1;
+
+                        return (
+                          <View
+                            key={`fake-${rank}`}
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              paddingVertical: 10,
+                              paddingHorizontal: 12,
+                              borderRadius: 14,
+                              marginBottom: 8,
+                              backgroundColor: colors.surfaceAlt,
+                              opacity: 0.4,
+                            }}
+                          >
+                            {/* Rank */}
+                            <View
+                              style={{
+                                width: 28,
+                                height: 28,
+                                borderRadius: 14,
+                                backgroundColor: colors.surfaceAlt,
+                                alignItems: "center",
+                                justifyContent: "center",
+                                marginRight: 10,
+                              }}
+                            >
+                              <Text
+                                style={{ color: colors.mutedText, fontWeight: "800" }}
+                              >
+                                {rank}
+                              </Text>
+                            </View>
+
+                            {/* Fake name */}
+                            <View style={{ flex: 1 }}>
+                              <Text
+                                style={{
+                                  color: colors.mutedText,
+                                  fontWeight: "500",
+                                }}
+                              >
+                                EcoJoueur {rank}
+                              </Text>
+                            </View>
+
+                            {/* Empty points pill */}
+                            <View
+                              style={{
+                                backgroundColor: "#D4F7E733",
+                                borderRadius: 12,
+                                paddingHorizontal: 10,
+                                paddingVertical: 6,
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  color: colors.mutedText,
+                                  fontWeight: "700",
+                                }}
+                              >
+                                — pts
+                              </Text>
+                            </View>
+                          </View>
+                        );
+                      }
+                    )}
                   </View>
                 )}
-
               </View>
             )}
 

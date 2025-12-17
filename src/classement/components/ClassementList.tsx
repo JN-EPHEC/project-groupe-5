@@ -14,7 +14,7 @@ export function ClassementList({ users, totalSlots = 50 }: Props) {
   return (
     <View>
       {users.map((u) => (
-        <ClassementRow key={u.userId} user={u} />
+        <ClassementRow key={u.uid} user={u} />
       ))}
 
       {/* Fill remaining slots with fake users */}
