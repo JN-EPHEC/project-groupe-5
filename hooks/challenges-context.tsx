@@ -19,6 +19,7 @@ import { useRouter } from "expo-router";
 import {
   addDoc // 👈 C'est ce qu'il manquait !
   ,
+
   collection,
   deleteDoc,
   doc,
@@ -193,12 +194,12 @@ export function ChallengesProvider({
         : "Ta preuve a été refusée. Tu peux réessayer avec un autre défi.",
       primaryLabel: isSuccess ? "Voir le classement" : "Choisir un défi",
       secondaryLabel: "Fermer",
-      onPrimary: () => {
+      onPrimary: async () => {
         if (isSuccess) {
-          // ✅ Validated → go to classement
+          const { awardClassementPoints } = await import("@/src/classement/services/awardClassementPoints");
+          await awardClassementPoints(current.points);
           setGoToClassement(true);
         } else {
-          // ❌ Rejected → reset everything and go back to step 1
           stop();
         }
       },

@@ -1,3 +1,4 @@
+//app/(tabs)/defi.tsx
 import { ReportModal } from "@/components/ui/defi/ReportModal";
 import { useClub } from "@/hooks/club-context";
 import { useFriends } from "@/hooks/friends-context";
@@ -29,11 +30,12 @@ import * as ImagePicker from "expo-image-picker";
 
 import { Challenge, TabKey } from "@/components/ui/defi/types";
 import { db } from "@/firebaseConfig";
-
-// 👇 LES NOUVEAUX IMPORTS QUI MANQUAIENT 👇
 import { useUser } from "@/hooks/user-context";
 import { sendReport } from "@/services/reports";
-// 👆 ----------------------------------- 👆
+import { ClassementList } from "@/src/classement/components/ClassementList";
+import { RewardDistributionModal } from "@/src/classement/components/RewardDistributionModal";
+import { useClassement } from "@/src/classement/hooks/useClassement";
+
 
 type DefiDoc = {
   id: string;
@@ -57,6 +59,7 @@ export default function DefiScreen() {
   const { friends } = useFriends();
   const { points } = usePoints();
   const { joinedClub, members } = useClub();
+  const [rewardModalVisible, setRewardModalVisible] = useState(false);
 // ... après const { joinedClub, members } = useClub();
 
   // 👇 COLLE ÇA ICI 👇
@@ -124,7 +127,6 @@ const [targetReportId, setTargetReportId] = useState<TargetReport | null>(null);
 
   const [activeTab, setActiveTab] = useState<TabKey>("perso");
   const [viewMode, setViewMode] = useState<"defis" | "classement">("defis");
-  const [persoRanking, setPersoRanking] = useState<any[] | null>(null);
   const {
     current,
     goToClassement,
@@ -138,6 +140,9 @@ const [targetReportId, setTargetReportId] = useState<TargetReport | null>(null);
     incrementReview,
     setFeedback,
   } = useChallenges();
+
+  // Classement data
+  const { users: classementUsers, loading: classementLoading } = useClassement();
 
   const [feedbackRating, setFeedbackRating] = useState<number>(0);
   const [feedbackComment, setFeedbackComment] = useState<string>("");
@@ -229,62 +234,6 @@ const [targetReportId, setTargetReportId] = useState<TargetReport | null>(null);
       setGoToClassement(false); // reset so it doesn't repeat
     }
   }, [goToClassement]);
-
-  // 🏆 Build perso classement ONCE (avoid random changes on every render)
-  useEffect(() => {
-    if (persoRanking) return; // already built → do nothing
-
-    const base: any[] = [];
-
-    // 1️⃣ Friends
-    friends.forEach((f: any) => {
-      base.push({
-        name: f.name ?? "Ami",
-        pts: f.points || 0,
-        avatar: f.avatar,
-      });
-    });
-
-    // 2️⃣ Me
-    base.push({
-      name: "Aymeric",
-      pts: points,
-      avatar: "https://i.pravatar.cc/100?u=me",
-    });
-
-    // 3️⃣ Fill with fake users (only once)
-    const mockNames = [
-      "Arthur",
-      "Camille",
-      "Yanis",
-      "Inès",
-      "Léa",
-      "Lucas",
-      "Maël",
-      "Nina",
-      "Noah",
-      "Sofia",
-    ];
-
-    while (base.length < 50) {
-      const n =
-        mockNames[base.length % mockNames.length] +
-        " " +
-        (Math.floor(Math.random() * 90) + 10);
-
-      base.push({
-        name: n,
-        pts: Math.floor(Math.random() * 800),
-        avatar: `https://i.pravatar.cc/100?u=${encodeURIComponent(n)}`,
-      });
-    }
-
-    // 4️⃣ Sort once
-    const sorted = base.sort((a, b) => b.pts - a.pts).slice(0, 50);
-
-    setPersoRanking(sorted);
-  }, [friends, points]);
-  
 
 
   // If user already has an ongoing challenge, only show that one.
@@ -591,17 +540,17 @@ const handleSendFeedbackToAdmin = async () => {
                     }}
                   />
                   <TouchableOpacity
-  onPress={handleSendFeedbackToAdmin} // <--- On utilise la nouvelle fonction
-  disabled={feedbackRating === 0}
-  style={{
-    marginTop: 14,
-    borderRadius: 14,
-    paddingVertical: 12,
-    alignItems: "center",
-    backgroundColor:
-      feedbackRating === 0 ? "#2A3431" : colors.accent,
-  }}
->
+                    onPress={handleSendFeedbackToAdmin} // <--- On utilise la nouvelle fonction
+                    disabled={feedbackRating === 0}
+                    style={{
+                      marginTop: 14,
+                      borderRadius: 14,
+                      paddingVertical: 12,
+                      alignItems: "center",
+                      backgroundColor:
+                        feedbackRating === 0 ? "#2A3431" : colors.accent,
+                    }}
+                  >
                     <Text
                       style={{
                         color:
@@ -648,104 +597,61 @@ const handleSendFeedbackToAdmin = async () => {
         {viewMode === 'classement' && (
           <>
             {activeTab === 'perso' && (
-              <View style={{ backgroundColor: colors.surface, padding: 20, borderRadius: 24, marginBottom: 18 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ color: colors.text, fontSize: 18, fontWeight: '800' }}>Top 50 — Perso</Text>
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <View style={{ backgroundColor: '#52D19233', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 6 }}>
-                      <Text style={{ color: '#52D192', fontWeight: '700' }}>Amis</Text>
-                    </View>
-                    <View style={{ backgroundColor: '#6BCB3D33', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 6 }}>
-                      <Text style={{ color: colors.accent, fontWeight: '700' }}>Points</Text>
-                    </View>
-                  </View>
+              <View
+                style={{
+                  backgroundColor: colors.surface,
+                  padding: 20,
+                  borderRadius: 24,
+                  marginBottom: 18,
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: colors.text,
+                      fontSize: 18,
+                      fontWeight: "800",
+                    }}
+                  >
+                    Top 50 — Perso
+                  </Text>
+
+                  <TouchableOpacity
+                    onPress={() => setRewardModalVisible(true)}
+                    style={{
+                      backgroundColor: "rgba(82, 209, 146, 0.14)",
+                      borderRadius: 14,
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderWidth: 1,
+                      borderColor: "rgba(82, 209, 146, 0.22)",
+                    }}
+                  >
+                    <Text style={{ color: colors.text, fontWeight: "800" }}>
+                      Récompenses
+                    </Text>
+                  </TouchableOpacity>
                 </View>
-                {persoRanking && (
+                {classementLoading ? (
+                  <Text style={{ color: colors.mutedText, marginTop: 12 }}>
+                    Chargement du classement...
+                  </Text>
+                ) : (
                   <View style={{ marginTop: 12 }}>
-                    {persoRanking.map((x, idx) => {
-                      const isMe = x.name === "Aymeric";
-
-                      const rankColor =
-                        idx === 0
-                          ? "#52D192"
-                          : idx === 1
-                          ? "#F6D365"
-                          : idx === 2
-                          ? "#F45B69"
-                          : colors.surfaceAlt;
-
-                      return (
-                        <View
-                          key={idx}
-                          style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            paddingVertical: 10,
-                            paddingHorizontal: 12,
-                            borderRadius: 14,
-                            marginBottom: 8,
-                            backgroundColor: isMe ? "#1A2F28" : colors.surfaceAlt,
-                          }}
-                        >
-                          <View
-                            style={{
-                              width: 28,
-                              height: 28,
-                              borderRadius: 14,
-                              backgroundColor: rankColor,
-                              alignItems: "center",
-                              justifyContent: "center",
-                              marginRight: 10,
-                            }}
-                          >
-                            <Text style={{ color: "#0F3327", fontWeight: "800" }}>
-                              {idx + 1}
-                            </Text>
-                          </View>
-
-                          <Image
-                            source={{
-                              uri:
-                                x.avatar ||
-                                `https://i.pravatar.cc/100?u=${encodeURIComponent(x.name)}`,
-                            }}
-                            style={{ width: 28, height: 28, borderRadius: 14, marginRight: 10 }}
-                          />
-
-                          <View style={{ flex: 1 }}>
-                            <Text
-                              style={{
-                                color: colors.text,
-                                fontWeight: isMe ? "800" : "600",
-                              }}
-                            >
-                              {x.name}
-                            </Text>
-                            {isMe && (
-                              <Text style={{ color: colors.mutedText, fontSize: 12 }}>
-                                Ta position
-                              </Text>
-                            )}
-                          </View>
-
-                          <View
-                            style={{
-                              backgroundColor: "#D4F7E7",
-                              borderRadius: 12,
-                              paddingHorizontal: 10,
-                              paddingVertical: 6,
-                            }}
-                          >
-                            <Text style={{ color: "#0F3327", fontWeight: "800" }}>
-                              {x.pts} pts
-                            </Text>
-                          </View>
-                        </View>
-                      );
-                    })}
+                    {classementUsers.length === 0 && (
+                      <Text style={{ color: colors.mutedText }}>
+                        Aucun participant pour l&apos;instant.
+                      </Text>
+                    )}
+                    <ClassementList users={classementUsers} totalSlots={50} />
                   </View>
                 )}
-
               </View>
             )}
 
@@ -825,6 +731,10 @@ const handleSendFeedbackToAdmin = async () => {
         visible={reportModalVisible}
         onClose={() => setReportModalVisible(false)}
         onSubmit={handleSubmitReport}
+      />
+      <RewardDistributionModal
+        visible={rewardModalVisible}
+        onClose={() => setRewardModalVisible(false)}
       />
     </SafeAreaView>
   );

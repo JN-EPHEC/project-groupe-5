@@ -29,7 +29,7 @@ export type ClassementLeague = {
 // User in classement
 // -----------------------------
 export type ClassementUser = {
-  userId: string;
+  uid: string;
   displayName: string;
   avatarUrl?: string;
 
