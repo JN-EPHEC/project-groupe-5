@@ -4,9 +4,6 @@ import { Image, Text, View } from "react-native";
 import { ClassementUser } from "../types/classement";
 import { CLASSEMENT_TIER_STYLES } from "../utils/classementTierColors";
 import { getClassementTier } from "../utils/getClassementTier";
-import { QualificationBadge } from "./QualificationBadge";
-import { RewardPreview } from "./RewardPreview";
-
 
 type Props = {
   user: ClassementUser;
@@ -15,69 +12,101 @@ type Props = {
 export function ClassementRow({ user }: Props) {
   const tierKey = getClassementTier(user.rank ?? 50);
   const tierStyle = CLASSEMENT_TIER_STYLES[tierKey];
+
+  const isCurrentUser = user.isCurrentUser;
+
   return (
     <View
       style={{
         flexDirection: "row",
         alignItems: "center",
-        padding: 12,
-        borderRadius: 16,
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 14,
         marginBottom: 8,
 
-        backgroundColor: tierStyle.background,
+        // 🎨 Tier look
+        backgroundColor: tierStyle.backgroundColor,
         borderWidth: 1.5,
-        borderColor: tierStyle.border,
+        borderColor: tierStyle.borderColor,
 
-        // keep highlight for current user
-        ...(user.isCurrentUser && {
-          shadowColor: tierStyle.border,
-          shadowOpacity: 0.9,
-          shadowRadius: 10,
-          elevation: 4,
-        }),
+        // 🧱 Relief / pop
+        shadowColor: tierStyle.borderColor,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: isCurrentUser ? 0.9 : 0.35,
+        shadowRadius: isCurrentUser ? 10 : 6,
+        elevation: isCurrentUser ? 6 : 3,
       }}
     >
-
-      {/* Rank */}
-      <Text style={{ width: 24, fontWeight: "800", color: "white" }}>
-        {user.rank}
-      </Text>
-
-      {/* Avatar */}
-      {user.avatarUrl && !user.isFake ? (
-        <Image
-          source={{ uri: user.avatarUrl }}
-          style={{ width: 28, height: 28, borderRadius: 14, marginRight: 10 }}
-        />
-      ) : (
-        <View
-          style={{
-            width: 28,
-            height: 28,
-            borderRadius: 14,
-            marginRight: 10,
-            backgroundColor: "#1f2937",
-          }}
-        />
-      )}
-
-      {/* Name */}
-      <View style={{ flex: 1 }}>
-        <Text style={{ color: "white", fontWeight: "600" }}>
-          {user.displayName}
+      {/* Rank circle */}
+      <View
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: 14,
+          backgroundColor: tierStyle.borderColor,
+          alignItems: "center",
+          justifyContent: "center",
+          marginRight: 10,
+        }}
+      >
+        <Text style={{ color: "#0F3327", fontWeight: "800" }}>
+          {user.rank}
         </Text>
-        <QualificationBadge qualified={user.qualified} />
       </View>
 
-      {/* Points + reward */}
-      <View style={{ alignItems: "flex-end" }}>
-        <Text style={{ fontWeight: "800", color: "#22c55e" }}>
+      {/* Avatar */}
+      <Image
+        source={{
+          uri:
+            user.avatarUrl ??
+            `https://i.pravatar.cc/100?u=${encodeURIComponent(
+              user.displayName
+            )}`,
+        }}
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: 14,
+          marginRight: 10,
+        }}
+      />
+
+      {/* Name + reserved subtitle space */}
+      <View style={{ flex: 1 }}>
+        <Text
+          style={{
+            color: isCurrentUser ? "#FFFFFF" : "#E5E7EB",
+            fontWeight: isCurrentUser ? "800" : "600",
+          }}
+        >
+          {user.displayName}
+        </Text>
+
+        {/* Always reserve height to avoid row jump */}
+        <Text
+          style={{
+            height: 14,
+            fontSize: 12,
+            color: isCurrentUser ? "#94A3B8" : "transparent",
+          }}
+        >
+          {isCurrentUser ? "Ta position" : "—"}
+        </Text>
+      </View>
+
+      {/* Points pill (unchanged, intentional) */}
+      <View
+        style={{
+          backgroundColor: "#D4F7E7",
+          borderRadius: 12,
+          paddingHorizontal: 10,
+          paddingVertical: 6,
+        }}
+      >
+        <Text style={{ color: "#0F3327", fontWeight: "800" }}>
           {user.rankingPoints} pts
         </Text>
-        <RewardPreview
-          greenies={user.greeniesEarned ?? 0}
-          qualified={user.qualified}
-        />
       </View>
     </View>
   );
