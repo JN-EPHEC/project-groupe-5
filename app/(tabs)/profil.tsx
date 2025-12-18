@@ -7,7 +7,7 @@ import { ShareQRModal } from "@/components/ui/qr/ShareQRModal";
 import PremiumCard from "@/components/ui/recompenses/PremiumCard";
 import { FontFamilies } from "@/constants/fonts";
 import { auth, db } from "@/firebaseConfig";
-import { useClub } from "@/hooks/club-context";
+import { useClassement } from "@/src/classement/hooks/useClassement";
 import { useFriends } from "@/hooks/friends-context";
 import { usePoints } from "@/hooks/points-context";
 import { useThemeMode } from "@/hooks/theme-context";
@@ -26,10 +26,35 @@ export default function ProfilScreen() {
   const { points } = usePoints();
   const { user } = useUser();
   const fullName = `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim();
-  const { joinedClub, members } = useClub();
   const { friends } = useFriends();
   const [showQR, setShowQR] = useState(false);
   const router = useRouter();
+
+  const { users: classementUsers, loading: classementLoading } = useClassement();
+
+  const { challengeRank } = useMemo(() => {
+    if (classementLoading || !classementUsers || !user) {
+      return { challengeRank: null };
+    }
+    const currentUserData = classementUsers.find((u) => u.uid === user.uid);
+    return {
+      challengeRank: currentUserData?.rank,
+    };
+  }, [classementUsers, classementLoading, user]);
+
+  const individualRankLabel = useMemo(() => {
+    if (challengeRank === null || challengeRank === undefined) return "—";
+    return `#${challengeRank}`;
+  }, [challengeRank]);
+
+  const myPoints = useMemo(() => (typeof points === "number" ? points : user?.points ?? 0), [points, user?.points]);
+
+  const friendRankLabel = useMemo(() => {
+    const totals = [...friends.map((friend) => friend.points || 0), myPoints].sort((a, b) => b - a);
+    const pos = totals.findIndex((value) => value === myPoints) + 1;
+    return `#${pos || 1}`;
+  }, [friends, myPoints]);
+
 
   const startSubscription = async () => {
     const current = auth.currentUser;
@@ -65,21 +90,6 @@ export default function ProfilScreen() {
       alert(error?.message || "Une erreur est survenue.");
     }
   };
-
-  const myPoints = useMemo(() => (typeof points === "number" ? points : user?.points ?? 0), [points, user?.points]);
-
-  const friendRankLabel = useMemo(() => {
-    const totals = [...friends.map((friend) => friend.points || 0), myPoints].sort((a, b) => b - a);
-    const pos = totals.findIndex((value) => value === myPoints) + 1;
-    return `#${pos || 1}`;
-  }, [friends, myPoints]);
-
-  const clubRankLabel = useMemo(() => {
-    if (!joinedClub) return null;
-    const clubTotals = [...members.map((member) => member.points || 0), myPoints].sort((a, b) => b - a);
-    const position = clubTotals.findIndex((value) => value === myPoints) + 1;
-    return `#${position || 1}`;
-  }, [joinedClub, members, myPoints]);
 
   const darkBg = "#021114";
   const darkCardGradient = ["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"] as const;
@@ -156,13 +166,19 @@ export default function ProfilScreen() {
 
         <View style={sectionSpacing}>
           <View style={styles.row}>
-            <StatCard icon="person-outline" label="Classement entre amis" value={friendRankLabel} />
             <TouchableOpacity
               style={{ flex: 1 }}
               activeOpacity={0.8}
-              onPress={() => router.push("/social?tab=clubs&view=clubRanking")}
+              onPress={() => router.push("/defi")}
             >
-              <StatCard icon="people" label="Classement club" value={clubRankLabel ?? "—"} />
+              <StatCard icon="trophy-outline" label="Classement individuel" value={individualRankLabel} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{ flex: 1 }}
+              activeOpacity={0.8}
+              onPress={() => router.push("/social?tab=amis")}
+            >
+              <StatCard icon="person-outline" label="Classement entre amis" value={friendRankLabel} />
             </TouchableOpacity>
           </View>
         </View>
