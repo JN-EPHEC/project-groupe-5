@@ -17,9 +17,10 @@ import { auth, db } from "@/firebaseConfig";
 import type { ClubInfo, ClubMember } from "@/hooks/club-context";
 import { useClub } from "@/hooks/club-context";
 import { useFriends } from "@/hooks/friends-context";
-import { usePoints } from "@/hooks/points-context";
 import { useSubscriptions } from "@/hooks/subscriptions-context";
 import { useUser } from "@/hooks/user-context";
+import { useCurrentCycle } from "@/src/classement/hooks/useCurrentCycle";
+import { useLeagueUsers } from "@/src/classement/hooks/useLeagueUsers";
 import { acceptJoinRequest, rejectJoinRequest, requestJoinClub, removeMember } from "@/services/clubs";
 import { acceptFriendRequest, rejectFriendRequest, removeFriend, searchUsers, sendFriendRequest } from "@/services/friends";
 import { Ionicons } from "@expo/vector-icons";
@@ -181,8 +182,19 @@ export default function SocialScreen() {
     // regular members cannot delete anyone
     return false;
   };
-  const { points } = usePoints();
   const { user } = useUser();
+  const { cycle: currentCycle } = useCurrentCycle('individuel');
+  const { users: allRankedUsers } = useLeagueUsers(currentCycle?.id ?? null, 'individuel');
+
+  const rankingPointsMap = useMemo(() => {
+    const map = new Map<string, number>();
+    if (allRankedUsers) {
+      for (const user of allRankedUsers) {
+        map.set(user.uid, user.rankingPoints);
+      }
+    }
+    return map;
+  }, [allRankedUsers]);
   const params = useLocalSearchParams();
   const router = useRouter();
   const { follow } = useSubscriptions();
@@ -313,7 +325,7 @@ export default function SocialScreen() {
                 (typeof profile.avatar === "string" && profile.avatar.length > 0
                   ? profile.avatar
                   : null);
-              const pointsValue = typeof profile.points === "number" ? profile.points : 0;
+              const pointsValue = rankingPointsMap.get(uid) ?? 0;
 
               return {
                 id: uid,
@@ -356,7 +368,7 @@ export default function SocialScreen() {
     return () => {
       active = false;
     };
-  }, [view, selectedTab, selectedChat?.id, joinedClub?.id]);
+  }, [view, selectedTab, selectedChat?.id, joinedClub?.id, rankingPointsMap]);
 
   useEffect(() => {
     if (
@@ -471,6 +483,7 @@ export default function SocialScreen() {
     const roster = members.map((member) => ({
       ...member,
       isMe: member.id === currentUid,
+      points: rankingPointsMap.get(member.id) ?? 0,
     }));
 
     if (currentUid && !roster.some((m) => m.id === currentUid)) {
@@ -478,7 +491,7 @@ export default function SocialScreen() {
         id: currentUid,
         name: user?.firstName ?? "Utilisateur",
         avatar: user?.photoURL ?? null,
-        points: points || 0,
+        points: rankingPointsMap.get(currentUid) ?? 0,
         isMe: true,
       } as any);
     }
@@ -486,15 +499,11 @@ export default function SocialScreen() {
     return roster
       .sort((a, b) => (b.points || 0) - (a.points || 0))
       .map((m, idx) => ({ ...m, rank: idx + 1 }));
-  }, [members, points, user, currentUid]);
+  }, [members, user, currentUid, rankingPointsMap]);
 
   const clanTotalPoints = useMemo(() => {
-    const total = members.reduce((sum, member) => sum + (member.points || 0), 0);
-    if (currentUid && members.some((member) => member.id === currentUid)) {
-      return total;
-    }
-    return total + (points || 0);
-  }, [members, points, currentUid]);
+    return members.reduce((sum, member) => sum + (rankingPointsMap.get(member.id) ?? 0), 0);
+  }, [members, rankingPointsMap]);
 
   // no early return; keep tabs visible in all views
 
@@ -897,12 +906,7 @@ export default function SocialScreen() {
                 fallback?.name ||
                 id;
 
-              const pointsValue =
-                typeof profile?.points === 'number'
-                  ? profile.points
-                  : typeof fallback?.points === 'number'
-                  ? fallback.points
-                  : 0;
+              const pointsValue = rankingPointsMap.get(id) ?? 0;
 
               const photoURL =
                 typeof profile?.photoURL === 'string' && profile.photoURL.length > 0
@@ -930,12 +934,12 @@ export default function SocialScreen() {
               friend.name.toLowerCase().includes(friendSearchText.trim().toLowerCase())
             );
 
-            const sorted = filtered.sort((a, b) => (b.points || 0) - (a.points || 0));
+            const sorted = filtered.sort((a, b) => (rankingPointsMap.get(b.id) || 0) - (rankingPointsMap.get(a.id) || 0));
 
             return sorted.map((friend, index) => (
               <FriendCard
                 key={`${friend.id}-${index}`}
-                friend={friend}
+                friend={{...friend, points: rankingPointsMap.get(friend.id) || 0}}
                 rank={index + 1}
                 isMe={friend.id === currentUid}
                 onChat={() => {
@@ -1337,7 +1341,7 @@ export default function SocialScreen() {
                       fontSize: 14,
                       marginRight: canDelete ? 8 : 0,
                     }}>
-                      {item.points || 0} pts
+                      {rankingPointsMap.get(item.id) || 0} pts
                     </Text>
                     
                     {canDelete && (
@@ -1485,7 +1489,7 @@ export default function SocialScreen() {
                     </Text>
                   )}
                 </View>
-                <Text style={{ color: item.isMe ? '#0F3327' : colors.accent, fontFamily: FontFamilies.bodyStrong }}>{item.points} pts</Text>
+                <Text style={{ color: item.isMe ? '#0F3327' : colors.accent, fontFamily: FontFamilies.bodyStrong }}>{rankingPointsMap.get(item.id) || 0} pts</Text>
                 {joinedClub?.ownerId === auth.currentUser?.uid && !item.isMe && (
                   (joinedClub?.officers || []).includes(item.id)
                     ? (
@@ -1535,7 +1539,7 @@ export default function SocialScreen() {
                         }}
                       >
                         <Text style={{ color: selected ? '#0F3327' : colors.text, fontFamily: FontFamilies.headingMedium }}>{member.name}</Text>
-                        <Text style={{ color: selected ? '#0F3327' : colors.mutedText }}>{member.points || 0} pts</Text>
+                        <Text style={{ color: selected ? '#0F3327' : colors.mutedText }}>{rankingPointsMap.get(member.id) || 0} pts</Text>
                       </TouchableOpacity>
                     );
                   })}

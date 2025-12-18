@@ -169,7 +169,7 @@ export default function ProfilScreen() {
             <TouchableOpacity
               style={{ flex: 1 }}
               activeOpacity={0.8}
-              onPress={() => router.push("/defi")}
+              onPress={() => router.push({ pathname: "/defi", params: { view: "classement", rankingTab: "perso" } })}
             >
               <StatCard icon="trophy-outline" label="Classement individuel" value={individualRankLabel} />
             </TouchableOpacity>

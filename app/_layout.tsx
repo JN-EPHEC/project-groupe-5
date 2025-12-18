@@ -1,14 +1,15 @@
-import { GlobalPopupProvider } from "@/hooks/global-popup-context"; // ✅ ADDED IMPORT
 import { DarkTheme, DefaultTheme } from "@react-navigation/native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import "react-native-gesture-handler";
+import { View } from "react-native";
+import { GestureHandlerRootView } from 'react-native-gesture-handler'; // Import important pour les gestes
 import "react-native-reanimated";
 
 import { ChallengesProvider } from "@/hooks/challenges-context";
 import { ClubProvider } from "@/hooks/club-context";
 import { CouponsProvider } from "@/hooks/coupons-context";
 import { FriendsProvider } from "@/hooks/friends-context";
+import { GlobalPopupProvider } from "@/hooks/global-popup-context"; // <--- AJOUTE CET IMPORT
 import { NotificationsProvider } from "@/hooks/notifications-context";
 import { PointsProvider } from "@/hooks/points-context";
 import { SubscriptionsProvider } from "@/hooks/subscriptions-context";
@@ -30,126 +31,81 @@ import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import { setBackgroundColorAsync } from 'expo-system-ui';
 import React, { useEffect, useRef } from "react";
-import { Platform, Text, TextInput } from "react-native";
 
 export const unstable_settings = {
-  initialRouteName: "(tabs)",
+    initialRouteName: "(tabs)",
 };
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
-// Preventing font scaling globally
-if ((Text as any).defaultProps == null) (Text as any).defaultProps = {};
-(Text as any).defaultProps.allowFontScaling = false;
-
-if ((TextInput as any).defaultProps == null) (TextInput as any).defaultProps = {};
-(TextInput as any).defaultProps.allowFontScaling = false;
-
 function RootNavigation() {
-  const { mode } = useThemeMode();
-  const colorScheme = useColorScheme();
-  const theme = (mode ?? colorScheme) === "dark" ? DarkTheme : DefaultTheme;
+    const { mode } = useThemeMode();
+    const colorScheme = useColorScheme();
+    const theme = (mode ?? colorScheme) === "dark" ? DarkTheme : DefaultTheme;
 
-  useEffect(() => {
-    setBackgroundColorAsync(theme.colors.background);
-  }, [theme]);
+    useEffect(() => {
+        setBackgroundColorAsync(theme.colors.background);
+    }, [theme]);
 
-  return (
-    <>
-      <Stack>
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="amis-plus" options={{ headerShown: false }} />
-        <Stack.Screen name="change-password" options={{ headerShown: false }} />
-        <Stack.Screen name="calendar" options={{ headerShown: false }} />
-        <Stack.Screen name="camera" options={{ headerShown: false }} />
-        <Stack.Screen name="commentaire" options={{ headerShown: false }} />
-        <Stack.Screen name="premium" options={{ headerShown: false }} />
-        <Stack.Screen name="validation" options={{ headerShown: false }} />
-      </Stack>
-
-      <StatusBar style={mode === "dark" ? "light" : "dark"} />
-    </>
-  );
+    return (
+        <GestureHandlerRootView style={{ flex: 1 }}>
+            <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+                <Stack screenOptions={{ headerShown: false }}>
+                    <Stack.Screen name="(auth)" />
+                    <Stack.Screen name="(tabs)" />
+                </Stack>
+                <StatusBar style={mode === "dark" ? "light" : "dark"} />
+            </View>
+        </GestureHandlerRootView>
+    );
 }
 
-
 export default function RootLayout() {
-  const [fontsLoaded, fontError] = useFonts({
-    FredokaOne_400Regular,
-    Baloo2_400Regular,
-    Baloo2_500Medium,
-    Baloo2_600SemiBold,
-    Quicksand_400Regular,
-    Quicksand_500Medium,
-    Quicksand_600SemiBold,
-  });
+    const [fontsLoaded, fontError] = useFonts({
+        FredokaOne_400Regular,
+        Baloo2_400Regular,
+        Baloo2_500Medium,
+        Baloo2_600SemiBold,
+        Quicksand_400Regular,
+        Quicksand_500Medium,
+        Quicksand_600SemiBold,
+    });
 
-  const defaultsAppliedRef = useRef(false);
+    const defaultsAppliedRef = useRef(false);
 
-  useEffect(() => {
-    if (fontError) throw fontError;
-  }, [fontError]);
+    useEffect(() => {
+        if (fontError) throw fontError;
+    }, [fontError]);
 
-  useEffect(() => {
-    if (!fontsLoaded || defaultsAppliedRef.current) return;
-    defaultsAppliedRef.current = true;
+    useEffect(() => {
+        if (!fontsLoaded || defaultsAppliedRef.current) return;
+        defaultsAppliedRef.current = true;
+        SplashScreen.hideAsync().catch(() => {});
+    }, [fontsLoaded]);
 
-    const applyDefaultFont = (component: any) => {
-      const existing = component.defaultProps ?? {};
-      const existingStyle = existing.style
-        ? Array.isArray(existing.style)
-          ? existing.style
-          : [existing.style]
-        : [];
-      component.defaultProps = {
-        ...existing,
-        style: [...existingStyle, { fontFamily: "Quicksand_500Medium" }],
-      };
-    };
+    if (!fontsLoaded) return null;
 
-    applyDefaultFont(Text as any);
-    applyDefaultFont(TextInput as any);
-
-    SplashScreen.hideAsync().catch(() => {});
-  }, [fontsLoaded]);
-
-  if (!fontsLoaded) {
-    return null;
-  }
-
-  return (
-  <ThemeProviderCustom>
-    <GlobalPopupProvider>     {/* ✅ ADDED HERE */}
-
-      <NotificationsProvider>
-        <UserProvider>
-          <PointsProvider>
-            <CouponsProvider>
-              <ClubProvider>
-                <ChallengesProvider>
-                  <FriendsProvider>
-                    <SubscriptionsProvider>
-
-                      <RootNavigation />
-
-                    </SubscriptionsProvider>
-                    {Platform.OS === "web" && (
-                      <style>{`
-                        html, body, #root, #__next { -ms-overflow-style: none; scrollbar-width: none; }
-                        html::-webkit-scrollbar, body::-webkit-scrollbar, div::-webkit-scrollbar { display: none; }
-                      `}</style>
-                    )}
-                  </FriendsProvider>
-                </ChallengesProvider>
-              </ClubProvider>
-            </CouponsProvider>
-          </PointsProvider>
-        </UserProvider>
-      </NotificationsProvider>
-
-    </GlobalPopupProvider>   {/* ✅ END */}
-  </ThemeProviderCustom>
-  );
-
+    return (
+        <ThemeProviderCustom>
+            <GlobalPopupProvider> {/* <--- ENTOURE TOUT AVEC ÇA */}
+                <NotificationsProvider>
+                    <UserProvider>
+                        <PointsProvider>
+                            <CouponsProvider>
+                                <ClubProvider>
+                                    <ChallengesProvider>
+                                        <FriendsProvider>
+                                            <SubscriptionsProvider>
+                                                <RootNavigation />
+                                            </SubscriptionsProvider>
+                                        </FriendsProvider>
+                                    </ChallengesProvider>
+                                </ClubProvider>
+                            </CouponsProvider>
+                        </PointsProvider>
+                    </UserProvider>
+                </NotificationsProvider>
+            </GlobalPopupProvider>
+        </ThemeProviderCustom>
+    );
 }
