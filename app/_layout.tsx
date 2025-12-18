@@ -87,25 +87,9 @@ export default function RootLayout() {
 
     return (
         <ThemeProviderCustom>
-            <GlobalPopupProvider> {/* <--- ENTOURE TOUT AVEC ÇA */}
-                <NotificationsProvider>
-                    <UserProvider>
-                        <PointsProvider>
-                            <CouponsProvider>
-                                <ClubProvider>
-                                    <ChallengesProvider>
-                                        <FriendsProvider>
-                                            <SubscriptionsProvider>
-                                                <RootNavigation />
-                                            </SubscriptionsProvider>
-                                        </FriendsProvider>
-                                    </ChallengesProvider>
-                                </ClubProvider>
-                            </CouponsProvider>
-                        </PointsProvider>
-                    </UserProvider>
-                </NotificationsProvider>
-            </GlobalPopupProvider>
+            <GlobalPopupProvider><NotificationsProvider><UserProvider><PointsProvider><CouponsProvider><ClubProvider><ChallengesProvider><FriendsProvider><SubscriptionsProvider>
+                <RootNavigation />
+            </SubscriptionsProvider></FriendsProvider></ChallengesProvider></ClubProvider></CouponsProvider></PointsProvider></UserProvider></NotificationsProvider></GlobalPopupProvider>
         </ThemeProviderCustom>
     );
 }
