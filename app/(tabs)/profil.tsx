@@ -7,11 +7,11 @@ import { ShareQRModal } from "@/components/ui/qr/ShareQRModal";
 import PremiumCard from "@/components/ui/recompenses/PremiumCard";
 import { FontFamilies } from "@/constants/fonts";
 import { auth, db } from "@/firebaseConfig";
-import { useClassement } from "@/src/classement/hooks/useClassement";
 import { useFriends } from "@/hooks/friends-context";
 import { usePoints } from "@/hooks/points-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { useUser } from "@/hooks/user-context";
+import { useClassement } from "@/src/classement/hooks/useClassement";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
@@ -100,20 +100,12 @@ export default function ProfilScreen() {
   const primaryButtonText = isLight ? colors.cardText : colors.text;
   const sectionSpacing = { marginBottom: 17 } as const;
 
-  // Defensive checks for imports that may be undefined (prevents React "element type is invalid")
   const hasHeader = typeof Header !== "undefined";
   const hasStatCard = typeof StatCard !== "undefined";
   const hasChallengeHistory = typeof ChallengeHistoryList !== "undefined";
   const hasSettingsSection = typeof SettingsSection !== "undefined";
   const hasShareQR = typeof ShareQRModal !== "undefined";
   const hasPremiumCard = typeof PremiumCard !== "undefined";
-
-  if (!hasHeader) console.warn("Missing Header import (undefined)");
-  if (!hasStatCard) console.warn("Missing StatCard import (undefined)");
-  if (!hasChallengeHistory) console.warn("Missing ChallengeHistoryList import (undefined)");
-  if (!hasSettingsSection) console.warn("Missing SettingsSection import (undefined)");
-  if (!hasShareQR) console.warn("Missing ShareQRModal import (undefined)");
-  if (!hasPremiumCard) console.warn("Missing PremiumCard import (undefined)");
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: isLight ? colors.background : darkBg }}>
@@ -166,17 +158,38 @@ export default function ProfilScreen() {
 
         <View style={sectionSpacing}>
           <View style={styles.row}>
+            {/* Carte Classement Individuel -> Force le refresh via timestamp 't' */}
             <TouchableOpacity
               style={{ flex: 1 }}
               activeOpacity={0.8}
-              onPress={() => router.push({ pathname: "/defi", params: { view: "classement", rankingTab: "perso" } })}
+              onPress={() => {
+                router.push({
+                  pathname: "/(tabs)/defi",
+                  params: { 
+                    view: "classement", 
+                    rankingTab: "perso", 
+                    t: Date.now() // Astuce pour forcer la navigation
+                  }
+                });
+              }}
             >
               <StatCard icon="trophy-outline" label="Classement individuel" value={individualRankLabel} />
             </TouchableOpacity>
+
+            {/* Carte Classement Amis -> Force l'onglet Amis et Reset la vue */}
             <TouchableOpacity
               style={{ flex: 1 }}
               activeOpacity={0.8}
-              onPress={() => router.push("/social?tab=amis")}
+              onPress={() => {
+                router.push({
+                  pathname: "/(tabs)/social",
+                  params: { 
+                    tab: "amis", 
+                    reset: "true", // Demande explicite de reset
+                    t: Date.now() 
+                  }
+                });
+              }}
             >
               <StatCard icon="person-outline" label="Classement entre amis" value={friendRankLabel} />
             </TouchableOpacity>

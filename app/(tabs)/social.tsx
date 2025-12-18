@@ -1,6 +1,6 @@
 import { useThemeMode } from "@/hooks/theme-context";
 import { useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, KeyboardAvoidingView, Platform } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
   
 // Composants UI
@@ -19,10 +19,10 @@ import { useClub } from "@/hooks/club-context";
 import { useFriends } from "@/hooks/friends-context";
 import { useSubscriptions } from "@/hooks/subscriptions-context";
 import { useUser } from "@/hooks/user-context";
+import { acceptJoinRequest, rejectJoinRequest, removeMember, requestJoinClub } from "@/services/clubs";
+import { acceptFriendRequest, rejectFriendRequest, removeFriend, searchUsers, sendFriendRequest } from "@/services/friends";
 import { useCurrentCycle } from "@/src/classement/hooks/useCurrentCycle";
 import { useLeagueUsers } from "@/src/classement/hooks/useLeagueUsers";
-import { acceptJoinRequest, rejectJoinRequest, requestJoinClub, removeMember } from "@/services/clubs";
-import { acceptFriendRequest, rejectFriendRequest, removeFriend, searchUsers, sendFriendRequest } from "@/services/friends";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -207,14 +207,37 @@ export default function SocialScreen() {
   const [deleteOnLeave, setDeleteOnLeave] = useState(false);
 
   const initFromParams = useRef(false);
-  useEffect(() => {
-    if (initFromParams.current) return;
-    const tabParam = (params?.tab as string) || "";
-    if (tabParam === "amis" || tabParam === "clubs") {
-      setSelectedTab(tabParam as any);
+
+
+// ... au début de SocialScreen ...
+
+const lastTimeRef = useRef<number>(0);
+
+
+
+useEffect(() => {
+  // On vérifie si un timestamp est fourni et s'il est plus récent que le dernier traité
+  const t = params?.t ? Number(params.t) : 0;
+  
+  // Si c'est une nouvelle demande de navigation venant du Profil
+  if (t > lastTimeRef.current) {
+    lastTimeRef.current = t; // On met à jour pour ne pas le refaire en boucle
+
+    if (params?.tab === "amis") {
+      setSelectedTab("amis");
+      if (params?.reset === "true") {
+        setView("main"); // Ferme les chats/modales
+        setEditingClub(false);
+      }
+    } else if (params?.tab === "clubs") {
+      setSelectedTab("clubs");
+      if (params?.view === "clubRanking") {
+        setView("clubRanking");
+      }
     }
-    initFromParams.current = true;
-  }, [params]);
+  }
+  // Si pas de timestamp nouveau, on ne fait RIEN -> La navigation manuelle fonctionne !
+}, [params]);
 
   // Realtime clubs listing from Firestore
   useEffect(() => {

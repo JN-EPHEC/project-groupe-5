@@ -6,7 +6,7 @@ import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { addDoc, collection, getDocs, serverTimestamp } from "firebase/firestore";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react"; // <--- AJOUT DE useRef
 import {
   Alert,
   Image,
@@ -59,7 +59,7 @@ type TargetReport = {
 
 export default function DefiScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ view?: string; rankingTab?: string }>();
+  const params = useLocalSearchParams<{ view?: string; rankingTab?: string; t?: string }>(); // Ajout de 't' dans le type
   const { colors, mode } = useThemeMode();
   const { friends } = useFriends();
   const { points } = usePoints();
@@ -137,7 +137,7 @@ export default function DefiScreen() {
 
   // LISTES DES DÉFIS
   const [rotatingChallenges, setRotatingChallenges] = useState<Challenge[]>([]);
-  const [clubChallenges, setClubChallenges] = useState<Challenge[]>([]); // <--- NOUVEAU STATE
+  const [clubChallenges, setClubChallenges] = useState<Challenge[]>([]);
 
   const difficultyKey = current
     ? (
@@ -150,7 +150,7 @@ export default function DefiScreen() {
     difficultyKey as any
   );
 
-  // 🔥 Load challenges from Firestore
+  // 🔥 Chargement des défis depuis Firestore
   useEffect(() => {
     const loadRotatingDefis = async () => {
       const snap = await getDocs(collection(db, "defis"));
@@ -158,7 +158,7 @@ export default function DefiScreen() {
         (d) => ({ id: d.id, ...(d.data() as any) } as DefiDoc)
       );
 
-      // 1. DÉFIS PERSO (inchangé)
+      // 1. DÉFIS PERSO
       const personals = docs.filter(
         (d) => d.categorie === "personnel" && d.statut === "rotation"
       );
@@ -199,23 +199,21 @@ export default function DefiScreen() {
       pick("difficile", "Difficile");
       setRotatingChallenges(selected);
 
-      // 2. DÉFIS CLUB (NOUVEAU)
-      // On récupère tout ce qui est categorie="club" et statut="rotation"
+      // 2. DÉFIS CLUB
       const clubs = docs.filter(
         (d) => d.categorie === "club" && d.statut === "rotation"
       );
 
-      // On map vers le format Challenge de l'UI
       const formattedClubs: Challenge[] = clubs.map((d, index) => ({
-        id: 1000 + index, // ID numérique fictif pour l'UI (évite conflit avec perso)
+        id: 1000 + index,
         firestoreId: d.id,
         title: d.titre,
         description: d.description,
-        category: "Local" as any, // Ou "Club"
+        category: "Local" as any,
         difficulty: d.difficulte === "facile" ? "Facile" : d.difficulte === "moyen" ? "Moyen" : "Difficile",
         points: d.points,
         audience: "Club",
-        timeLeft: "Cette semaine", // Les défis clubs durent souvent plus longtemps
+        timeLeft: "Cette semaine",
       }));
 
       setClubChallenges(formattedClubs);
@@ -224,21 +222,35 @@ export default function DefiScreen() {
     loadRotatingDefis();
   }, []);
 
-  // NEW: react to /defi?view=classement&rankingTab=perso|club
+  // 🔴 CORRECTION NAVIGATION : On utilise useRef pour ne réagir qu'aux NOUVEAUX paramètres
+  const lastTimeRef = useRef<number>(0);
+
   useEffect(() => {
+    // On convertit en string simple au cas où c'est un tableau
     const viewParam = Array.isArray(params.view) ? params.view[0] : params.view;
     const tabParam = Array.isArray(params.rankingTab) ? params.rankingTab[0] : params.rankingTab;
+    const tParam = params.t ? Number(params.t) : 0;
 
-    if (viewParam === "classement") {
-      setViewMode("classement");
-    } else if (viewParam === "defis") {
-      setViewMode("defis");
-    }
+    // Si on reçoit un timestamp plus récent que le dernier traité, on applique la navigation forcée
+    if (tParam > lastTimeRef.current) {
+        lastTimeRef.current = tParam;
 
-    if (tabParam === 'perso' || tabParam === 'club') {
-      setActiveTab(tabParam);
+        // Force la vue (Défi ou Classement)
+        if (viewParam === "classement") {
+            setViewMode("classement");
+        } else if (viewParam === "defis") {
+            setViewMode("defis");
+        }
+
+        // Force l'onglet (Perso ou Club)
+        if (tabParam === 'perso') {
+            setActiveTab('perso');
+        } else if (tabParam === 'club') {
+            setActiveTab('club');
+        }
     }
-  }, [params.view, params.rankingTab]);
+    // Sinon (si pas de nouveau timestamp), on laisse l'utilisateur naviguer librement
+  }, [params]);
 
   useEffect(() => {
     if (goToClassement) {
