@@ -1,8 +1,8 @@
 import { ChallengeOfTheDay } from "@/components/ui/acceuil/ChallengeOfTheDay";
-import { HeaderProfile } from "@/components/ui/acceuil/HeaderProfile";
 import { ProgressionCard } from "@/components/ui/acceuil/ProgressionCard";
 import StreakCalendar from "@/components/ui/acceuil/StreakCalendar";
 import NotificationBell from "@/components/ui/common/NotificationBell";
+import { Header } from "@/components/ui/profil/Header";
 import PremiumCard from "@/components/ui/recompenses/PremiumCard";
 import { FontFamilies } from "@/constants/fonts";
 import { auth, db } from "@/firebaseConfig";
@@ -81,13 +81,11 @@ export default function AcceuilScreen() {
 
   const isLight = mode === "light";
   // Defensive checks to prevent "Element type is invalid" runtime errors
-  const hasHeaderProfile = typeof HeaderProfile !== "undefined";
   const hasProgressionCard = typeof ProgressionCard !== "undefined";
   const hasChallengeOfTheDay = typeof ChallengeOfTheDay !== "undefined";
   const hasStreakCalendar = typeof StreakCalendar !== "undefined";
   const hasPremiumCard = typeof PremiumCard !== "undefined";
 
-  if (!hasHeaderProfile) console.warn("Missing HeaderProfile import (undefined)");
   if (!hasProgressionCard) console.warn("Missing ProgressionCard import (undefined)");
   if (!hasChallengeOfTheDay) console.warn("Missing ChallengeOfTheDay import (undefined)");
   if (!hasStreakCalendar) console.warn("Missing StreakCalendar import (undefined)");
@@ -132,15 +130,11 @@ export default function AcceuilScreen() {
             <NotificationBell />
           </View>
         </View>
-        {/* Section: Profil -> components/ui/acceuil/HeaderProfile */}
-        {hasHeaderProfile ? (
-          <HeaderProfile clubName={joinedClub?.name} />
-        ) : (
-          <Text style={{ color: isLight ? colors.text : "#fff" }}>Profil indisponible</Text>
-        )}
+        
+        <Header />
 
         {/* Section: Classement Cards */}
-        <View style={{ marginBottom: 20 }}>
+        <View style={{ marginBottom: 20, marginTop: 20 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 }}>
             <Ionicons name="trophy-outline" size={20} color={isLight ? colors.text : "#fff"} />
             <Text style={{ fontSize: 20, fontFamily: FontFamilies.heading, color: isLight ? colors.text : "#fff" }}>
@@ -154,7 +148,11 @@ export default function AcceuilScreen() {
               activeOpacity={0.85}
               style={[
                 styles.rankCard,
-                { backgroundColor: isLight ? colors.card : "rgba(0, 151, 178, 0.15)" }
+                { 
+                  backgroundColor: isLight ? colors.card : "rgba(0, 151, 178, 0.15)",
+                  borderWidth: 1,
+                  borderColor: isLight ? '#007AFF' : 'rgba(0, 151, 178, 0.3)'
+                }
               ]}
               onPress={() => router.push({ pathname: "/social", params: { tab: "amis" } })}
             >
@@ -172,7 +170,11 @@ export default function AcceuilScreen() {
               activeOpacity={joinedClub ? 0.85 : 1}
               style={[
                 styles.rankCard,
-                { backgroundColor: isLight ? colors.card : "rgba(0, 151, 178, 0.15)" }
+                { 
+                  backgroundColor: isLight ? colors.card : "rgba(0, 151, 178, 0.15)",
+                  borderWidth: 1,
+                  borderColor: isLight ? '#007AFF' : 'rgba(0, 151, 178, 0.3)'
+                }
               ]}
               disabled={!joinedClub}
               onPress={() => router.push({ pathname: "/social", params: { tab: "clubs", view: "clubRanking" } })}
