@@ -1,4 +1,3 @@
-//app/(tabs)/defi.tsx
 import { ReportModal } from "@/components/ui/defi/ReportModal";
 import { useClub } from "@/hooks/club-context";
 import { useFriends } from "@/hooks/friends-context";
@@ -26,7 +25,6 @@ import { ValidationCard } from "@/components/ui/defi/ValidationCard";
 import { useChallenges } from "@/hooks/challenges-context";
 import { useValidationQueue } from "@/hooks/useValidationQueue";
 import { voteOnProof } from "@/services/proofs";
-import * as ImagePicker from "expo-image-picker";
 
 import { Challenge, TabKey } from "@/components/ui/defi/types";
 import { db } from "@/firebaseConfig";
@@ -50,7 +48,14 @@ type DefiDoc = {
   createdAt?: { seconds: number; nanoseconds: number } | any;
 };
 
-
+// Type pour le signalement
+type TargetReport = {
+  id: string;
+  title: string;
+  defiId: string;
+  photoUrl?: string;
+  commentaire?: string;
+};
 
 export default function DefiScreen() {
   const router = useRouter();
@@ -60,68 +65,53 @@ export default function DefiScreen() {
   const { points } = usePoints();
   const { joinedClub, members } = useClub();
   const [rewardModalVisible, setRewardModalVisible] = useState(false);
-// ... après const { joinedClub, members } = useClub();
 
-  // 👇 COLLE ÇA ICI 👇
-  const { user } = useUser(); 
+  const { user } = useUser();
   const [reportModalVisible, setReportModalVisible] = useState(false);
-  // 1. Définir le type précis pour éviter les erreurs rouges
-type TargetReport = {
-  id: string;          // L'ID de la preuve
-  title: string;       // Le titre du défi
-  defiId: string;      // L'ID du défi parent
-  photoUrl?: string;   // Optionnel (peut être null)
-  commentaire?: string; // Optionnel
-};
+  const [targetReportId, setTargetReportId] = useState<TargetReport | null>(null);
 
-// 2. Utiliser ce type dans le useState
-const [targetReportId, setTargetReportId] = useState<TargetReport | null>(null);
-  // Ouvre la popup
   // Ouvre la popup avec toutes les données requises
   const handleOpenReport = (
-    id: string, 
-    title: string, 
-    defiId: string,        // <--- NOUVEAU : Obligatoire selon ton type
-    photoUrl?: string,     // <--- NOUVEAU : Optionnel
-    commentaire?: string   // <--- NOUVEAU : Optionnel
+    id: string,
+    title: string,
+    defiId: string,
+    photoUrl?: string,
+    commentaire?: string
   ) => {
     setTargetReportId({ id, title, defiId, photoUrl, commentaire });
     setReportModalVisible(true);
   };
 
-// Envoie les données à Firebase
- // Envoie les données à Firebase
+  // Envoie les données à Firebase
   const handleSubmitReport = async (reason: string) => {
     if (!targetReportId || !user) return;
-    
-    // 1. Détermine si c'est une image ou du texte
+
     const hasImage = targetReportId.photoUrl && targetReportId.photoUrl !== "";
     const proofType = hasImage ? 'image' : 'text';
-    
-    // 2. Sécurise le contenu (évite l'erreur "undefined" avec || "")
-    const proofContent = hasImage 
-        ? (targetReportId.photoUrl || "") 
-        : (targetReportId.commentaire || "Pas de contenu");
 
-    // 3. Envoi
+    const proofContent = hasImage
+      ? (targetReportId.photoUrl || "")
+      : (targetReportId.commentaire || "Pas de contenu");
+
     const success = await sendReport(
-        targetReportId.defiId || "inconnu", // Sécurité anti-plantage
-        targetReportId.title || "Défi signalé", 
-        targetReportId.id,          
-        proofContent,               
-        proofType,                  
-        reason,                     
-        user.uid                    
+      targetReportId.defiId || "inconnu",
+      targetReportId.title || "Défi signalé",
+      targetReportId.id,
+      proofContent,
+      proofType,
+      reason,
+      user.uid
     );
 
     if (success) {
-        Alert.alert("Merci", "Le signalement a été envoyé.");
-        setReportModalVisible(false); // On ferme la modale
-        setTargetReportId(null);      // On nettoie
+      Alert.alert("Merci", "Le signalement a été envoyé.");
+      setReportModalVisible(false);
+      setTargetReportId(null);
     } else {
-        Alert.alert("Erreur", "Impossible d'envoyer le signalement. Vérifiez votre connexion.");
+      Alert.alert("Erreur", "Impossible d'envoyer le signalement. Vérifiez votre connexion.");
     }
   };
+
   const isLight = mode === "light";
   const darkBg = "#021114";
 
@@ -133,10 +123,8 @@ const [targetReportId, setTargetReportId] = useState<TargetReport | null>(null);
     setGoToClassement,
     start,
     stop,
-    canceledIds,
     reviewCompleted,
     reviewRequiredCount,
-    //validationPhaseDone, => if code works will need to be removed
     incrementReview,
     setFeedback,
   } = useChallenges();
@@ -146,21 +134,23 @@ const [targetReportId, setTargetReportId] = useState<TargetReport | null>(null);
 
   const [feedbackRating, setFeedbackRating] = useState<number>(0);
   const [feedbackComment, setFeedbackComment] = useState<string>("");
-  
 
+  // LISTES DES DÉFIS
   const [rotatingChallenges, setRotatingChallenges] = useState<Challenge[]>([]);
+  const [clubChallenges, setClubChallenges] = useState<Challenge[]>([]); // <--- NOUVEAU STATE
+
   const difficultyKey = current
     ? (
-        current.difficulty.toLowerCase() === "facile" ? "facile" :
+      current.difficulty.toLowerCase() === "facile" ? "facile" :
         current.difficulty.toLowerCase() === "moyen" ? "moyen" :
-        "difficile"
-      )
+          "difficile"
+    )
     : null;
   const { queue: validationQueue, removeFromQueue } = useValidationQueue(
     difficultyKey as any
   );
 
-  // 🔥 Load 3 rotation challenges from Firestore (FIFO per difficulty)
+  // 🔥 Load challenges from Firestore
   useEffect(() => {
     const loadRotatingDefis = async () => {
       const snap = await getDocs(collection(db, "defis"));
@@ -168,12 +158,11 @@ const [targetReportId, setTargetReportId] = useState<TargetReport | null>(null);
         (d) => ({ id: d.id, ...(d.data() as any) } as DefiDoc)
       );
 
-      // Only personal + rotation
+      // 1. DÉFIS PERSO (inchangé)
       const personals = docs.filter(
         (d) => d.categorie === "personnel" && d.statut === "rotation"
       );
 
-      // Sort FIFO by createdAt
       personals.sort((a, b) => {
         const aSec = (a.createdAt?.seconds ?? 0) as number;
         const bSec = (b.createdAt?.seconds ?? 0) as number;
@@ -193,8 +182,8 @@ const [targetReportId, setTargetReportId] = useState<TargetReport | null>(null);
         const d = byDiff[diffKey][0];
         if (!d) return;
         selected.push({
-          id: idCounter++,                // UI ID
-          firestoreId: d.id,              // REAL Firestore ID from Firestore
+          id: idCounter++,
+          firestoreId: d.id,
           title: d.titre,
           description: d.description,
           category: "Recyclage" as any,
@@ -205,12 +194,31 @@ const [targetReportId, setTargetReportId] = useState<TargetReport | null>(null);
         });
       };
 
-
       pick("facile", "Facile");
       pick("moyen", "Moyen");
       pick("difficile", "Difficile");
-
       setRotatingChallenges(selected);
+
+      // 2. DÉFIS CLUB (NOUVEAU)
+      // On récupère tout ce qui est categorie="club" et statut="rotation"
+      const clubs = docs.filter(
+        (d) => d.categorie === "club" && d.statut === "rotation"
+      );
+
+      // On map vers le format Challenge de l'UI
+      const formattedClubs: Challenge[] = clubs.map((d, index) => ({
+        id: 1000 + index, // ID numérique fictif pour l'UI (évite conflit avec perso)
+        firestoreId: d.id,
+        title: d.titre,
+        description: d.description,
+        category: "Local" as any, // Ou "Club"
+        difficulty: d.difficulte === "facile" ? "Facile" : d.difficulte === "moyen" ? "Moyen" : "Difficile",
+        points: d.points,
+        audience: "Club",
+        timeLeft: "Cette semaine", // Les défis clubs durent souvent plus longtemps
+      }));
+
+      setClubChallenges(formattedClubs);
     };
 
     loadRotatingDefis();
@@ -235,44 +243,45 @@ const [targetReportId, setTargetReportId] = useState<TargetReport | null>(null);
   useEffect(() => {
     if (goToClassement) {
       setViewMode("classement");
-      setGoToClassement(false); // reset so it doesn't repeat
+      setGoToClassement(false);
     }
   }, [goToClassement]);
 
 
-  // If user already has an ongoing challenge, only show that one.
   const gatingActive =
     current?.status === "pendingValidation" &&
-    reviewCompleted < reviewRequiredCount; 
-    //&& !validationPhaseDone; // => if code works will need to be removed
+    reviewCompleted < reviewRequiredCount;
 
-    const hideAfterFeedback =
+  const hideAfterFeedback =
     current?.status === "pendingValidation" &&
     reviewCompleted >= reviewRequiredCount &&
     current?.feedbackSubmitted;
 
-const challengesToDisplay = useMemo(() => {
-    // 🟢 CORRECTION : On affiche le défi courant tant qu'il n'y a pas de blocage (gating)
-    // On retire "!hideAfterFeedback" pour garder la carte visible après l'avis
+  const challengesToDisplay = useMemo(() => {
     if (current && !gatingActive) return [current];
     return rotatingChallenges;
   }, [current, rotatingChallenges, gatingActive]);
 
   // 🔁 Activate or cancel a challenge
   const toggleOngoing = (id: number) => {
-  if (current && current.id === id) {
-    stop(); // stop does not need the id
-    return;
-  }
+    if (current && current.id === id) {
+      stop();
+      return;
+    }
 
-  const challenge = rotatingChallenges.find((c) => c.id === id);
-  if (!challenge) {
-    return;
-  }
-  start(challenge);
-};
+    // Recherche d'abord dans les défis Perso
+    let challenge = rotatingChallenges.find((c) => c.id === id);
+    
+    // Si pas trouvé, recherche dans les défis Club
+    if (!challenge) {
+        challenge = clubChallenges.find((c) => c.id === id);
+    }
 
-
+    if (!challenge) {
+      return;
+    }
+    start(challenge);
+  };
 
 
   // 📷 Camera
@@ -280,51 +289,27 @@ const challengesToDisplay = useMemo(() => {
     router.push({ pathname: "/camera", params: { id: String(challengeId) } });
   };
 
-  // 🖼 Gallery picker (still here if we need later)
-  const pickFromGallery = async (challengeId: number) => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (perm.status !== "granted") return;
-    const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
-    });
-    if (!res.canceled && res.assets[0]?.uri) {
-      router.push({
-        pathname: "/camera",
-        params: { id: String(challengeId), preset: res.assets[0].uri },
-      });
-    }
-  };
-const handleSendFeedbackToAdmin = async () => {
-    // Sécurité : on n'envoie rien si la note est 0
+  const handleSendFeedbackToAdmin = async () => {
     if (feedbackRating === 0) return;
-
     try {
-      // CORRECTION ICI : On gère le nom de l'utilisateur pour éviter l'erreur TypeScript
-      // On essaie 'name', sinon 'displayName', sinon "Membre"
       const safeUserName = (user as any)?.name || (user as any)?.displayName || "Membre";
-
-      // 1. On prépare les données pour l'Admin
       const feedbackData = {
         challengeTitle: current?.title || "Défi sans titre",
         rating: feedbackRating,
         comment: feedbackComment.trim(),
-        userName: safeUserName, 
-        userId: user?.uid, 
-        createdAt: serverTimestamp(), // Maintenant ça va marcher car c'est importé
+        userName: safeUserName,
+        userId: user?.uid,
+        createdAt: serverTimestamp(),
       };
-
-      // 2. On écrit dans la collection "feedbacks"
       await addDoc(collection(db, "feedbacks"), feedbackData);
-
       console.log("Avis envoyé à l'admin avec succès !");
     } catch (error) {
       console.error("Erreur envoi avis admin:", error);
     } finally {
-      // 3. Quoi qu'il arrive, on valide dans l'appli utilisateur
       setFeedback(feedbackRating, feedbackComment.trim());
     }
   };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: isLight ? colors.background : darkBg }]}>
       {/* HEADER with toggle icon */}
@@ -338,7 +323,6 @@ const handleSendFeedbackToAdmin = async () => {
         </TouchableOpacity>
       </View>
 
-      {/* TAB SWITCHER used both in Défis and Classement to toggle Perso/Club */}
       <TabSwitcher activeTab={activeTab} onChange={setActiveTab} />
 
       <ScrollView
@@ -346,66 +330,26 @@ const handleSendFeedbackToAdmin = async () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 140 }}
       >
-        {/* PERSO TAB or Classement view */}
+        {/* =======================================================
+            ONGLET PERSO - VUE DÉFIS
+           ======================================================= */}
         {(activeTab === "perso" && viewMode === 'defis') && (
           <>
-            {/* Votre preuve: retiré de cette étape. Pendant la phase "valider 3 défis",
-                on n'affiche plus la preuve ici. Elle réapparaîtra intégrée dans la carte du défi
-                (au-dessus de "En attente de validation") après cette étape. */}
             {/* Gating message */}
             {gatingActive && (
-              <View
-                style={{
-                  backgroundColor: colors.card,
-                  padding: 20,
-                  borderRadius: 24,
-                  marginBottom: 18,
-                }}
-              >
-                <Text
-                  style={{
-                    color: colors.text,
-                    fontSize: 16,
-                    fontWeight: "700",
-                  }}
-                >
+              <View style={{ backgroundColor: colors.card, padding: 20, borderRadius: 24, marginBottom: 18 }}>
+                <Text style={{ color: colors.text, fontSize: 16, fontWeight: "700" }}>
                   Validation requise
                 </Text>
                 <Text style={{ color: colors.mutedText, marginTop: 8 }}>
                   Il vous faut maintenant valider 3 défis d&apos;autres membres avant que
                   votre propre défi soit examiné.
                 </Text>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    marginTop: 14,
-                    gap: 12,
-                  }}
-                >
-                  <View
-                    style={{
-                      flex: 1,
-                      height: 10,
-                      backgroundColor: colors.surfaceAlt,
-                      borderRadius: 6,
-                      overflow: "hidden",
-                    }}
-                  >
-                    <View
-                      style={{
-                        width: `${(reviewCompleted / reviewRequiredCount) * 100}%`,
-                        backgroundColor: colors.accent,
-                        height: "100%",
-                      }}
-                    />
+                <View style={{ flexDirection: "row", alignItems: "center", marginTop: 14, gap: 12 }}>
+                  <View style={{ flex: 1, height: 10, backgroundColor: colors.surfaceAlt, borderRadius: 6, overflow: "hidden" }}>
+                    <View style={{ width: `${(reviewCompleted / reviewRequiredCount) * 100}%`, backgroundColor: colors.accent, height: "100%" }} />
                   </View>
-                  <Text
-                    style={{
-                      color: colors.text,
-                      fontWeight: "700",
-                    }}
-                  >
+                  <Text style={{ color: colors.text, fontWeight: "700" }}>
                     {reviewCompleted}/{reviewRequiredCount}
                   </Text>
                 </View>
@@ -444,14 +388,13 @@ const handleSendFeedbackToAdmin = async () => {
                       await voteOnProof(p.id, false);
                       removeFromQueue(p.id);
                       incrementReview();
-                    }} 
-                    // 👇 CORRECTION ICI 👇
+                    }}
                     onReport={() => handleOpenReport(
-                      p.id, 
-                      "Preuve à vérifier", 
-                      p.defiId,       // On passe l'ID du défi parent
-                      p.photoUrl,     // On passe l'URL de la photo
-                      p.commentaire   // On passe le commentaire
+                      p.id,
+                      "Preuve à vérifier",
+                      p.defiId,
+                      p.photoUrl,
+                      p.commentaire
                     )}
                   />
                 ))
@@ -461,23 +404,22 @@ const handleSendFeedbackToAdmin = async () => {
             {!gatingActive &&
               challengesToDisplay.map((challenge: any) => {
                 return (
-                 <ChallengeCard
+                  <ChallengeCard
                     key={challenge.id}
                     challenge={challenge}
                     categorie="personnel"
                     isOngoing={current?.id === challenge.id}
                     status={current?.id === challenge.id ? current?.status : undefined}
                     onToggle={toggleOngoing}
-                    // 👇 CORRECTION ICI 👇
                     onReport={() => handleOpenReport(
-                      challenge.firestoreId || String(challenge.id), 
+                      challenge.firestoreId || String(challenge.id),
                       challenge.title,
-                      challenge.firestoreId || String(challenge.id) // Le defiId est l'ID du challenge lui-même
+                      challenge.firestoreId || String(challenge.id)
                     )}
                     onValidatePhoto={
                       current &&
-                      current.id === challenge.id &&
-                      current.status === "active"
+                        current.id === challenge.id &&
+                        current.status === "active"
                         ? () => openCamera(challenge.id)
                         : undefined
                     }
@@ -485,44 +427,20 @@ const handleSendFeedbackToAdmin = async () => {
                 );
               })}
 
-
-            {/* Feedback form when pending validation & reviews complete */}
+            {/* Feedback form */}
             {current &&
               current.status === "pendingValidation" &&
               reviewCompleted >= reviewRequiredCount &&
               !current.feedbackSubmitted && (
-                <View
-                  style={{
-                    backgroundColor: colors.card,
-                    padding: 20,
-                    borderRadius: 24,
-                    marginTop: 10,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: colors.text,
-                      fontSize: 16,
-                      fontWeight: "700",
-                    }}
-                  >
-                    Laisser un avis
-                  </Text>
-                  <Text
-                    style={{ color: colors.mutedText, marginTop: 6 }}
-                  >
+                <View style={{ backgroundColor: colors.card, padding: 20, borderRadius: 24, marginTop: 10 }}>
+                  <Text style={{ color: colors.text, fontSize: 16, fontWeight: "700" }}>Laisser un avis</Text>
+                  <Text style={{ color: colors.mutedText, marginTop: 6 }}>
                     Notez ce défi et laissez un commentaire pour aider la validation.
                   </Text>
                   <View style={{ flexDirection: "row", marginTop: 12 }}>
                     {[1, 2, 3, 4, 5].map((n) => (
-                      <TouchableOpacity
-                        key={n}
-                        onPress={() => setFeedbackRating(n)}
-                        style={{ marginRight: 8 }}
-                      >
-                        <Text style={{ fontSize: 24 }}>
-                          {feedbackRating >= n ? "⭐" : "☆"}
-                        </Text>
+                      <TouchableOpacity key={n} onPress={() => setFeedbackRating(n)} style={{ marginRight: 8 }}>
+                        <Text style={{ fontSize: 24 }}>{feedbackRating >= n ? "⭐" : "☆"}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -532,126 +450,51 @@ const handleSendFeedbackToAdmin = async () => {
                     placeholder="Votre commentaire"
                     multiline
                     numberOfLines={4}
-                    style={{
-                      marginTop: 12,
-                      borderWidth: 1,
-                      borderColor: "#2A3431",
-                      backgroundColor: colors.surfaceAlt,
-                      color: colors.text,
-                      borderRadius: 12,
-                      padding: 12,
-                      textAlignVertical: "top",
-                    }}
+                    style={{ marginTop: 12, borderWidth: 1, borderColor: "#2A3431", backgroundColor: colors.surfaceAlt, color: colors.text, borderRadius: 12, padding: 12, textAlignVertical: "top" }}
                   />
                   <TouchableOpacity
-                    onPress={handleSendFeedbackToAdmin} // <--- On utilise la nouvelle fonction
+                    onPress={handleSendFeedbackToAdmin}
                     disabled={feedbackRating === 0}
-                    style={{
-                      marginTop: 14,
-                      borderRadius: 14,
-                      paddingVertical: 12,
-                      alignItems: "center",
-                      backgroundColor:
-                        feedbackRating === 0 ? "#2A3431" : colors.accent,
-                    }}
+                    style={{ marginTop: 14, borderRadius: 14, paddingVertical: 12, alignItems: "center", backgroundColor: feedbackRating === 0 ? "#2A3431" : colors.accent }}
                   >
-                    <Text
-                      style={{
-                        color:
-                          feedbackRating === 0 ? "#8AA39C" : "#0F3327",
-                        fontWeight: "700",
-                      }}
-                    >
-                      Envoyer l&apos;avis
-                    </Text>
+                    <Text style={{ color: feedbackRating === 0 ? "#8AA39C" : "#0F3327", fontWeight: "700" }}>Envoyer l&apos;avis</Text>
                   </TouchableOpacity>
                 </View>
               )}
 
             {/* Message après envoi de l'avis */}
             {hideAfterFeedback && (
-              <View
-                style={{
-                  backgroundColor: colors.card,
-                  padding: 20,
-                  borderRadius: 24,
-                  marginTop: 10,
-                }}
-              >
-                <Text
-                  style={{
-                    color: colors.text,
-                    fontSize: 16,
-                    fontWeight: "700",
-                  }}
-                >
-                  Défi en cours de validation
-                </Text>
-                <Text
-                  style={{ color: colors.mutedText, marginTop: 6 }}
-                >
-                  Merci pour votre avis. Votre défi sera examiné prochainement par
-                  l&apos;équipe.
-                </Text>
+              <View style={{ backgroundColor: colors.card, padding: 20, borderRadius: 24, marginTop: 10 }}>
+                <Text style={{ color: colors.text, fontSize: 16, fontWeight: "700" }}>Défi en cours de validation</Text>
+                <Text style={{ color: colors.mutedText, marginTop: 6 }}>Merci pour votre avis. Votre défi sera examiné prochainement par l&apos;équipe.</Text>
               </View>
             )}
           </>
         )}
 
+
+        {/* =======================================================
+            ONGLET CLASSEMENT (VUE CLASSEMENT)
+           ======================================================= */}
         {viewMode === 'classement' && (
           <>
             {activeTab === 'perso' && (
-              <View
-                style={{
-                  backgroundColor: colors.surface,
-                  padding: 20,
-                  borderRadius: 24,
-                  marginBottom: 18,
-                }}
-              >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: colors.text,
-                      fontSize: 18,
-                      fontWeight: "800",
-                    }}
-                  >
-                    Top 50 — Perso
-                  </Text>
-
+              <View style={{ backgroundColor: colors.surface, padding: 20, borderRadius: 24, marginBottom: 18 }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <Text style={{ color: colors.text, fontSize: 18, fontWeight: "800" }}>Top 50 — Perso</Text>
                   <TouchableOpacity
                     onPress={() => setRewardModalVisible(true)}
-                    style={{
-                      backgroundColor: "rgba(82, 209, 146, 0.14)",
-                      borderRadius: 14,
-                      paddingHorizontal: 12,
-                      paddingVertical: 6,
-                      borderWidth: 1,
-                      borderColor: "rgba(82, 209, 146, 0.22)",
-                    }}
+                    style={{ backgroundColor: "rgba(82, 209, 146, 0.14)", borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: "rgba(82, 209, 146, 0.22)" }}
                   >
-                    <Text style={{ color: colors.text, fontWeight: "800" }}>
-                      Récompenses
-                    </Text>
+                    <Text style={{ color: colors.text, fontWeight: "800" }}>Récompenses</Text>
                   </TouchableOpacity>
                 </View>
                 {classementLoading ? (
-                  <Text style={{ color: colors.mutedText, marginTop: 12 }}>
-                    Chargement du classement...
-                  </Text>
+                  <Text style={{ color: colors.mutedText, marginTop: 12 }}>Chargement du classement...</Text>
                 ) : (
                   <View style={{ marginTop: 12 }}>
                     {classementUsers.length === 0 && (
-                      <Text style={{ color: colors.mutedText }}>
-                        Aucun participant pour l&apos;instant.
-                      </Text>
+                      <Text style={{ color: colors.mutedText }}>Aucun participant pour l&apos;instant.</Text>
                     )}
                     <ClassementList users={classementUsers} totalSlots={50} />
                   </View>
@@ -680,12 +523,12 @@ const handleSendFeedbackToAdmin = async () => {
                   }
                   const mockClubNames = ['Les Écogardiens', 'Verte Équipe', 'Planète Propre', 'Zéro Déchet Squad', 'Les Tri-Héros', 'Green Sparks', 'Eco Runner', 'TerraFriends', 'BlueLeaf', 'GreenMinds'];
                   while (clubs.length < 50) {
-                    const name = mockClubNames[(clubs.length) % mockClubNames.length] + ' ' + (Math.floor(Math.random()*90)+10);
-                    const pts = Math.floor(Math.random()*5000) + 200;
+                    const name = mockClubNames[(clubs.length) % mockClubNames.length] + ' ' + (Math.floor(Math.random() * 90) + 10);
+                    const pts = Math.floor(Math.random() * 5000) + 200;
                     const avatar = `https://api.dicebear.com/8.x/shapes/svg?seed=${encodeURIComponent(name)}`;
                     clubs.push({ name, pts, avatar });
                   }
-                  const sorted = clubs.sort((a,b) => b.pts - a.pts).slice(0,50);
+                  const sorted = clubs.sort((a, b) => b.pts - a.pts).slice(0, 50);
                   const myIndex = sorted.findIndex(c => c.isMine);
                   return (
                     <View style={{ marginTop: 12 }}>
@@ -695,7 +538,7 @@ const handleSendFeedbackToAdmin = async () => {
                         return (
                           <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 14, marginBottom: 8, backgroundColor: isMine ? '#1A2F28' : colors.surfaceAlt }}>
                             <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: rankColor, alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
-                              <Text style={{ color: '#0F3327', fontWeight: '800' }}>{idx+1}</Text>
+                              <Text style={{ color: '#0F3327', fontWeight: '800' }}>{idx + 1}</Text>
                             </View>
                             <Image source={{ uri: c.avatar }} style={{ width: 28, height: 28, borderRadius: 14, marginRight: 10 }} />
                             <View style={{ flex: 1 }}>
@@ -719,18 +562,44 @@ const handleSendFeedbackToAdmin = async () => {
           </>
         )}
 
-        {/* CLUB TAB – placeholder for now */}
-        {activeTab === "club" && (
-          <View style={{ paddingTop: 40 }}>
-            <Text
-              style={{ color: colors.mutedText, textAlign: "center" }}
-            >
-              Aucun défi de club pour le moment.
-            </Text>
+        {/* =======================================================
+            ONGLET CLUB - VUE DÉFIS (C'est ici qu'on affiche enfin les défis club !)
+           ======================================================= */}
+        {(activeTab === "club" && viewMode === 'defis') && (
+          <View style={{ paddingTop: 20 }}>
+            {clubChallenges.length === 0 ? (
+              <Text style={{ color: colors.mutedText, textAlign: "center", marginTop: 20 }}>
+                Aucun défi de club actif pour le moment.
+              </Text>
+            ) : (
+              clubChallenges.map((challenge) => (
+                <ChallengeCard
+                  key={challenge.id}
+                  challenge={challenge}
+                  categorie="club" // Style visuel différent si ton composant le gère
+                  isOngoing={current?.id === challenge.id}
+                  status={current?.id === challenge.id ? current?.status : undefined}
+                  onToggle={toggleOngoing}
+                  onReport={() => handleOpenReport(
+                    challenge.firestoreId || String(challenge.id),
+                    challenge.title,
+                    challenge.firestoreId || String(challenge.id)
+                  )}
+                  onValidatePhoto={
+                    current &&
+                      current.id === challenge.id &&
+                      current.status === "active"
+                      ? () => openCamera(challenge.id)
+                      : undefined
+                  }
+                />
+              ))
+            )}
           </View>
         )}
+
       </ScrollView>
-      {/* 🔴 COLLE CE BLOC ICI (ENTRE ScrollView et SafeAreaView) 🔴 */}
+
       <ReportModal
         visible={reportModalVisible}
         onClose={() => setReportModalVisible(false)}

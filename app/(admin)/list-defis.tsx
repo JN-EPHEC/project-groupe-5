@@ -81,9 +81,7 @@ export default function ListDefisScreen() {
       />
 
       <View style={styles.headerContainer}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
-        </TouchableOpacity>
+        {/* Suppression du bouton back ici car il est dans le layout */}
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           Catalogue Défis
         </Text>
@@ -290,19 +288,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.3)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 15,
-  },
   headerTitle: {
     fontSize: 24,
     fontWeight: "800",
     letterSpacing: 0.5,
+    marginLeft: 60, // Marge pour laisser la place au bouton retour flottant
   },
   searchContainer: {
     flexDirection: 'row',

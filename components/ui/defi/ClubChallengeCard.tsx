@@ -20,7 +20,19 @@ export function ClubChallengeCard({ challenge, participating, onParticipate, onC
   const cardAlt = colors.cardAlt;
   const cardText = isLight ? colors.cardText : colors.text;
   const cardMuted = isLight ? colors.cardMuted : colors.mutedText;
-  const category = CATEGORY_CONFIG[challenge.category as keyof typeof CATEGORY_CONFIG];
+
+  // --- CORRECTION CRITIQUE ICI ---
+  // On récupère la config, mais on prévoit le cas où elle n'existe pas (undefined)
+  const rawCategory = CATEGORY_CONFIG[challenge.category as keyof typeof CATEGORY_CONFIG];
+  
+  // Si la catégorie n'est pas trouvée dans la config, on utilise une valeur par défaut pour éviter le crash
+  const category = rawCategory || { 
+    icon: "help-circle-outline" as any, 
+    label: challenge.category || "Divers", // Affiche le nom brut ou "Divers"
+    color: "#7DCAB0" 
+  };
+  // -------------------------------
+
   const [confirmVisible, setConfirmVisible] = useState(false);
   const { current, reviewCompleted, reviewRequiredCount } = useChallenges();
 
@@ -28,7 +40,6 @@ export function ClubChallengeCard({ challenge, participating, onParticipate, onC
   const shouldHide = useMemo(() => {
     if (!participating) return false;
     if (reviewCompleted >= reviewRequiredCount) {
-      // If this is not the current validated challenge, hide it
       if (current && current.id !== challenge.id) return true;
     }
     return false;
@@ -58,8 +69,9 @@ export function ClubChallengeCard({ challenge, participating, onParticipate, onC
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   };
 
+  if (shouldHide) return null;
+
   return (
-    shouldHide ? null : (
     <View style={[
       styles.card, 
       { 
@@ -70,6 +82,7 @@ export function ClubChallengeCard({ challenge, participating, onParticipate, onC
     ]}> 
       <View style={styles.header}>
         <View style={[styles.categoryPill, { backgroundColor: cardAlt }]}> 
+          {/* Utilisation sécurisée de category.icon */}
           <Ionicons name={category.icon} size={16} color="#7DCAB0" />
           <Text style={styles.categoryText}>{category.label}</Text>
         </View>
@@ -139,7 +152,6 @@ export function ClubChallengeCard({ challenge, participating, onParticipate, onC
         </View>
       </Modal>
     </View>
-    )
   );
 }
 

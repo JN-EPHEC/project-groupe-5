@@ -119,9 +119,7 @@ export default function NewDefiScreen() {
       />
 
       <View style={styles.headerContainer}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
-        </TouchableOpacity>
+        {/* J'ai supprimé le TouchableOpacity ici */}
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           {isEditing ? "Modifier" : "Nouveau Défi"}
         </Text>
@@ -283,25 +281,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.3)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 15,
-  },
+  // j'ai retiré le style backButton qui ne servait plus
   headerTitle: {
     fontSize: 24,
     fontWeight: "800",
     letterSpacing: 0.5,
+    marginLeft: 60, // Marge ajoutée pour éviter que le texte ne soit sous la flèche flottante
   },
   glassCard: {
     padding: 24,
     borderRadius: 30,
     borderWidth: 1,
-    backgroundColor: "rgba(255,255,255,0.2)", // Base glass opacity
+    backgroundColor: "rgba(255,255,255,0.2)",
   },
   label: {
     marginTop: 16,
