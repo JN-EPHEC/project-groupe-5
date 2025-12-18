@@ -54,7 +54,7 @@ type DefiDoc = {
 
 export default function DefiScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ view?: string }>();
+  const params = useLocalSearchParams<{ view?: string; rankingTab?: string }>();
   const { colors, mode } = useThemeMode();
   const { friends } = useFriends();
   const { points } = usePoints();
@@ -216,17 +216,21 @@ const [targetReportId, setTargetReportId] = useState<TargetReport | null>(null);
     loadRotatingDefis();
   }, []);
 
-  // 👇 NEW: react to /defi?view=classement
+  // NEW: react to /defi?view=classement&rankingTab=perso|club
   useEffect(() => {
-    const raw = params.view;
-    const v = Array.isArray(raw) ? raw[0] : raw;
+    const viewParam = Array.isArray(params.view) ? params.view[0] : params.view;
+    const tabParam = Array.isArray(params.rankingTab) ? params.rankingTab[0] : params.rankingTab;
 
-    if (v === "classement") {
+    if (viewParam === "classement") {
       setViewMode("classement");
-    } else if (v === "defis") {
+    } else if (viewParam === "defis") {
       setViewMode("defis");
     }
-  }, [params.view]);
+
+    if (tabParam === 'perso' || tabParam === 'club') {
+      setActiveTab(tabParam);
+    }
+  }, [params.view, params.rankingTab]);
 
   useEffect(() => {
     if (goToClassement) {
