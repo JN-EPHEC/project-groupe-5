@@ -158,7 +158,7 @@ export default function ProfilScreen() {
 
         <View style={sectionSpacing}>
           <View style={styles.row}>
-            {/* Carte Classement Individuel -> Force le refresh via timestamp 't' */}
+            {/* Carte Classement Individuel */}
             <TouchableOpacity
               style={{ flex: 1 }}
               activeOpacity={0.8}
@@ -168,7 +168,7 @@ export default function ProfilScreen() {
                   params: { 
                     view: "classement", 
                     rankingTab: "perso", 
-                    t: Date.now() // Astuce pour forcer la navigation
+                    t: Date.now() // Timestamp pour forcer le refresh
                   }
                 });
               }}
@@ -176,7 +176,7 @@ export default function ProfilScreen() {
               <StatCard icon="trophy-outline" label="Classement individuel" value={individualRankLabel} />
             </TouchableOpacity>
 
-            {/* Carte Classement Amis -> Force l'onglet Amis et Reset la vue */}
+            {/* Carte Classement Amis */}
             <TouchableOpacity
               style={{ flex: 1 }}
               activeOpacity={0.8}
@@ -185,7 +185,7 @@ export default function ProfilScreen() {
                   pathname: "/(tabs)/social",
                   params: { 
                     tab: "amis", 
-                    reset: "true", // Demande explicite de reset
+                    reset: "true", // Force le reset de la vue (ferme les chats)
                     t: Date.now() 
                   }
                 });
