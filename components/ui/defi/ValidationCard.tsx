@@ -1,3 +1,4 @@
+// components/ui/defi/ValidationCard.tsx
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
@@ -53,7 +54,7 @@ export function ValidationCard({ item, onValidate, onReject, onReport }: Props) 
         shadowRadius: 8,
         elevation: 2,
       }
-    ]}> 
+    ]}>
       {/* HEADER */}
       <View style={styles.header}>
         <View style={[styles.categoryPill, { backgroundColor: cardAlt }]}> 

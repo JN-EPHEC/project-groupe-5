@@ -2,22 +2,27 @@
 import { auth, db } from "@/firebaseConfig";
 import { useChallenges } from "@/hooks/challenges-context";
 import {
-    collection,
-    DocumentData,
-    limit,
-    onSnapshot,
-    query,
-    where,
+  collection,
+  DocumentData,
+  limit,
+  onSnapshot,
+  query,
+  where,
 } from "firebase/firestore";
 import { useEffect, useRef, useState } from "react";
 
 // =========================
 // Debug (LOW NOISE)
 // =========================
-const VQ_DEBUG = true;
-const log = (msg: string, data?: any) => {
-  if (!VQ_DEBUG) return;
-  console.log(`[VQ] ${msg}`, data ?? "");
+let GLOBAL_VQ_LISTENER_COUNT = 0;
+let GLOBAL_VQ_ID_SEQ = 0;
+
+const vqLog = (id: number, msg: string, data?: any) => {
+  console.log(
+    `%c[VQ#${id}] ${msg}`,
+    "color:#22c55e;font-weight:bold",
+    data ?? ""
+  );
 };
 
 // =========================
@@ -46,6 +51,17 @@ type UseValidationQueueReturn = {
 export function useValidationQueue(
   difficulty: "facile" | "moyen" | "difficile" | null
 ): UseValidationQueueReturn {
+
+
+  const instanceIdRef = useRef<number | null>(null);
+
+if (instanceIdRef.current === null) {
+  instanceIdRef.current = ++GLOBAL_VQ_ID_SEQ;
+  vqLog(instanceIdRef.current, "HOOK CREATED");
+}
+const ID = instanceIdRef.current;
+
+
   const {
     current,
     setReviewRequiredCount,
@@ -58,6 +74,13 @@ export function useValidationQueue(
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;
+
+  vqLog(ID!, "useEffect RUN", {
+    uid,
+    status: current?.status,
+    difficulty,
+  });
+
 
     // ---------- HARD EXITS ----------
     if (!uid) {
@@ -80,8 +103,6 @@ export function useValidationQueue(
     }
 
     // ---------- SUBSCRIBE ----------
-    log("subscribe", { difficulty });
-
     const q = query(
       collection(db, "preuves"),
       where("status", "==", "pending"),
@@ -89,7 +110,22 @@ export function useValidationQueue(
       limit(5)
     );
 
+
+GLOBAL_VQ_LISTENER_COUNT++;
+vqLog(ID!, "SUBSCRIBE Firestore", {
+  activeListeners: GLOBAL_VQ_LISTENER_COUNT,
+});
+
+
+
     const unsub = onSnapshot(q, (snap) => {
+
+      vqLog(ID!, "SNAPSHOT FIRED", {
+  docs: snap.docs.length,
+});
+
+
+
       if (hasDecidedRef.current) return; // extra safety
 
       const raw = snap.docs.map((d) => {
@@ -115,14 +151,12 @@ export function useValidationQueue(
         return true;
       });
 
-      log("snapshot", {
-        raw: raw.length,
-        visible: filtered.length,
-      });
-
       // ---------- DECISION POINT ----------
       if (filtered.length === 0) {
-        log("decision: skip validation");
+
+        
+        vqLog(ID!, "DECISION: no validations available");
+
 
         hasDecidedRef.current = true;
         //setValidationPhaseDone(true); => if code works will need to be removed
@@ -137,7 +171,14 @@ export function useValidationQueue(
     });
 
     return () => {
-      log("unsubscribe");
+
+
+      GLOBAL_VQ_LISTENER_COUNT--;
+vqLog(ID!, "UNSUBSCRIBE Firestore", {
+  activeListeners: GLOBAL_VQ_LISTENER_COUNT,
+});
+
+
       unsub();
     };
   }, [
