@@ -9,10 +9,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { useSafeAreaInsets } from "react-native-safe-area-context"; // <--- IMPORT CRUCIAL
-
-// Constantes
-const BG_DARK = "#0B1412";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 function CircleIcon({ name, color, focused, light }: any) {
   const scale = useSharedValue(focused ? 1 : 0.9);
@@ -21,31 +18,25 @@ function CircleIcon({ name, color, focused, light }: any) {
   useEffect(() => {
     scale.value = withTiming(focused ? 1 : 0.9, { duration: 220 });
     opacity.value = withTiming(focused ? 1 : 0.6, { duration: 220 });
-  }, [focused, scale, opacity]);
+  }, [focused]);
 
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ scale: scale.value }],
-      opacity: opacity.value,
-    };
-  });
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: opacity.value,
+  }));
 
   return (
-    // pointerEvents="none" est l'astuce magique : 
-    // ça empêche l'icône de bloquer le clic destiné au bouton en dessous.
-    <View pointerEvents="none"> 
+    <View pointerEvents="none" style={{ alignItems: 'center', justifyContent: 'center', marginTop: -5 }}> 
       <Animated.View
         style={[
           {
-            width: 46,
-            height: 46,
-            borderRadius: 23,
+            width: 38, // Encore plus petit pour laisser de la place au texte en dessous
+            height: 38,
+            borderRadius: 19,
             justifyContent: "center",
             alignItems: "center",
             backgroundColor: focused
-              ? light
-                ? "#FFFFFF"
-                : "#E3F9F1"
+              ? light ? "#FFFFFF" : "#E3F9F1"
               : "transparent",
             borderWidth: focused && light ? 2 : 0,
             borderColor: light ? "#19D07D" : "transparent",
@@ -55,8 +46,8 @@ function CircleIcon({ name, color, focused, light }: any) {
       >
         <Ionicons
           name={name}
-          size={24}
-          color={focused ? (light ? "#0F3327" : "#0F3327") : color}
+          size={20} // Icône légèrement plus petite
+          color={focused ? "#0F3327" : color}
         />
       </Animated.View>
     </View>
@@ -66,7 +57,7 @@ function CircleIcon({ name, color, focused, light }: any) {
 export default function TabLayout() {
   const { colors, mode } = useThemeMode();
   const { user, loading } = useUser();
-  const insets = useSafeAreaInsets(); // <--- Récupère les marges de l'iPhone 15
+  const insets = useSafeAreaInsets();
 
   if (loading) {
     return (
@@ -76,9 +67,7 @@ export default function TabLayout() {
     );
   }
 
-  if (!user) {
-    return <Redirect href="/(auth)/login" />;
-  }
+  if (!user) return <Redirect href="/(auth)/login" />;
 
   return (
     <Tabs
@@ -87,40 +76,37 @@ export default function TabLayout() {
         tabBarShowLabel: true,
         tabBarStyle: {
           position: "absolute",
-          // CALCUL DYNAMIQUE : On ajoute 10px au-dessus de la barre système (insets.bottom)
+          // On remonte la barre un peu pour ne pas être gêné par le trait iOS
           bottom: Platform.OS === "ios" ? insets.bottom + 10 : 20,
-          left: 20,
-          right: 20,
-          height: 70, // Hauteur fixe
-          paddingBottom: 0, // Important sur iOS pour centrer verticalement
+          left: 15,
+          right: 15,
+          height: 80, // Hauteur augmentée pour respirer
           backgroundColor: mode === "dark" ? "rgba(20,26,24,0.95)" : "#E6E9E8",
-          borderRadius: 35,
+          borderRadius: 40,
           borderTopWidth: 0,
           borderWidth: mode === "light" ? 2 : 0,
           borderColor: mode === "light" ? "#0F3327" : "transparent",
-          elevation: 10,
+          elevation: 5,
           shadowColor: "#000",
-          shadowOpacity: 0.3,
-          shadowRadius: 10,
-          shadowOffset: { width: 0, height: 5 },
-          zIndex: 9999, // Force la barre au-dessus de tout le reste
+          shadowOpacity: 0.2,
+          shadowRadius: 8,
+          zIndex: 100,
+          paddingBottom: 15, // Donne de l'espace au texte en bas
         },
         tabBarItemStyle: {
-          // Force les boutons à prendre toute la hauteur pour être faciles à cliquer
-          height: 70, 
+          height: 70,
           paddingTop: 10,
         },
         tabBarLabelStyle: {
-          fontSize: 10,
-          marginBottom: 10,
-          fontWeight: "600",
+          fontSize: 9, // Légèrement plus petit pour être sûr que ça tienne
+          fontWeight: "700",
+          marginTop: 5, 
         },
         tabBarActiveTintColor: mode === "dark" ? "#E6FFF5" : "#0F3327",
         tabBarInactiveTintColor: mode === "dark" ? "#8AA39C" : "#0F3327AA",
       }}
     >
       <Tabs.Screen name="index" options={{ href: null }} />
-
       <Tabs.Screen
         name="acceuil"
         options={{
@@ -130,7 +116,6 @@ export default function TabLayout() {
           ),
         }}
       />
-      
       <Tabs.Screen
         name="defi"
         options={{
@@ -140,7 +125,6 @@ export default function TabLayout() {
           ),
         }}
       />
-
       <Tabs.Screen
         name="social"
         options={{
@@ -150,17 +134,15 @@ export default function TabLayout() {
           ),
         }}
       />
-
       <Tabs.Screen
         name="recompenses"
         options={{
-          title: "Cadeaux",
+          title: "Récompenses",
           tabBarIcon: ({ color, focused }) => (
             <CircleIcon name="gift-outline" color={color} focused={focused} light={mode === "light"} />
           ),
         }}
       />
-
       <Tabs.Screen
         name="profil"
         options={{

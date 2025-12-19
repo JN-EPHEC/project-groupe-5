@@ -1,8 +1,8 @@
 import { ChallengeOfTheDay } from "@/components/ui/acceuil/ChallengeOfTheDay";
-import { HeaderProfile } from "@/components/ui/acceuil/HeaderProfile";
 import { ProgressionCard } from "@/components/ui/acceuil/ProgressionCard";
 import StreakCalendar from "@/components/ui/acceuil/StreakCalendar";
 import NotificationBell from "@/components/ui/common/NotificationBell";
+import { Header } from "@/components/ui/profil/Header";
 import PremiumCard from "@/components/ui/recompenses/PremiumCard";
 import { FontFamilies } from "@/constants/fonts";
 import { auth, db } from "@/firebaseConfig";
@@ -11,12 +11,21 @@ import { useClub } from "@/hooks/club-context";
 import { useFriends } from "@/hooks/friends-context";
 import { usePoints } from "@/hooks/points-context";
 import { useThemeMode } from "@/hooks/theme-context";
+import { useClassement } from "@/src/classement/hooks/useClassement";
 import { useUser } from "@/hooks/user-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import { addDoc, collection, onSnapshot } from "firebase/firestore";
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useMemo } from "react";
+import {
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function AcceuilScreen() {
@@ -26,7 +35,8 @@ export default function AcceuilScreen() {
   const router = useRouter();
   const { joinedClub, members } = useClub();
   const { current } = useChallenges();
-  const { friends } = useFriends();
+  const { users: classementUsers, loading: classementLoading } =
+    useClassement();
   const startSubscription = async () => {
     const user = auth.currentUser;
     if (!user) {
@@ -59,35 +69,93 @@ export default function AcceuilScreen() {
   };
 
   const defisFaient = 2; // TODO: derive from real data
-  const defisTotal = 5;  // TODO: derive from real data
+  const defisTotal = 5; // TODO: derive from real data
 
   const myPoints = typeof points === "number" ? points : user?.points ?? 0;
 
-  // Classement entre amis basé sur les points actuels
-  const friendPoints = [...friends.map((friend) => friend.points || 0), myPoints];
-  const sorted = [...friendPoints].sort((a, b) => b - a);
-  const positionIndex = sorted.findIndex((value) => value === myPoints);
-  const position = positionIndex >= 0 ? positionIndex + 1 : sorted.length;
-  const totalFriends = sorted.length;
-  const positionLabel = position === 1 ? "1er" : `${position}e`;
+  // Classement individuel
+  const { position, totalUsers } = useMemo(() => {
+    if (classementLoading || !classementUsers || !user)
+      return { position: null, totalUsers: 50 };
+    const currentUser = classementUsers.find((u) => u.isCurrentUser);
+    return {
+      position: currentUser?.rank ?? null,
+      totalUsers: 50,
+    };
+  }, [classementUsers, classementLoading, user]);
+  const positionLabel = position
+    ? position === 1
+      ? "1er"
+      : `${position}e`
+    : "—";
 
   // Classement Club
-  const clubAllPoints = joinedClub ? [...members.map((member) => member.points || 0), myPoints] : [];
-  const clubSorted = joinedClub ? [...clubAllPoints].sort((a, b) => b - a) : [];
-  const clubPositionIndex = joinedClub ? clubSorted.findIndex((value) => value === myPoints) : -1;
-  const clubPosition = clubPositionIndex >= 0 ? clubPositionIndex + 1 : clubSorted.length;
-  const clubTotal = joinedClub ? clubSorted.length : 0;
-  const clubLabel = clubPosition === 1 ? "1er" : `${clubPosition}e`;
+  const { clubPosition, totalClubs } = useMemo(() => {
+    if (!joinedClub) return { clubPosition: null, totalClubs: 50 };
+
+    const clubs: Array<{
+      name: string;
+      pts: number;
+      isMine?: boolean;
+      avatar: string;
+    }> = [];
+
+    const totalClubPts =
+      members.reduce((sum, m: any) => sum + (m.points || 0), 0) + myPoints;
+    clubs.push({
+      name: joinedClub.name ?? "Mon club",
+      pts: totalClubPts,
+      isMine: true,
+      avatar:
+        joinedClub.logo || "https://api.dicebear.com/8.x/shapes/svg?seed=myclub",
+    });
+
+    const mockClubNames = [
+      "Les Écogardiens",
+      "Verte Équipe",
+      "Planète Propre",
+      "Zéro Déchet Squad",
+      "Les Tri-Héros",
+      "Green Sparks",
+      "Eco Runner",
+      "TerraFriends",
+      "BlueLeaf",
+      "GreenMinds",
+    ];
+    while (clubs.length < 50) {
+      const name =
+        mockClubNames[clubs.length % mockClubNames.length] +
+        " " +
+        (Math.floor(Math.random() * 90) + 10);
+      const pts = Math.floor(Math.random() * 5000) + 200;
+      const avatar = `https://api.dicebear.com/8.x/shapes/svg?seed=${encodeURIComponent(
+        name
+      )}`;
+      clubs.push({ name, pts, avatar });
+    }
+
+    const sortedClubs = clubs.sort((a, b) => b.pts - a.pts);
+    const myClubIndex = sortedClubs.findIndex((c) => c.isMine);
+
+    return {
+      clubPosition: myClubIndex !== -1 ? myClubIndex + 1 : null,
+      totalClubs: sortedClubs.length,
+    };
+  }, [joinedClub, members, myPoints]);
+
+  const clubLabel = clubPosition
+    ? clubPosition === 1
+      ? "1er"
+      : `${clubPosition}e`
+    : "—";
 
   const isLight = mode === "light";
   // Defensive checks to prevent "Element type is invalid" runtime errors
-  const hasHeaderProfile = typeof HeaderProfile !== "undefined";
   const hasProgressionCard = typeof ProgressionCard !== "undefined";
   const hasChallengeOfTheDay = typeof ChallengeOfTheDay !== "undefined";
   const hasStreakCalendar = typeof StreakCalendar !== "undefined";
   const hasPremiumCard = typeof PremiumCard !== "undefined";
 
-  if (!hasHeaderProfile) console.warn("Missing HeaderProfile import (undefined)");
   if (!hasProgressionCard) console.warn("Missing ProgressionCard import (undefined)");
   if (!hasChallengeOfTheDay) console.warn("Missing ChallengeOfTheDay import (undefined)");
   if (!hasStreakCalendar) console.warn("Missing StreakCalendar import (undefined)");
@@ -132,15 +200,11 @@ export default function AcceuilScreen() {
             <NotificationBell />
           </View>
         </View>
-        {/* Section: Profil -> components/ui/acceuil/HeaderProfile */}
-        {hasHeaderProfile ? (
-          <HeaderProfile clubName={joinedClub?.name} />
-        ) : (
-          <Text style={{ color: isLight ? colors.text : "#fff" }}>Profil indisponible</Text>
-        )}
+        
+        <Header />
 
         {/* Section: Classement Cards */}
-        <View style={{ marginBottom: 20 }}>
+        <View style={{ marginBottom: 20, marginTop: 20 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 }}>
             <Ionicons name="trophy-outline" size={20} color={isLight ? colors.text : "#fff"} />
             <Text style={{ fontSize: 20, fontFamily: FontFamilies.heading, color: isLight ? colors.text : "#fff" }}>
@@ -154,13 +218,17 @@ export default function AcceuilScreen() {
               activeOpacity={0.85}
               style={[
                 styles.rankCard,
-                { backgroundColor: isLight ? colors.card : "rgba(0, 151, 178, 0.15)" }
+                { 
+                  backgroundColor: isLight ? colors.card : "rgba(0, 151, 178, 0.15)",
+                  borderWidth: 1,
+                  borderColor: isLight ? '#007AFF' : 'rgba(0, 151, 178, 0.3)'
+                }
               ]}
-              onPress={() => router.push({ pathname: "/social", params: { tab: "amis" } })}
+              onPress={() => router.push({ pathname: "/defi", params: { view: "classement", rankingTab: "perso" } })}
             >
               <Text style={[styles.rankCardLabel, { color: isLight ? colors.mutedText : "#9FB9AE" }]}>Individuel</Text>
               <Text style={[styles.rankCardValue, { color: isLight ? colors.text : "#fff" }]}>
-                {positionLabel} <Text style={{ fontSize: 16, fontWeight: '400' }}>sur {totalFriends}</Text>
+                {positionLabel} <Text style={{ fontSize: 16, fontWeight: '400' }}>sur {totalUsers}</Text>
               </Text>
               <View style={{ alignItems: 'flex-end', marginTop: 'auto' }}>
                 <Ionicons name="person" size={24} color={isLight ? colors.mutedText : "rgba(255,255,255,0.5)"} />
@@ -172,16 +240,20 @@ export default function AcceuilScreen() {
               activeOpacity={joinedClub ? 0.85 : 1}
               style={[
                 styles.rankCard,
-                { backgroundColor: isLight ? colors.card : "rgba(0, 151, 178, 0.15)" }
+                { 
+                  backgroundColor: isLight ? colors.card : "rgba(0, 151, 178, 0.15)",
+                  borderWidth: 1,
+                  borderColor: isLight ? '#007AFF' : 'rgba(0, 151, 178, 0.3)'
+                }
               ]}
               disabled={!joinedClub}
-              onPress={() => router.push({ pathname: "/social", params: { tab: "clubs", view: "clubRanking" } })}
+              onPress={() => router.push({ pathname: "/defi", params: { view: "classement", rankingTab: "club" } })}
             >
               <Text style={[styles.rankCardLabel, { color: isLight ? colors.mutedText : "#9FB9AE" }]}>Club</Text>
               <Text style={[styles.rankCardValue, { color: isLight ? colors.text : "#fff" }]}>
                 {joinedClub ? (
                   <>
-                    {clubLabel} <Text style={{ fontSize: 16, fontWeight: '400' }}>sur {clubTotal}</Text>
+                    {clubLabel} <Text style={{ fontSize: 16, fontWeight: '400' }}>sur {totalClubs}</Text>
                   </>
                 ) : (
                   "—"

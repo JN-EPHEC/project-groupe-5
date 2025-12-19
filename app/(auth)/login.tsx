@@ -177,9 +177,9 @@ export default function Login() {
             </Pressable>
 
             <View style={styles.footerRow}>
-              <Text style={styles.footerText}>Vous n'avez pas encore de compte ? </Text>
+              <Text style={[styles.footerText, { color: colors.text }]}>Vous n'avez pas encore de compte ? </Text>
               <Pressable onPress={() => router.push("/register")}>
-                <Text style={styles.footerLink}>Créer un compte</Text>
+                <Text style={[styles.footerLink, { color: colors.text }]}>Créer un compte</Text>
               </Pressable>
             </View>
           </View>
@@ -266,7 +266,7 @@ const styles = StyleSheet.create({
   primaryBtnText: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#00231A",
+    color: "#FFFFFF",
   },
   footerRow: {
     flexDirection: "row",

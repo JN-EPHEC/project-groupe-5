@@ -1,5 +1,6 @@
 import { FontFamilies } from "@/constants/fonts";
 import { useThemeMode } from "@/hooks/theme-context";
+import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import ProgressCircle from "../common/ProgressCircle";
@@ -26,36 +27,46 @@ export function ProgressionCard({
   streakText,
   title = "Progression de la semaine",
 }: ProgressionCardProps) {
-  const { mode } = useThemeMode();
+  const { mode, colors } = useThemeMode();
   const isLight = mode === "light";
 
-  // En mode light, on utilise le nouveau thème vert. Le mode dark reste inchangé pour l'instant.
   if (!isLight) {
-    // Fallback pour le mode sombre (non modifié pour l'instant)
-    const { colors } = useThemeMode();
-    const darkCardGradient = ["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"] as const;
+    const gradientColors = ["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"];
     return (
-        <View style={[styles.card, { backgroundColor: '#021114'}]}>
-            <Text style={[styles.title, { color: '#FFFFFF' }]}>{title}</Text>
-            <View style={styles.row}>
-                <ProgressCircle done={done} total={total} />
-                <View style={{ marginLeft: 16 }}>
-                    <Text style={[styles.points, { color: '#FFFFFF' }]}>{pointsText}</Text>
-                    <Text style={[styles.streak, { color: 'rgba(255, 255, 255, 0.7)' }]}>{streakText}</Text>
-                </View>
-            </View>
+      <LinearGradient
+        colors={gradientColors}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.card, { borderWidth: 1, borderColor: 'rgba(0, 151, 178, 0.3)' }]}
+      >
+        <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+        <View style={styles.row}>
+          <ProgressCircle done={done} total={total} />
+          <View style={{ marginLeft: 16 }}>
+            <Text style={[styles.points, { color: colors.text }]}>
+              {pointsText}
+            </Text>
+            <Text style={[styles.streak, { color: colors.mutedText }]}>
+              {streakText}
+            </Text>
+          </View>
         </View>
+      </LinearGradient>
     );
   }
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { backgroundColor: colors.card, borderWidth: 1, borderColor: '#007AFF' }]}>
       <Text style={[styles.title, { color: greenTheme.cardTitle }]}>{title}</Text>
       <View style={styles.row}>
         <ProgressCircle done={done} total={total} />
         <View style={{ marginLeft: 16 }}>
-          <Text style={[styles.points, { color: greenTheme.statText }]}>{pointsText}</Text>
-          <Text style={[styles.streak, { color: greenTheme.mutedText }]}>{streakText}</Text>
+          <Text style={[styles.points, { color: greenTheme.statText }]}>
+            {pointsText}
+          </Text>
+          <Text style={[styles.streak, { color: greenTheme.mutedText }]}>
+            {streakText}
+          </Text>
         </View>
       </View>
     </View>
@@ -64,7 +75,6 @@ export function ProgressionCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
     padding: 20,
     borderRadius: 24,
     shadowColor: "#64748B",
@@ -74,14 +84,16 @@ const styles = StyleSheet.create({
     elevation: 4,
     width: "100%",
   },
-  title: { 
-    marginBottom: 16, 
-    fontSize: 14, 
-    fontFamily: FontFamilies.bodyStrong,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+  title: {
+    marginBottom: 16,
+    fontSize: 18,
+    fontFamily: FontFamilies.heading,
   },
   row: { flexDirection: "row", alignItems: "center" },
-  points: { fontSize: 16, fontFamily: FontFamilies.heading, color: '#0F172A' },
-  streak: { marginTop: 6, fontFamily: FontFamilies.headingMedium, color: '#64748B' },
+  points: { fontSize: 16, fontFamily: FontFamilies.heading, color: "#0F172A" },
+  streak: {
+    marginTop: 6,
+    fontFamily: FontFamilies.headingMedium,
+    color: "#64748B",
+  },
 });
