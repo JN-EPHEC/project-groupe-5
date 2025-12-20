@@ -68,7 +68,12 @@ export const RewardCard: React.FC<RewardCardProps> = ({ item, onRedeem, redeemed
           style={{ width: '100%' }}
         >
           {loopImages.map((src, idx) => (
-            <TouchableOpacity key={idx} activeOpacity={0.85} onPress={() => router.push({ pathname: `/reward/${item.id}` })}>
+            <TouchableOpacity 
+                key={idx} 
+                activeOpacity={0.85} 
+                // CORRECTION 1 : Ajout de 'as any' pour le router
+                onPress={() => router.push({ pathname: `/reward/${item.id}` } as any)}
+            >
               <Image source={{ uri: src }} style={styles.image} resizeMode="cover" />
             </TouchableOpacity>
           ))}
@@ -142,7 +147,8 @@ export const RewardCard: React.FC<RewardCardProps> = ({ item, onRedeem, redeemed
         </View>
       </Modal>
       <TouchableOpacity
-        onPress={() => router.push({ pathname: `/reward/${item.id}` })}
+        // CORRECTION 2 : Ajout de 'as any' ici aussi
+        onPress={() => router.push({ pathname: `/reward/${item.id}` } as any)}
         style={{ marginTop: 8, paddingVertical: 8, borderRadius: 10, alignItems: 'center', backgroundColor: cardAlt }}
       >
         <Text style={{ color: cardText, fontWeight: '600', fontSize: 12 }}>En savoir plus</Text>

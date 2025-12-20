@@ -3,15 +3,16 @@ import { User as FirebaseUser, onAuthStateChanged } from "firebase/auth";
 import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 import React, {
     createContext,
+    useCallback,
     useContext,
     useEffect,
     useMemo,
     useState,
 } from "react";
-// No UI imports; provider shouldn't render screens
 import { auth, db } from "../firebaseConfig";
+import { checkPremiumStatus } from "@/services/premiumService";
 
-// 🔥 Full user profile (Option B)
+// The core user profile from the 'users' collection
 export type UserProfile = {
   uid: string;
   email: string;
@@ -26,50 +27,59 @@ export type UserProfile = {
   username?: string | null;
   bio?: string | null;
   photoURL?: string | null;
+  isPremium?: boolean;
 };
 
+// The context now includes the separate premium status
 type UserContextType = {
-  user: UserProfile;
-  loading: boolean;
+  user: UserProfile | null; // Can be null when logged out
+  isPremium: boolean;
+  loading: boolean; // A single flag for overall loading state
   userClub: { id: string; name: string; isPrivate?: boolean } | null;
+  refreshUser: () => Promise<void>; // To re-trigger premium check
 };
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
-
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
   const [userClub, setUserClub] = useState<{ id: string; name: string; isPrivate?: boolean } | null>(null);
+  const [isPremium, setIsPremium] = useState(false);
+  
+  // Separate loading states for clarity
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [premiumLoading, setPremiumLoading] = useState(true);
 
   // 1️⃣ Listen to Firebase Auth state
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       setFirebaseUser(user);
-
       if (!user) {
-        // If logged out, delete profile and stop loading
+        // If logged out, reset everything
         setUserProfile(null);
-        setLoading(false);
+        setIsPremium(false);
+        setProfileLoading(false);
+        setPremiumLoading(false);
       }
     });
-
     return unsub;
   }, []);
 
   // 2️⃣ Listen to Firestore user profile (only when logged in)
   useEffect(() => {
-    if (!firebaseUser) return;
+    if (!firebaseUser) {
+        setProfileLoading(false);
+        return;
+    };
 
+    setProfileLoading(true);
     const ref = doc(db, "users", firebaseUser.uid);
-
     const unsub = onSnapshot(
       ref,
       (snap) => {
         if (snap.exists()) {
           const data = snap.data();
-
           setUserProfile({
             uid: firebaseUser.uid,
             email: firebaseUser.email ?? "",
@@ -85,74 +95,86 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             bio: data.bio ?? null,
             photoURL: data.photoURL ?? null,
           });
+        } else {
+            setUserProfile(null);
         }
-        setLoading(false);
+        setProfileLoading(false);
       },
       (err) => {
         console.error("Firestore user error:", err);
-        setLoading(false);
+        setProfileLoading(false);
       }
     );
-
     return unsub;
   }, [firebaseUser]);
 
-  // 3️⃣ Listen to clubs that contain the current user in their members array.
-  // This allows detecting membership even when `users/{uid}.clubId` is not set.
+  // 3️⃣ Listen to clubs
   useEffect(() => {
     if (!firebaseUser) {
       setUserClub(null);
       return;
     }
-
     const q = query(collection(db, "clubs"), where("members", "array-contains", firebaseUser.uid));
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
+    const unsub = onSnapshot(q, (snap) => {
         if (snap.docs.length > 0) {
-          const d = snap.docs[0];
-          const data: any = d.data();
-          const club = { id: d.id, name: data.name ?? "Club", isPrivate: Boolean(data.isPrivate) };
-          setUserClub(club);
-          // update in-memory userProfile.clubId so other parts of the app react
-          setUserProfile((prev) => {
-            if (!prev) return prev;
-            if (prev.clubId === club.id) return prev;
-            return { ...prev, clubId: club.id };
-          });
+            const d = snap.docs[0];
+            const data: any = d.data();
+            const club = { id: d.id, name: data.name ?? "Club", isPrivate: Boolean(data.isPrivate) };
+            setUserClub(club);
+            setUserProfile((prev) => prev ? { ...prev, clubId: club.id } : null);
         } else {
-          setUserClub(null);
-          setUserProfile((prev) => {
-            if (!prev) return prev;
-            if (prev.clubId === null) return prev;
-            return { ...prev, clubId: null };
-          });
+            setUserClub(null);
+            setUserProfile((prev) => prev ? { ...prev, clubId: null } : null);
         }
-      },
-      (err) => {
-        console.error("Firestore club-members listener error:", err);
-      }
-    );
-
+    });
     return unsub;
   }, [firebaseUser]);
+  
+  // 4️⃣ Check for premium status once user profile is loaded
+  const refreshPremiumStatus = useCallback(async () => {
+    if (!userProfile) {
+        setIsPremium(false);
+        setPremiumLoading(false);
+        return;
+    }
+    setPremiumLoading(true);
+    try {
+        const status = await checkPremiumStatus(userProfile);
+        setIsPremium(status);
+    } catch (e) {
+        console.error(e);
+        setIsPremium(false);
+    } finally {
+        setPremiumLoading(false);
+    }
+  }, [userProfile]);
+
+  useEffect(() => {
+    refreshPremiumStatus();
+  }, [refreshPremiumStatus]);
+
+  // The single loading flag exposed to the app
+  const isLoading = profileLoading || premiumLoading;
 
   // Memoized context value
   const value = useMemo(
     () => ({
-      user: userProfile as UserProfile,
-      loading,
+      user: userProfile,
+      isPremium,
+      loading: isLoading,
       userClub,
+      refreshUser: refreshPremiumStatus, // refreshUser now re-checks premium status
     }),
-    [userProfile, loading]
+    [userProfile, isPremium, isLoading, userClub, refreshPremiumStatus]
   );
-  // Provide state only; routing handled in app layouts
+
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 }
 
-// Hook to access the user
+// Hook to access the user data
 export function useUser() {
   const ctx = useContext(UserContext);
   if (!ctx) throw new Error("useUser must be used within a UserProvider");
   return ctx;
 }
+
