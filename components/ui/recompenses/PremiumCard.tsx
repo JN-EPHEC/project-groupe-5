@@ -1,6 +1,10 @@
 import { FontFamilies } from "@/constants/fonts";
+import { db } from "@/firebaseConfig"; // ✅ Import Firebase
 import { useThemeMode } from "@/hooks/theme-context";
+import { useUser } from "@/hooks/user-context"; // ✅ Import du contexte utilisateur
 import { LinearGradient } from "expo-linear-gradient";
+import { collection, limit, onSnapshot, query, where } from "firebase/firestore"; // ✅ Imports Firestore
+import React, { useEffect, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity } from "react-native";
 
 type Props = {
@@ -9,6 +13,35 @@ type Props = {
 
 export function PremiumCard({ onSubscribe }: Props) {
   const { colors, mode } = useThemeMode();
+  const { user } = useUser(); // ✅ Récupération de l'utilisateur
+  const [isPremium, setIsPremium] = useState(false); // ✅ État pour gérer la visibilité
+
+  // ✅ ÉCOUTEUR EN TEMPS RÉEL (Copie de la logique du Header)
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    // On regarde s'il y a un abonnement actif ou en essai
+    const q = query(
+      collection(db, "customers", user.uid, "subscriptions"),
+      where("status", "in", ["active", "trialing"]),
+      limit(1)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      // Si on trouve un document, c'est que l'utilisateur est Premium
+      setIsPremium(!snapshot.empty);
+    });
+
+    return () => unsubscribe();
+  }, [user?.uid]);
+
+  // ✅ MAGIE : Si l'utilisateur est Premium, on n'affiche RIEN du tout
+  if (isPremium) {
+    return null;
+  }
+
+  // --- Le reste du code d'affichage normal pour les non-premium ---
+
   const isLight = mode === "light";
   const darkCardGradient = ["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"] as const;
   const gradientColors = isLight
@@ -30,6 +63,7 @@ export function PremiumCard({ onSubscribe }: Props) {
     "#14746F",
   ] as const;
   const buttonTextColor = "#FFFFFF";
+
   return (
     <LinearGradient
       colors={gradientColors}

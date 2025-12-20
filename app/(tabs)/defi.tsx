@@ -6,7 +6,7 @@ import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { addDoc, collection, getDocs, serverTimestamp } from "firebase/firestore";
-import { useEffect, useMemo, useRef, useState } from "react"; // <--- AJOUT DE useRef
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Image,
@@ -35,6 +35,10 @@ import { RewardDistributionModal } from "@/src/classement/components/RewardDistr
 import { useClassement } from "@/src/classement/hooks/useClassement";
 
 
+import { AVPlaybackStatus, ResizeMode, Video } from "expo-av";
+import { Modal } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 type DefiDoc = {
   id: string;
   titre: string;
@@ -48,7 +52,6 @@ type DefiDoc = {
   createdAt?: { seconds: number; nanoseconds: number } | any;
 };
 
-// Type pour le signalement
 type TargetReport = {
   id: string;
   title: string;
@@ -59,18 +62,47 @@ type TargetReport = {
 
 export default function DefiScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ view?: string; rankingTab?: string; t?: string }>(); // Ajout de 't' dans le type
+  const params = useLocalSearchParams<{ view?: string; rankingTab?: string; t?: string }>();
   const { colors, mode } = useThemeMode();
   const { friends } = useFriends();
   const { points } = usePoints();
   const { joinedClub, members } = useClub();
+  
+  // --- GESTION DES PUBS ---
+  const [showAd, setShowAd] = useState(false);
+  const [adScenario, setAdScenario] = useState<"start_challenge" | "claim_reward" | null>(null);
+  const [pendingChallengeId, setPendingChallengeId] = useState<number | null>(null); // Stocke l'ID du défi en attente de pub
+
   const [rewardModalVisible, setRewardModalVisible] = useState(false);
 
-  const { user } = useUser();
+  const { user, isPremium } = useUser();
+
+  // --- ÉTATS POUR LA PUB ---
+  const insets = useSafeAreaInsets();
+  const videoRef = useRef<Video>(null);
+  const [adFinished, setAdFinished] = useState(false);
+
+  // Recharge la vidéo quand la pub s'ouvre
+  useEffect(() => {
+    if (showAd) {
+      setAdFinished(false);
+      videoRef.current?.replayAsync();
+    } else {
+      videoRef.current?.pauseAsync();
+    }
+  }, [showAd]);
+
+  // Callback de fin de vidéo
+  const handlePlaybackStatusUpdate = (status: AVPlaybackStatus) => {
+    if (!status.isLoaded) return;
+    if (status.didJustFinish && !adFinished) {
+      setAdFinished(true);
+    }
+  };
+
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [targetReportId, setTargetReportId] = useState<TargetReport | null>(null);
 
-  // Ouvre la popup avec toutes les données requises
   const handleOpenReport = (
     id: string,
     title: string,
@@ -82,7 +114,6 @@ export default function DefiScreen() {
     setReportModalVisible(true);
   };
 
-  // Envoie les données à Firebase
   const handleSubmitReport = async (reason: string) => {
     if (!targetReportId || !user) return;
 
@@ -129,13 +160,11 @@ export default function DefiScreen() {
     setFeedback,
   } = useChallenges();
 
-  // Classement data
   const { users: classementUsers, loading: classementLoading } = useClassement();
 
   const [feedbackRating, setFeedbackRating] = useState<number>(0);
   const [feedbackComment, setFeedbackComment] = useState<string>("");
 
-  // LISTES DES DÉFIS
   const [rotatingChallenges, setRotatingChallenges] = useState<Challenge[]>([]);
   const [clubChallenges, setClubChallenges] = useState<Challenge[]>([]);
 
@@ -150,7 +179,6 @@ export default function DefiScreen() {
     difficultyKey as any
   );
 
-  // 🔥 Chargement des défis depuis Firestore
   useEffect(() => {
     const loadRotatingDefis = async () => {
       const snap = await getDocs(collection(db, "defis"));
@@ -158,7 +186,6 @@ export default function DefiScreen() {
         (d) => ({ id: d.id, ...(d.data() as any) } as DefiDoc)
       );
 
-      // 1. DÉFIS PERSO
       const personals = docs.filter(
         (d) => d.categorie === "personnel" && d.statut === "rotation"
       );
@@ -199,7 +226,6 @@ export default function DefiScreen() {
       pick("difficile", "Difficile");
       setRotatingChallenges(selected);
 
-      // 2. DÉFIS CLUB
       const clubs = docs.filter(
         (d) => d.categorie === "club" && d.statut === "rotation"
       );
@@ -222,34 +248,28 @@ export default function DefiScreen() {
     loadRotatingDefis();
   }, []);
 
-  // 🔴 CORRECTION NAVIGATION : On utilise useRef pour ne réagir qu'aux NOUVEAUX paramètres
   const lastTimeRef = useRef<number>(0);
 
   useEffect(() => {
-    // On convertit en string simple au cas où c'est un tableau
     const viewParam = Array.isArray(params.view) ? params.view[0] : params.view;
     const tabParam = Array.isArray(params.rankingTab) ? params.rankingTab[0] : params.rankingTab;
     const tParam = params.t ? Number(params.t) : 0;
 
-    // Si on reçoit un timestamp plus récent que le dernier traité, on applique la navigation forcée
     if (tParam > lastTimeRef.current) {
         lastTimeRef.current = tParam;
 
-        // Force la vue (Défi ou Classement)
         if (viewParam === "classement") {
             setViewMode("classement");
         } else if (viewParam === "defis") {
             setViewMode("defis");
         }
 
-        // Force l'onglet (Perso ou Club)
         if (tabParam === 'perso') {
             setActiveTab('perso');
         } else if (tabParam === 'club') {
             setActiveTab('club');
         }
     }
-    // Sinon (si pas de nouveau timestamp), on laisse l'utilisateur naviguer librement
   }, [params]);
 
   useEffect(() => {
@@ -274,25 +294,55 @@ export default function DefiScreen() {
     return rotatingChallenges;
   }, [current, rotatingChallenges, gatingActive]);
 
-  // 🔁 Activate or cancel a challenge
+  // 🔴 LOGIQUE DÉMARRAGE (AVEC BYPASS PREMIUM)
   const toggleOngoing = (id: number) => {
+    // 1. Si c'est pour arrêter le défi en cours
     if (current && current.id === id) {
       stop();
       return;
     }
 
-    // Recherche d'abord dans les défis Perso
-    let challenge = rotatingChallenges.find((c) => c.id === id);
-    
-    // Si pas trouvé, recherche dans les défis Club
-    if (!challenge) {
-        challenge = clubChallenges.find((c) => c.id === id);
+    // 2. VÉRIFICATION PREMIUM
+    if (isPremium) {
+      // 🚀 PREMIUM : Démarrage direct (On cherche le défi et on le lance)
+      let challenge = rotatingChallenges.find((c) => c.id === id);
+      if (!challenge) challenge = clubChallenges.find((c) => c.id === id);
+      if (challenge) start(challenge);
+    } else {
+      // 🎬 NON-PREMIUM : On lance la pub
+      setPendingChallengeId(id);
+      setAdScenario("start_challenge");
+      setShowAd(true);
     }
+  };
 
-    if (!challenge) {
-      return;
+  // 🔴 LOGIQUE RÉCOMPENSES (AVEC BYPASS PREMIUM)
+  const handleOpenRewards = () => {
+    if (isPremium) {
+      // 🚀 PREMIUM : Ouverture directe
+      setRewardModalVisible(true);
+    } else {
+      // 🎬 NON-PREMIUM : On lance la pub d'abord
+      setAdScenario("claim_reward");
+      setShowAd(true);
     }
-    start(challenge);
+  };
+
+  // 🔴 CALLBACK FIN DE PUB (À placer avant le return)
+  const handleAdFinished = () => {
+    setShowAd(false); // Ferme la pub
+
+    if (adScenario === "start_challenge" && pendingChallengeId) {
+       // On cherche le défi à démarrer (Perso ou Club)
+       let challenge = rotatingChallenges.find((c) => c.id === pendingChallengeId);
+       if (!challenge) challenge = clubChallenges.find((c) => c.id === pendingChallengeId);
+       
+       if (challenge) start(challenge); // Démarrage effectif
+       setPendingChallengeId(null);
+    } else if (adScenario === "claim_reward") {
+       setRewardModalVisible(true); // Ouvre les récompenses
+    }
+    setAdScenario(null);
   };
 
 
@@ -324,7 +374,6 @@ export default function DefiScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: isLight ? colors.background : darkBg }]}>
-      {/* HEADER with toggle icon */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <Text style={[styles.title, { color: colors.text }]}>{viewMode === 'defis' ? 'Défis' : 'Classement'}</Text>
         <TouchableOpacity
@@ -342,12 +391,8 @@ export default function DefiScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 140 }}
       >
-        {/* =======================================================
-            ONGLET PERSO - VUE DÉFIS
-           ======================================================= */}
         {(activeTab === "perso" && viewMode === 'defis') && (
           <>
-            {/* Gating message */}
             {gatingActive && (
               <View style={{ backgroundColor: colors.card, padding: 20, borderRadius: 24, marginBottom: 18 }}>
                 <Text style={{ color: colors.text, fontSize: 16, fontWeight: "700" }}>
@@ -368,7 +413,6 @@ export default function DefiScreen() {
               </View>
             )}
 
-            {/* Validation cards phase */}
             {gatingActive &&
               (validationQueue.length === 0 ? (
                 <Text style={[styles.emptyText, { color: colors.mutedText }]}>
@@ -412,7 +456,6 @@ export default function DefiScreen() {
                 ))
               ))}
 
-            {/* Normal challenge cards (3 rotation + maybe current) */}
             {!gatingActive &&
               challengesToDisplay.map((challenge: any) => {
                 return (
@@ -422,6 +465,7 @@ export default function DefiScreen() {
                     categorie="personnel"
                     isOngoing={current?.id === challenge.id}
                     status={current?.id === challenge.id ? current?.status : undefined}
+                    // 👇 Utilisation de la nouvelle fonction qui lance la pub
                     onToggle={toggleOngoing}
                     onReport={() => handleOpenReport(
                       challenge.firestoreId || String(challenge.id),
@@ -439,7 +483,6 @@ export default function DefiScreen() {
                 );
               })}
 
-            {/* Feedback form */}
             {current &&
               current.status === "pendingValidation" &&
               reviewCompleted >= reviewRequiredCount &&
@@ -474,7 +517,6 @@ export default function DefiScreen() {
                 </View>
               )}
 
-            {/* Message après envoi de l'avis */}
             {hideAfterFeedback && (
               <View style={{ backgroundColor: colors.card, padding: 20, borderRadius: 24, marginTop: 10 }}>
                 <Text style={{ color: colors.text, fontSize: 16, fontWeight: "700" }}>Défi en cours de validation</Text>
@@ -485,9 +527,6 @@ export default function DefiScreen() {
         )}
 
 
-        {/* =======================================================
-            ONGLET CLASSEMENT (VUE CLASSEMENT)
-           ======================================================= */}
         {viewMode === 'classement' && (
           <>
             {activeTab === 'perso' && (
@@ -495,7 +534,7 @@ export default function DefiScreen() {
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                   <Text style={{ color: colors.text, fontSize: 18, fontWeight: "800" }}>Top 50 — Perso</Text>
                   <TouchableOpacity
-                    onPress={() => setRewardModalVisible(true)}
+                    onPress={handleOpenRewards}
                     style={{ backgroundColor: "rgba(82, 209, 146, 0.14)", borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: "rgba(82, 209, 146, 0.22)" }}
                   >
                     <Text style={{ color: colors.text, fontWeight: "800" }}>Récompenses</Text>
@@ -574,9 +613,6 @@ export default function DefiScreen() {
           </>
         )}
 
-        {/* =======================================================
-            ONGLET CLUB - VUE DÉFIS (C'est ici qu'on affiche enfin les défis club !)
-           ======================================================= */}
         {(activeTab === "club" && viewMode === 'defis') && (
           <View style={{ paddingTop: 20 }}>
             {clubChallenges.length === 0 ? (
@@ -588,9 +624,10 @@ export default function DefiScreen() {
                 <ChallengeCard
                   key={challenge.id}
                   challenge={challenge}
-                  categorie="club" // Style visuel différent si ton composant le gère
+                  categorie="club"
                   isOngoing={current?.id === challenge.id}
                   status={current?.id === challenge.id ? current?.status : undefined}
+                  // 👇 Pub pour défi club aussi
                   onToggle={toggleOngoing}
                   onReport={() => handleOpenReport(
                     challenge.firestoreId || String(challenge.id),
@@ -612,15 +649,49 @@ export default function DefiScreen() {
 
       </ScrollView>
 
+      {/* MODAL SIGNALEMENT */}
       <ReportModal
         visible={reportModalVisible}
         onClose={() => setReportModalVisible(false)}
         onSubmit={handleSubmitReport}
       />
+      {/* MODAL RÉCOMPENSES */}
       <RewardDistributionModal
         visible={rewardModalVisible}
         onClose={() => setRewardModalVisible(false)}
       />
+      
+      {/* MODAL PUBLICITÉ */}
+      <Modal 
+        animationType="fade" 
+        visible={showAd} 
+        transparent={false} 
+        onRequestClose={() => { if(adFinished) setShowAd(false); }}
+      >
+        <View style={styles.adContainer}>
+          <Video
+            ref={videoRef}
+            style={styles.adVideo}
+            // 👇 C'est ici qu'on charge le fichier renommé "pub_greenup.mp4"
+            source={require("../../assets/videos/pub_greenup.mp4")}
+            resizeMode={ResizeMode.COVER}
+            shouldPlay={showAd}
+            isLooping={false}
+            onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
+          />
+          
+          <View style={[styles.adOverlay, { top: insets.top + 10 }]}>
+            <Text style={styles.adTag}>Publicité</Text>
+            {/* La croix apparaît à la fin */}
+            {adFinished && (
+              <TouchableOpacity onPress={handleAdFinished} style={styles.adCloseBtn}>
+                <Ionicons name="close" size={24} color="black" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -630,4 +701,10 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: "700" },
   scroll: { marginTop: 12 },
   emptyText: { textAlign: "center", marginTop: 40, fontSize: 16 },
+  // Ajoutez ceci :
+  adContainer: { flex: 1, backgroundColor: "black", justifyContent: "center", alignItems: "center" },
+  adVideo: { width: "100%", height: "100%" },
+  adOverlay: { position: "absolute", right: 20, alignItems: "flex-end", gap: 10 },
+  adTag: { color: "white", backgroundColor: "rgba(0,0,0,0.5)", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, fontSize: 12, fontWeight: "bold", overflow: "hidden" },
+  adCloseBtn: { backgroundColor: "white", width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
 });

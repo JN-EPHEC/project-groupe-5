@@ -6,7 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Camera } from "expo-camera";
 import { useRouter } from "expo-router";
 import { signOut } from "firebase/auth";
-import { collection, deleteDoc, doc, getDocs, query, updateDoc, where } from "firebase/firestore";
+import { collection, deleteDoc, doc, getDocs, query, updateDoc, where, limit } from "firebase/firestore";
 import { deleteObject, ref as storageRef } from "firebase/storage";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Linking, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from "react-native";
@@ -28,6 +28,64 @@ export const SettingsSection = () => {
   const { user } = useUser();
   const [accountEditing, setAccountEditing] = useState(false);
   const [accountDeleteVisible, setAccountDeleteVisible] = useState(false);
+
+  // --- DÉBUT AJOUT ABONNEMENT ---
+  const [showSubscriptionDetails, setShowSubscriptionDetails] = useState(false);
+  const [subscription, setSubscription] = useState<any>(null);
+  const [loadingSubscription, setLoadingSubscription] = useState(false);
+
+  // Charger l'abonnement quand l'utilisateur est détecté
+  useEffect(() => {
+    if (user) fetchSubscription();
+  }, [user]);
+
+  async function fetchSubscription() {
+    if (!user) return;
+    setLoadingSubscription(true);
+    try {
+      // On cherche un abonnement actif ou en essai
+      const q = query(
+        collection(db, "customers", user.uid, "subscriptions"),
+        where("status", "in", ["active", "trialing"]),
+        limit(1)
+      );
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const subData = querySnapshot.docs[0].data();
+        setSubscription(subData);
+      } else {
+        setSubscription(null);
+      }
+    } catch (error) {
+      console.log("Erreur chargement abonnement:", error);
+    } finally {
+      setLoadingSubscription(false);
+    }
+  }
+
+  const formatDate = (timestamp: any) => {
+    if (!timestamp) return "";
+    // Conversion du timestamp Firestore en date lisible
+    const date = new Date(timestamp.seconds * 1000);
+    return date.toLocaleDateString("fr-FR");
+  };
+
+  const handleManageSubscription = () => {
+    // Lien vers le portail client Stripe (Remplacez par votre lien si vous en avez un fixe, sinon redirige vers Stripe global)
+    // Idéalement, utilisez votre lien "Customer Portal" trouvable dans le Dashboard Stripe > Paramètres > Portail client
+    const portalUrl = "https://billing.stripe.com/p/login/test"; 
+    
+    Alert.alert(
+      "Gérer l'abonnement",
+      "Pour annuler ou modifier votre abonnement, vous devez accéder au portail sécurisé Stripe.",
+      [
+        { text: "Annuler", style: "cancel" },
+        { text: "Accéder au portail", onPress: () => Linking.openURL(portalUrl) }
+      ]
+    );
+  };
+  // --- FIN AJOUT ABONNEMENT ---
 
   // Account edit states
   const [editingFirstName, setEditingFirstName] = useState("");
@@ -473,6 +531,65 @@ export const SettingsSection = () => {
                 </TouchableOpacity>
               </View>
             )}
+
+            {/* --- DÉBUT SECTION ABONNEMENT --- */}
+            <TouchableOpacity 
+              style={styles.subRow} 
+              activeOpacity={0.8} 
+              onPress={() => setShowSubscriptionDetails(!showSubscriptionDetails)}
+            >
+              <View style={styles.subRowLeft}>
+                <Ionicons name="card-outline" size={20} color={mutedColor} style={{ marginRight: 10 }} />
+                <Text style={[styles.subText, { color: titleColor }]}>Abonnement</Text>
+              </View>
+              <Ionicons name={showSubscriptionDetails ? "chevron-down" : "chevron-forward"} size={16} color={mutedColor} />
+            </TouchableOpacity>
+
+            {showSubscriptionDetails && (
+              <View style={{ paddingLeft: 16, paddingRight: 8, paddingVertical: 12, borderLeftWidth: 2, borderLeftColor: colors.accent, marginLeft: 10, marginBottom: 10 }}>
+                {loadingSubscription ? (
+                  <ActivityIndicator color={colors.accent} size="small" />
+                ) : subscription ? (
+                  <View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <Text style={{ color: mutedColor, fontFamily: FontFamilies.body }}>Statut</Text>
+                        <Text style={{ color: colors.accent, fontFamily: FontFamilies.bodyStrong, textTransform: 'capitalize' }}>
+                            {subscription.status === 'trialing' ? 'Essai Gratuit' : 'Actif'}
+                        </Text>
+                    </View>
+                    
+                    {subscription.cancel_at_period_end ? (
+                        <Text style={{ color: '#F26767', fontSize: 13, marginBottom: 10, fontFamily: FontFamilies.body, fontStyle: 'italic' }}>
+                            Arrêt prévu le {formatDate(subscription.current_period_end)}
+                        </Text>
+                    ) : (
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
+                            <Text style={{ color: mutedColor, fontFamily: FontFamilies.body }}>Renouvellement</Text>
+                            <Text style={{ color: titleColor, fontFamily: FontFamilies.body }}>
+                                {formatDate(subscription.current_period_end)}
+                            </Text>
+                        </View>
+                    )}
+
+                    {!subscription.cancel_at_period_end && (
+                        <TouchableOpacity 
+                            style={{ backgroundColor: 'rgba(242, 103, 103, 0.1)', padding: 10, borderRadius: 8, alignItems: 'center', marginTop: 4, borderWidth: 1, borderColor: 'rgba(242, 103, 103, 0.3)' }}
+                            onPress={handleManageSubscription}
+                        >
+                            <Text style={{ color: '#F26767', fontFamily: FontFamilies.bodyStrong, fontSize: 14 }}>
+                                Annuler l'abonnement
+                            </Text>
+                        </TouchableOpacity>
+                    )}
+                  </View>
+                ) : (
+                  <View>
+                    <Text style={{ color: mutedColor, fontFamily: FontFamilies.body, fontStyle: 'italic' }}>Aucun abonnement actif.</Text>
+                  </View>
+                )}
+              </View>
+            )}
+            {/* --- FIN SECTION ABONNEMENT --- */}
 
             <TouchableOpacity style={styles.subRow} activeOpacity={0.8} onPress={() => router.push("/conditions-generales")}>
               <View style={styles.subRowLeft}>
