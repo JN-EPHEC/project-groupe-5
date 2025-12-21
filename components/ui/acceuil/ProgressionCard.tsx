@@ -13,11 +13,12 @@ export type ProgressionCardProps = {
   title?: string;
 };
 
-// NOUVEAU THEME "Camaïeu de Verts"
-const greenTheme = {
-  cardTitle: "#15803D", // Vert Forêt moderne
-  statText: "#0F172A", // Gris Foncé
-  mutedText: "#64748B", // Gris
+const cardTheme = {
+  glassBg: ["rgba(240, 253, 244, 0.95)", "rgba(255, 255, 255, 0.85)"] as const,
+  borderColor: "rgba(255, 255, 255, 0.6)",
+  titleMain: "#0A3F33",
+  textAccent: "#008F6B",
+  textMuted: "#4A665F",
 };
 
 export function ProgressionCard({
@@ -31,69 +32,62 @@ export function ProgressionCard({
   const isLight = mode === "light";
 
   if (!isLight) {
-    const gradientColors = ["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"];
+    const gradientColors = ["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"] as const;
     return (
-      <LinearGradient
-        colors={gradientColors}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.card, { borderWidth: 1, borderColor: 'rgba(0, 151, 178, 0.3)' }]}
-      >
+      <LinearGradient colors={gradientColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.card, { borderWidth: 1, borderColor: 'rgba(0, 151, 178, 0.3)' }]}>
         <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
         <View style={styles.row}>
           <ProgressCircle done={done} total={total} />
           <View style={{ marginLeft: 16 }}>
-            <Text style={[styles.points, { color: colors.text }]}>
-              {pointsText}
-            </Text>
-            <Text style={[styles.streak, { color: colors.mutedText }]}>
-              {streakText}
-            </Text>
+            <Text style={[styles.points, { color: colors.text }]}>{pointsText}</Text>
+            <Text style={[styles.streak, { color: colors.mutedText }]}>{streakText}</Text>
           </View>
         </View>
       </LinearGradient>
     );
   }
 
+  // --- LIGHT MODE CLEAN ---
   return (
-    <View style={[styles.card, { backgroundColor: colors.card, borderWidth: 1, borderColor: '#007AFF' }]}>
-      <Text style={[styles.title, { color: greenTheme.cardTitle }]}>{title}</Text>
-      <View style={styles.row}>
-        <ProgressCircle done={done} total={total} />
-        <View style={{ marginLeft: 16 }}>
-          <Text style={[styles.points, { color: greenTheme.statText }]}>
-            {pointsText}
-          </Text>
-          <Text style={[styles.streak, { color: greenTheme.mutedText }]}>
-            {streakText}
-          </Text>
+    <LinearGradient
+      colors={cardTheme.glassBg}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={[styles.card, styles.glassEffect]}
+    >
+      <View style={{ zIndex: 10 }}>
+        <Text style={[styles.title, { color: cardTheme.titleMain }]}>{title}</Text>
+        <View style={styles.row}>
+          <ProgressCircle done={done} total={total} />
+          <View style={{ marginLeft: 16 }}>
+            <Text style={[styles.points, { color: cardTheme.textAccent }]}>{pointsText}</Text>
+            <Text style={[styles.streak, { color: cardTheme.textMuted }]}>{streakText}</Text>
+          </View>
         </View>
       </View>
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
     padding: 20,
-    borderRadius: 24,
-    shadowColor: "#64748B",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
+    borderRadius: 26,
     width: "100%",
+    minHeight: 130,
+    justifyContent: "center",
   },
-  title: {
-    marginBottom: 16,
-    fontSize: 18,
-    fontFamily: FontFamilies.heading,
+  glassEffect: {
+    borderWidth: 1,
+    borderColor: cardTheme.borderColor,
+    shadowColor: "#005c4b",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    elevation: 3,
   },
+  title: { marginBottom: 16, fontSize: 18, fontFamily: FontFamilies.heading },
   row: { flexDirection: "row", alignItems: "center" },
-  points: { fontSize: 16, fontFamily: FontFamilies.heading, color: "#0F172A" },
-  streak: {
-    marginTop: 6,
-    fontFamily: FontFamilies.headingMedium,
-    color: "#64748B",
-  },
+  points: { fontSize: 16, fontFamily: FontFamilies.heading },
+  streak: { marginTop: 6, fontFamily: FontFamilies.headingMedium },
 });

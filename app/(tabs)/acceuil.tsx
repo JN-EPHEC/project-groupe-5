@@ -8,25 +8,28 @@ import { FontFamilies } from "@/constants/fonts";
 import { auth, db } from "@/firebaseConfig";
 import { useChallenges } from "@/hooks/challenges-context";
 import { useClub } from "@/hooks/club-context";
-import { useFriends } from "@/hooks/friends-context";
 import { usePoints } from "@/hooks/points-context";
 import { useThemeMode } from "@/hooks/theme-context";
-import { useClassement } from "@/src/classement/hooks/useClassement";
 import { useUser } from "@/hooks/user-context";
+import { useClassement } from "@/src/classement/hooks/useClassement";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import { addDoc, collection, onSnapshot } from "firebase/firestore";
 import { useMemo } from "react";
-import {
-  Image,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+// 🎨 THEME GLOBAL MENTHE GIVRÉE
+const THEME = {
+    bgGradient: ["#DDF7E8", "#F4FDF9"] as const,
+    glassCardBg: ["rgba(240, 253, 244, 0.95)", "rgba(255, 255, 255, 0.85)"] as const,
+    textMain: "#0A3F33", 
+    textMuted: "#4A665F",
+    accentCoral: "#FF8C66",
+    rankWatermark: "rgba(0, 143, 107, 0.10)", 
+};
 
 export default function AcceuilScreen() {
   const { colors, mode } = useThemeMode();
@@ -35,8 +38,9 @@ export default function AcceuilScreen() {
   const router = useRouter();
   const { joinedClub, members } = useClub();
   const { current } = useChallenges();
-  const { users: classementUsers, loading: classementLoading } =
-    useClassement();
+  const { users: classementUsers, loading: classementLoading } = useClassement();
+
+  // ✅ LOGIQUE RESTAURÉE : ABONNEMENT
   const startSubscription = async () => {
     const user = auth.currentUser;
     if (!user) {
@@ -56,82 +60,47 @@ export default function AcceuilScreen() {
       onSnapshot(sessionRef, (snap) => {
         const data = snap.data();
         if (!data) return;
-        if (data.error) {
-          alert(data.error.message);
-        }
-        if (data.url) {
-          Linking.openURL(data.url);
-        }
+        if (data.error) alert(data.error.message);
+        if (data.url) Linking.openURL(data.url);
       });
     } catch (e: any) {
       alert(e?.message || "Une erreur est survenue.");
     }
   };
 
-  const defisFaient = 2; // TODO: derive from real data
-  const defisTotal = 5; // TODO: derive from real data
-
+  const defisFaient = 2; // TODO: Connecter aux vraies données
+  const defisTotal = 5;  // TODO: Connecter aux vraies données
   const myPoints = typeof points === "number" ? points : user?.points ?? 0;
 
-  // Classement individuel
+  // ✅ LOGIQUE RESTAURÉE : CLASSEMENT INDIVIDUEL
   const { position, totalUsers } = useMemo(() => {
-    if (classementLoading || !classementUsers || !user)
-      return { position: null, totalUsers: 50 };
+    if (classementLoading || !classementUsers || !user) return { position: null, totalUsers: 50 };
     const currentUser = classementUsers.find((u) => u.isCurrentUser);
-    return {
-      position: currentUser?.rank ?? null,
-      totalUsers: 50,
-    };
+    return { position: currentUser?.rank ?? null, totalUsers: 50 };
   }, [classementUsers, classementLoading, user]);
-  const positionLabel = position
-    ? position === 1
-      ? "1er"
-      : `${position}e`
-    : "—";
+  
+  const positionLabel = position ? (position === 1 ? "1er" : `${position}e`) : "—";
 
-  // Classement Club
+  // ✅ LOGIQUE RESTAURÉE : CLASSEMENT CLUB (MOCK)
   const { clubPosition, totalClubs } = useMemo(() => {
     if (!joinedClub) return { clubPosition: null, totalClubs: 50 };
 
-    const clubs: Array<{
-      name: string;
-      pts: number;
-      isMine?: boolean;
-      avatar: string;
-    }> = [];
-
-    const totalClubPts =
-      members.reduce((sum, m: any) => sum + (m.points || 0), 0) + myPoints;
+    const clubs: Array<{ name: string; pts: number; isMine?: boolean; avatar: string }> = [];
+    const totalClubPts = members.reduce((sum, m: any) => sum + (m.points || 0), 0) + myPoints;
+    
     clubs.push({
       name: joinedClub.name ?? "Mon club",
       pts: totalClubPts,
       isMine: true,
-      avatar:
-        joinedClub.logo || "https://api.dicebear.com/8.x/shapes/svg?seed=myclub",
+      avatar: joinedClub.logo || "https://api.dicebear.com/8.x/shapes/svg?seed=myclub",
     });
 
-    const mockClubNames = [
-      "Les Écogardiens",
-      "Verte Équipe",
-      "Planète Propre",
-      "Zéro Déchet Squad",
-      "Les Tri-Héros",
-      "Green Sparks",
-      "Eco Runner",
-      "TerraFriends",
-      "BlueLeaf",
-      "GreenMinds",
-    ];
+    const mockClubNames = ["Les Écogardiens", "Verte Équipe", "Planète Propre", "Zéro Déchet Squad", "Les Tri-Héros", "Green Sparks", "Eco Runner", "TerraFriends", "BlueLeaf", "GreenMinds"];
+    
     while (clubs.length < 50) {
-      const name =
-        mockClubNames[clubs.length % mockClubNames.length] +
-        " " +
-        (Math.floor(Math.random() * 90) + 10);
+      const name = mockClubNames[clubs.length % mockClubNames.length] + " " + (Math.floor(Math.random() * 90) + 10);
       const pts = Math.floor(Math.random() * 5000) + 200;
-      const avatar = `https://api.dicebear.com/8.x/shapes/svg?seed=${encodeURIComponent(
-        name
-      )}`;
-      clubs.push({ name, pts, avatar });
+      clubs.push({ name, pts, avatar: `https://api.dicebear.com/8.x/shapes/svg?seed=${encodeURIComponent(name)}` });
     }
 
     const sortedClubs = clubs.sort((a, b) => b.pts - a.pts);
@@ -143,205 +112,107 @@ export default function AcceuilScreen() {
     };
   }, [joinedClub, members, myPoints]);
 
-  const clubLabel = clubPosition
-    ? clubPosition === 1
-      ? "1er"
-      : `${clubPosition}e`
-    : "—";
+  const clubLabel = clubPosition ? (clubPosition === 1 ? "1er" : `${clubPosition}e`) : "—";
 
+  // RENDU
   const isLight = mode === "light";
-  // Defensive checks to prevent "Element type is invalid" runtime errors
   const hasProgressionCard = typeof ProgressionCard !== "undefined";
   const hasChallengeOfTheDay = typeof ChallengeOfTheDay !== "undefined";
   const hasStreakCalendar = typeof StreakCalendar !== "undefined";
   const hasPremiumCard = typeof PremiumCard !== "undefined";
 
-  if (!hasProgressionCard) console.warn("Missing ProgressionCard import (undefined)");
-  if (!hasChallengeOfTheDay) console.warn("Missing ChallengeOfTheDay import (undefined)");
-  if (!hasStreakCalendar) console.warn("Missing StreakCalendar import (undefined)");
-  if (!hasPremiumCard) console.warn("Missing PremiumCard import (undefined)");
-  
-  // Liquid Ice Theme (Dark Mode)
-  const darkBg = "#021114";
-  const darkCardGradient = ["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"] as const;
-  const darkCardBorder = "rgba(0, 151, 178, 0.3)";
-  const darkMiniCardBg = "rgba(0, 151, 178, 0.1)";
-  const darkMiniCardBorder = "rgba(0, 151, 178, 0.2)";
-
-  const rankingGradient = isLight
-    ? ([colors.card, colors.card] as const)
-    : darkCardGradient;
-  const rankingBorder = isLight ? "transparent" : darkCardBorder;
-  const miniCardBg = isLight ? colors.cardAlt : darkMiniCardBg;
-  const miniCardBorder = isLight ? "transparent" : darkMiniCardBorder;
-  const miniCardLabel = isLight ? colors.cardMuted : colors.mutedText;
-  const miniCardValue = isLight ? colors.cardText : colors.text;
+  const BackgroundComponent = isLight ? LinearGradient : View;
+  const bgProps = isLight ? { colors: THEME.bgGradient, style: styles.backgroundFill } : { style: [styles.backgroundFill, { backgroundColor: "#021114" }] };
 
   return (
-    <SafeAreaView
-      style={[styles.safeArea, { backgroundColor: isLight ? colors.background : darkBg }]}
-      edges={["top", "left", "right", "bottom"]}
-    >
-      <ScrollView
-        style={[styles.container, { backgroundColor: isLight ? colors.background : darkBg }]}
-        contentContainerStyle={{ paddingBottom: 120 }}
-      >
-        <View style={styles.pageHeader}>
-          <Image
-            source={
-              isLight
-                ? require("../../assets/images/logo_Green_UP_noir_degradé-removebg-preview.png")
-                : require("../../assets/images/logo_fond_vert_degradé__1_-removebg-preview.png")
-            }
-            style={{ width: 160, height: 50 }}
-            resizeMode="contain"
-          />
-          <View style={{ position: 'absolute', right: 8, top: 6 }}>
-            <NotificationBell />
-          </View>
-        </View>
-        
-        <Header />
+    <View style={{ flex: 1 }}>
+        <BackgroundComponent {...(bgProps as any)} />
+        <SafeAreaView style={styles.safeArea} edges={["top", "left", "right", "bottom"]}>
+        <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+            {/* HEADER LOGO */}
+            <View style={styles.pageHeader}>
+                <Image source={isLight ? require("../../assets/images/logo_Green_UP_noir_degradé-removebg-preview.png") : require("../../assets/images/logo_fond_vert_degradé__1_-removebg-preview.png")} style={{ width: 160, height: 50 }} resizeMode="contain" />
+                <View style={{ position: 'absolute', right: 8, top: 6 }}><NotificationBell /></View>
+            </View>
+            
+            <Header />
 
-        {/* Section: Classement Cards */}
-        <View style={{ marginBottom: 20, marginTop: 20 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 }}>
-            <Ionicons name="trophy-outline" size={20} color={isLight ? colors.text : "#fff"} />
-            <Text style={{ fontSize: 20, fontFamily: FontFamilies.heading, color: isLight ? colors.text : "#fff" }}>
-              Classement
-            </Text>
-          </View>
+            {/* SECTION CLASSEMENT */}
+            <View style={{ marginBottom: 20, marginTop: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 8 }}>
+                    <Ionicons name="trophy-outline" size={20} color={isLight ? THEME.textMain : "#fff"} />
+                    <Text style={{ fontSize: 20, fontFamily: FontFamilies.heading, color: isLight ? THEME.textMain : "#fff" }}>Classement</Text>
+                </View>
 
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            {/* Card Individuel */}
-            <TouchableOpacity
-              activeOpacity={0.85}
-              style={[
-                styles.rankCard,
-                { 
-                  backgroundColor: isLight ? colors.card : "rgba(0, 151, 178, 0.15)",
-                  borderWidth: 1,
-                  borderColor: isLight ? '#007AFF' : 'rgba(0, 151, 178, 0.3)'
-                }
-              ]}
-              onPress={() => router.push({ pathname: "/defi", params: { view: "classement", rankingTab: "perso" } })}
-            >
-              <Text style={[styles.rankCardLabel, { color: isLight ? colors.mutedText : "#9FB9AE" }]}>Individuel</Text>
-              <Text style={[styles.rankCardValue, { color: isLight ? colors.text : "#fff" }]}>
-                {positionLabel} <Text style={{ fontSize: 16, fontWeight: '400' }}>sur {totalUsers}</Text>
-              </Text>
-              <View style={{ alignItems: 'flex-end', marginTop: 'auto' }}>
-                <Ionicons name="person" size={24} color={isLight ? colors.mutedText : "rgba(255,255,255,0.5)"} />
-              </View>
-            </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                    {/* CARTE INDIVIDUEL */}
+                    <TouchableOpacity activeOpacity={0.85} style={{ flex: 1 }} onPress={() => router.push({ pathname: "/defi", params: { view: "classement", rankingTab: "perso" } })}>
+                    <LinearGradient
+                        colors={isLight ? THEME.glassCardBg : ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"]}
+                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                        style={[styles.rankCard, isLight ? styles.glassBorder : styles.darkBorder]}
+                    >
+                        {isLight && (
+                            <View style={styles.rankWatermarkBottomRight}>
+                                <Ionicons name="person" size={80} color={THEME.rankWatermark} />
+                            </View>
+                        )}
+                        <View style={{ zIndex: 10, flex: 1, justifyContent: 'space-between' }}>
+                            <Text style={[styles.rankCardLabel, { color: isLight ? THEME.textMuted : "#9FB9AE" }]}>Individuel</Text>
+                            <Text style={[styles.rankCardValue, { color: isLight ? THEME.textMain : "#fff" }]}>
+                                {positionLabel} <Text style={{ fontSize: 16, fontWeight: '400' }}>sur {totalUsers}</Text>
+                            </Text>
+                        </View>
+                    </LinearGradient>
+                    </TouchableOpacity>
 
-            {/* Card Club */}
-            <TouchableOpacity
-              activeOpacity={joinedClub ? 0.85 : 1}
-              style={[
-                styles.rankCard,
-                { 
-                  backgroundColor: isLight ? colors.card : "rgba(0, 151, 178, 0.15)",
-                  borderWidth: 1,
-                  borderColor: isLight ? '#007AFF' : 'rgba(0, 151, 178, 0.3)'
-                }
-              ]}
-              disabled={!joinedClub}
-              onPress={() => router.push({ pathname: "/defi", params: { view: "classement", rankingTab: "club" } })}
-            >
-              <Text style={[styles.rankCardLabel, { color: isLight ? colors.mutedText : "#9FB9AE" }]}>Club</Text>
-              <Text style={[styles.rankCardValue, { color: isLight ? colors.text : "#fff" }]}>
-                {joinedClub ? (
-                  <>
-                    {clubLabel} <Text style={{ fontSize: 16, fontWeight: '400' }}>sur {totalClubs}</Text>
-                  </>
-                ) : (
-                  "—"
-                )}
-              </Text>
-              <View style={{ alignItems: 'flex-end', marginTop: 'auto' }}>
-                <Ionicons name="people" size={24} color={isLight ? colors.mutedText : "rgba(255,255,255,0.5)"} />
-              </View>
-            </TouchableOpacity>
-          </View>
-        </View>
+                    {/* CARTE CLUB */}
+                    <TouchableOpacity activeOpacity={0.85} style={{ flex: 1 }} disabled={!joinedClub} onPress={() => router.push({ pathname: "/defi", params: { view: "classement", rankingTab: "club" } })}>
+                    <LinearGradient
+                        colors={isLight ? THEME.glassCardBg : ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"]}
+                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                        style={[styles.rankCard, isLight ? styles.glassBorder : styles.darkBorder]}
+                    >
+                        {isLight && (
+                            <View style={styles.rankWatermarkTopRight}>
+                                <Ionicons name="people" size={80} color={THEME.rankWatermark} />
+                            </View>
+                        )}
+                        <View style={{ zIndex: 10, flex: 1, justifyContent: 'space-between' }}>
+                            <Text style={[styles.rankCardLabel, { color: isLight ? THEME.textMuted : "#9FB9AE" }]}>Club</Text>
+                            <Text style={[styles.rankCardValue, { color: isLight ? THEME.textMain : "#fff" }]}>
+                                {joinedClub ? <>{clubLabel} <Text style={{ fontSize: 16, fontWeight: '400' }}>sur {totalClubs}</Text></> : "—"}
+                            </Text>
+                        </View>
+                    </LinearGradient>
+                    </TouchableOpacity>
+                </View>
+            </View>
 
-        {/* Série d'activités (streak) */}
-        <View style={styles.blockSpacing}>
-          {hasStreakCalendar ? (
-            <StreakCalendar />
-          ) : (
-            <Text style={{ color: isLight ? colors.text : "#fff" }}>Calendar indisponible</Text>
-          )}
-        </View>
-
-        {/* Section: Progression -> components/ui/acceuil/ProgressionCard + components/ProgressCircle */}
-        <View style={styles.blockSpacing}>
-          {hasProgressionCard ? (
-            <ProgressionCard
-              done={defisFaient}
-              total={defisTotal}
-              pointsText="50 Points gagnés"
-              streakText="2 jours de suite"
-            />
-          ) : (
-            <Text style={{ color: isLight ? colors.text : "#fff" }}>Progression indisponible</Text>
-          )}
-        </View>
-
-        {/* PREMIUM sous la progression */}
-        <View style={styles.blockSpacing}>
-          {hasPremiumCard ? (
-            <PremiumCard onSubscribe={startSubscription} />
-          ) : (
-            <Text style={{ color: isLight ? colors.text : "#fff" }}>Premium indisponible</Text>
-          )}
-        </View>
-
-        {/* Section: Défi en cours (seulement si status active) */}
-        {current && current.status === 'active' && (
-          <View style={styles.blockSpacing}>
-            {hasChallengeOfTheDay ? (
-              <ChallengeOfTheDay
-                title={current.title}
-                description={current.description}
-                difficulty={current.difficulty}
-                onValidate={() => router.push({ pathname: "/camera", params: { id: String(current.id) } })}
-              />
-            ) : (
-              <Text style={{ color: isLight ? colors.text : "#fff" }}>Défi indisponible</Text>
+            {/* AUTRES BLOCS */}
+            <View style={styles.blockSpacing}>{hasStreakCalendar && <StreakCalendar />}</View>
+            <View style={styles.blockSpacing}>{hasProgressionCard && <ProgressionCard done={defisFaient} total={defisTotal} pointsText="50 Points gagnés" streakText="2 jours de suite" />}</View>
+            <View style={styles.blockSpacing}>{hasPremiumCard && <PremiumCard onSubscribe={startSubscription} />}</View>
+            {current && current.status === 'active' && hasChallengeOfTheDay && (
+            <View style={styles.blockSpacing}><ChallengeOfTheDay title={current.title} description={current.description} difficulty={current.difficulty} onValidate={() => router.push({ pathname: "/camera", params: { id: String(current.id) } })} /></View>
             )}
-          </View>
-        )}
-      </ScrollView>
-    </SafeAreaView>
+        </ScrollView>
+        </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  backgroundFill: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   safeArea: { flex: 1 },
   container: { flex: 1, paddingHorizontal: 20, paddingTop: 8 },
-  pageHeader: { alignItems: "center", marginTop: 8, marginBottom: 20, position: 'relative' },
-  screenTitle: {
-    fontSize: 34,
-    lineHeight: 38,
-    fontFamily: FontFamilies.heading,
-  },
-  rankCard: {
-    flex: 1,
-    height: 110,
-    borderRadius: 20,
-    padding: 16,
-    justifyContent: 'space-between',
-  },
-  rankCardLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  rankCardValue: {
-    fontSize: 24,
-    fontWeight: '800',
-    marginTop: 4,
-  },
-  blockSpacing: { marginBottom: 17 },
+  pageHeader: { alignItems: "center", marginTop: 4, marginBottom: 8 },
+  rankCard: { height: 125, borderRadius: 24, padding: 20, justifyContent: 'space-between', overflow: 'hidden', position: 'relative' },
+  glassBorder: { borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.6)", shadowColor: "#005c4b", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
+  darkBorder: { borderWidth: 1, borderColor: 'rgba(0, 151, 178, 0.3)' },
+  rankCardLabel: { fontSize: 15, fontFamily: FontFamilies.headingMedium },
+  rankCardValue: { fontSize: 28, fontFamily: FontFamilies.heading, letterSpacing: -0.5 },
+  blockSpacing: { marginBottom: 12 },
+  rankWatermarkBottomRight: { position: 'absolute', bottom: -10, right: -10, transform: [{ rotate: '-10deg' }] },
+  rankWatermarkTopRight: { position: 'absolute', top: -15, right: -15, transform: [{ rotate: '15deg' }] }
 });

@@ -3,172 +3,103 @@ import { db } from "@/firebaseConfig";
 import { useClub } from "@/hooks/club-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { useUser } from "@/hooks/user-context";
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-// ✅ AJOUT : Imports nécessaires pour vérifier l'abonnement
 import { collection, doc, limit, onSnapshot, query, where } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
+
+const headerTheme = {
+    glassBg: ["rgba(240, 253, 244, 0.95)", "rgba(255, 255, 255, 0.85)"] as const,
+    borderColor: "rgba(255, 255, 255, 0.6)",
+    textMain: "#0A3F33",
+    textMuted: "#4A665F",
+    coralBadge: "#FF8C66",
+    watermarkColor: "rgba(0, 143, 107, 0.12)", // Un peu plus subtil
+};
 
 export const Header = () => {
   const { user, loading } = useUser();
   const { joinedClub } = useClub();
   const { colors, mode } = useThemeMode();
-  
-  // État local pour la couleur et le statut Premium
   const [liveColor, setLiveColor] = useState<string | null>(null);
-  const [isPremium, setIsPremium] = useState(false); // ✅ État pour gérer le cercle doré
-
+  const [isPremium, setIsPremium] = useState(false);
   const isLight = mode === "light";
-  const gradientColors = isLight
-    ? ([colors.cardAlt, colors.card] as const)
-    : (["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"] as const);
-    
-  const primaryText = isLight ? colors.cardText : colors.text;
-  const secondaryText = isLight ? colors.cardMuted : colors.mutedText;
 
-  // 1. Écouteur pour la couleur de l'avatar (existant)
   useEffect(() => {
     if (!user?.uid) return;
-
-    const unsubUser = onSnapshot(doc(db, "users", user.uid), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        if (data.avatarColor) {
-          setLiveColor(data.avatarColor);
-        }
-      }
-    });
-
-    return () => unsubUser();
-  }, [user?.uid]);
-
-  // 2. ✅ NOUVEAU : Écouteur pour le statut Premium (Cercle Doré)
-  useEffect(() => {
-    if (!user?.uid) return;
-
-    // On écoute la collection subscriptions en temps réel
-    const q = query(
-      collection(db, "customers", user.uid, "subscriptions"),
-      where("status", "in", ["active", "trialing"]),
-      limit(1)
-    );
-
-    const unsubSub = onSnapshot(q, (snapshot) => {
-      // Si snapshot n'est pas vide, c'est qu'il y a un abonnement actif
-      setIsPremium(!snapshot.empty);
-    });
-
-    return () => unsubSub();
+    const unsubUser = onSnapshot(doc(db, "users", user.uid), (docSnap) => { if (docSnap.exists()) { const data = docSnap.data(); if (data.avatarColor) setLiveColor(data.avatarColor); } });
+    const q = query(collection(db, "customers", user.uid, "subscriptions"), where("status", "in", ["active", "trialing"]), limit(1));
+    const unsubSub = onSnapshot(q, (snapshot) => { setIsPremium(!snapshot.empty); });
+    return () => { unsubUser(); unsubSub(); };
   }, [user?.uid]);
   
-  if (loading || !user) {
-    return null;
-  }
+  if (loading || !user) return null;
   
   const displayName = (user?.username ?? `${user?.firstName ?? ""} ${user?.lastName ?? ""}`).trim() || "Invité";
   const initials = displayName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
-
-  // Gestion des couleurs
   const avatarBgColor = liveColor || (user as any).avatarColor || "#19D07D";
   const isWhiteBg = ["#FFFFFF", "#ffffff", "#fff", "#FFF"].includes(avatarBgColor);
-  const initialsColor = isWhiteBg ? "#1A1A1A" : "#FFFFFF";
-
-  // ✅ LOGIQUE DU CERCLE DORÉ
-  // Si Premium : Doré (#FFD700) et bordure épaisse (3)
-  // Sinon : Bordure standard (transparente ou grise selon le fond)
   const finalBorderColor = isPremium ? "#FFD700" : (isWhiteBg ? "#E5E5E5" : "transparent");
   const finalBorderWidth = isPremium ? 3 : (isWhiteBg ? 1 : 0);
+  const badgeColor = isLight ? headerTheme.coralBadge : colors.accent;
 
   return (
     <LinearGradient
-      colors={gradientColors}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
+      colors={isLight ? headerTheme.glassBg : (["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"] as const)}
+      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
       style={[
         styles.header, 
-        { 
-          shadowColor: colors.accent, 
-          borderColor: isLight ? "transparent" : "rgba(0, 151, 178, 0.3)", 
-          borderWidth: isLight ? 0 : 1 
-        }
+        { borderColor: isLight ? headerTheme.borderColor : "rgba(0, 151, 178, 0.3)", borderWidth: 1, shadowColor: isLight ? "#005c4b" : colors.accent },
+        isLight && styles.lightShadow
       ]}
     >
-      <View style={styles.avatarContainer}>
-        {/* Affichage Photo ou Placeholder avec le style dynamique */}
-        {user?.photoURL ? (
-          <Image 
-            source={{ uri: user.photoURL }} 
-            style={[
-              styles.avatarImage, 
-              // ✅ Application de la bordure dorée ici
-              { borderColor: finalBorderColor, borderWidth: finalBorderWidth } 
-            ]} 
-          />
-        ) : (
-          <View
-            style={[
-              styles.avatarPlaceholder,
-              { 
-                backgroundColor: avatarBgColor, 
-                alignItems: "center",
-                justifyContent: "center",
-                // ✅ Application de la bordure dorée ici aussi
-                borderWidth: finalBorderWidth,
-                borderColor: finalBorderColor
-              },
-            ]}
-          >
-            <Text style={{ color: initialsColor, fontSize: 28, fontFamily: FontFamilies.heading }}>
-              {initials}
-            </Text>
-          </View>
-        )}
-        
-        {/* Badge Niveau */}
-        <View
-          style={[styles.badge, { backgroundColor: colors.accent }]}
-        >
-          <Text style={[styles.badgeText, { color: "#07321F" }]}>10</Text>
+      {/* 🍃 FEUILLE ÉLÉGANTE (Référence Récompenses) */}
+      {isLight && (
+        <View style={styles.watermarkContainer} pointerEvents="none">
+            {/* Utilisation de 'leaf' mais plus petit et bien placé */}
+            <Ionicons name="leaf" size={100} color={headerTheme.watermarkColor} />
         </View>
-      </View>
-      
-      <Text style={[styles.name, { color: primaryText }]}>
-        Bonjour {displayName}
-      </Text>
-      
-      {/* Affichage du statut Premium sous le nom (Optionnel, pour debug ou style) */}
-      {isPremium && (
-        <Text style={{ color: "#FFD700", fontFamily: FontFamilies.bodyStrong, fontSize: 12, marginTop: 2, marginBottom: 2 }}>
-          MEMBRE PREMIUM
-        </Text>
       )}
 
-      <Text style={[styles.club, { color: secondaryText }]}>
-        {joinedClub?.name ?? user?.bio ?? "—"}
-      </Text>
+      <View style={{ zIndex: 10, alignItems: 'center' }}>
+        <View style={styles.avatarContainer}>
+            {user?.photoURL ? (
+            <Image source={{ uri: user.photoURL }} style={[styles.avatarImage, { borderColor: finalBorderColor, borderWidth: finalBorderWidth }]} />
+            ) : (
+            <View style={[styles.avatarPlaceholder, { backgroundColor: avatarBgColor, borderWidth: finalBorderWidth, borderColor: finalBorderColor }]}>
+                <Text style={{ color: isWhiteBg ? "#1A1A1A" : "#FFFFFF", fontSize: 28, fontFamily: FontFamilies.heading }}>{initials}</Text>
+            </View>
+            )}
+            <View style={[styles.badge, { backgroundColor: badgeColor }]}><Text style={[styles.badgeText, { color: isLight ? "#FFFFFF" : "#07321F" }]}>10</Text></View>
+        </View>
+        <Text style={[styles.name, { color: isLight ? headerTheme.textMain : colors.text }]}>Bonjour {displayName}</Text>
+        {isPremium && <Text style={styles.premiumText}>MEMBRE PREMIUM</Text>}
+        <Text style={[styles.club, { color: isLight ? headerTheme.textMuted : colors.mutedText }]}>{joinedClub?.name ?? user?.bio ?? "—"}</Text>
+      </View>
     </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
-  header: {
-    alignItems: "center",
-    marginTop: 28,
-    marginBottom: 20,
-    paddingVertical: 24,
-    borderRadius: 26,
-    position: "relative",
-    shadowOpacity: 0.25,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 6,
-  },
+  header: { alignItems: "center", marginTop: 28, marginBottom: 20, paddingVertical: 24, borderRadius: 26, position: "relative", width: "100%", overflow: 'hidden' },
+  lightShadow: { shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.06, shadowRadius: 16, elevation: 3 },
   avatarContainer: { position: "relative", alignItems: 'center', justifyContent: 'center' },
-  // J'ai retiré le borderRadius ici car il est géré dynamiquement, mais on garde la taille
   avatarImage: { width: 80, height: 80, borderRadius: 40 }, 
-  avatarPlaceholder: { width: 80, height: 80, borderRadius: 40 },
-  badge: { position: "absolute", bottom: 5, right: 0, borderRadius: 15, paddingHorizontal: 8, paddingVertical: 2 },
-  badgeText: { fontFamily: FontFamilies.bodyStrong },
-  name: { fontSize: 24, fontFamily: FontFamilies.heading, marginTop: 10 },
+  avatarPlaceholder: { width: 80, height: 80, borderRadius: 40, alignItems: "center", justifyContent: "center" },
+  badge: { position: "absolute", bottom: 0, right: 0, borderRadius: 15, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 2, borderColor: "#FFF" },
+  badgeText: { fontFamily: FontFamilies.bodyStrong, fontSize: 12 },
+  name: { fontSize: 24, fontFamily: FontFamilies.heading, marginTop: 12 },
   club: { fontFamily: FontFamilies.body, marginTop: 4 },
+  premiumText: { color: "#FFD700", fontFamily: FontFamilies.bodyStrong, fontSize: 12, marginTop: 2, marginBottom: 2 },
+  
+  // ✅ PLACEMENT ÉLÉGANT
+  watermarkContainer: {
+    position: 'absolute',
+    top: -20,    // Juste un peu dépassante en haut
+    right: -25,  // Coin droit
+    transform: [
+      { rotate: '-20deg' } // Légère inclinaison naturelle
+    ]
+  }
 });
