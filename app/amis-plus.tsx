@@ -1,15 +1,29 @@
+import { FontFamilies } from "@/constants/fonts";
 import { auth, db } from "@/firebaseConfig";
 import { useThemeMode } from "@/hooks/theme-context";
 import { searchUsers, sendFriendRequest } from "@/services/friends";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { collection, onSnapshot } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { Alert, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+// 🎨 THEME AMIS+
+const theme = {
+    bgGradient: ["#DDF7E8", "#F4FDF9"] as const,
+    glassCardBg: ["rgba(240, 253, 244, 0.95)", "rgba(255, 255, 255, 0.85)"] as const,
+    glassBorder: "rgba(255, 255, 255, 0.6)",
+    textMain: "#0A3F33",
+    textMuted: "#4A665F",
+    accentCoral: "#FF8C66",
+};
 
 export default function AmisPlusScreen() {
-  const { colors } = useThemeMode();
+  const { colors, mode } = useThemeMode();
   const router = useRouter();
+  const isLight = mode === "light";
 
   const [searchText, setSearchText] = useState("");
   const [results, setResults] = useState<any[]>([]);
@@ -17,7 +31,6 @@ export default function AmisPlusScreen() {
   const [myFriendIds, setMyFriendIds] = useState<Record<string, true>>({});
   const [requested, setRequested] = useState<Record<string, true>>({});
 
-  // Live friends to disable the button when already friends
   useEffect(() => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
@@ -34,7 +47,6 @@ export default function AmisPlusScreen() {
       setResults([]);
       return;
     }
-
     setLoading(true);
     try {
       const users = await searchUsers(searchText.trim());
@@ -52,7 +64,6 @@ export default function AmisPlusScreen() {
       Alert.alert("Demande envoyée !");
       setRequested((prev) => ({ ...prev, [targetId]: true }));
     } catch (e: any) {
-      console.log(e);
       if (String(e?.message || "").includes("Demande déjà envoyée")) {
         setRequested((prev) => ({ ...prev, [targetId]: true }));
         Alert.alert("Info", "Demande déjà envoyée.");
@@ -64,111 +75,127 @@ export default function AmisPlusScreen() {
     }
   }
 
+  const BackgroundComponent = isLight ? LinearGradient : View;
+  const bgProps = isLight 
+    ? { colors: theme.bgGradient, style: StyleSheet.absoluteFill } 
+    : { style: [StyleSheet.absoluteFill, { backgroundColor: "#021114" }] };
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}> 
+    <View style={{ flex: 1 }}>
+      <BackgroundComponent {...(bgProps as any)} />
       
-      {/* HEADER */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={{ paddingRight: 10 }}>
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={[styles.title, { color: colors.text }]}>Amis +</Text>
-      </View>
-
-      <Text style={{ color: colors.mutedText, marginBottom: 14 }}>
-        Invite tes amis ou découvre de nouveaux profils à suivre.
-      </Text>
-
-      {/* SEARCH BAR */}
-      <View style={[styles.searchContainer, { backgroundColor: colors.surfaceAlt }]}>
-        <TextInput
-          placeholder="Recherche..."
-          placeholderTextColor={colors.mutedText}
-          value={searchText}
-          onChangeText={setSearchText}
-          style={[styles.searchInput, { color: colors.text }]}
-        />
-        <TouchableOpacity
-          onPress={handleSearch}
-          style={[styles.searchBtn, { backgroundColor: colors.accent }]}
-        >
-          <Text style={{ color: "#0F3327", fontWeight: "700" }}>Chercher</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* RESULTS */}
-      {loading && <Text style={{ color: colors.mutedText }}>Recherche en cours...</Text>}
-
-      <FlatList
-        style={{ marginTop: 10 }}
-        data={results}
-        keyExtractor={(item) => item.id}
-        ListEmptyComponent={
-          !loading ? (
-            <Text style={{ color: colors.mutedText }}>Aucun utilisateur.</Text>
-          ) : null
-        }
-        renderItem={({ item }) => {
-          return (
-            <View
-              style={[
-                styles.resultRow,
-                { backgroundColor: colors.surface },
-              ]}
-            >
-              <View>
-                <Text style={{ color: colors.text, fontWeight: "700" }}>
-                  {item.username || item.firstName || "Utilisateur"}
-                </Text>
-                <Text style={{ color: colors.mutedText }}>{item.email}</Text>
-              </View>
-
-              {item.id !== auth.currentUser?.uid && (
-                <TouchableOpacity
-                  disabled={!!myFriendIds[item.id] || !!requested[item.id]}
-                  onPress={() => handleAddFriend(item.id)}
-                  style={[
-                    styles.addBtn,
-                    { backgroundColor: (!!myFriendIds[item.id] || !!requested[item.id]) ? colors.surfaceAlt : colors.accent },
-                  ]}
-                >
-                  <Text style={{ color: (!!myFriendIds[item.id] || !!requested[item.id]) ? colors.mutedText : "#0F3327", fontWeight: "700" }}>
-                    {myFriendIds[item.id] ? "Amis" : requested[item.id] ? "Demandé" : "Ajouter"}
-                  </Text>
+      <SafeAreaView style={{ flex: 1 }}>
+        <View style={styles.container}>
+            {/* HEADER */}
+            <View style={styles.header}>
+                <TouchableOpacity onPress={() => router.back()} style={{ paddingRight: 10 }}>
+                    <Ionicons name="arrow-back" size={24} color={isLight ? theme.textMain : colors.text} />
                 </TouchableOpacity>
-              )}
+                <Text style={[styles.title, { color: isLight ? theme.textMain : colors.text }]}>Amis +</Text>
             </View>
-          );
-        }}
-      />
+
+            <Text style={{ color: isLight ? theme.textMuted : colors.mutedText, marginBottom: 14 }}>
+                Invite tes amis ou découvre de nouveaux profils à suivre.
+            </Text>
+
+            {/* SEARCH BAR (Glassmorphism) */}
+            <LinearGradient
+                colors={isLight ? theme.glassCardBg : ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"]}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={[styles.searchContainer, { borderColor: isLight ? theme.glassBorder : "rgba(255,255,255,0.1)", borderWidth: 1 }]}
+            >
+                <TextInput
+                    placeholder="Recherche..."
+                    placeholderTextColor={isLight ? theme.textMuted : colors.mutedText}
+                    value={searchText}
+                    onChangeText={setSearchText}
+                    style={[styles.searchInput, { color: isLight ? theme.textMain : colors.text }]}
+                />
+                <TouchableOpacity
+                    onPress={handleSearch}
+                    style={[styles.searchBtn, { backgroundColor: isLight ? theme.accentCoral : colors.accent }]}
+                >
+                    <Text style={{ color: "#FFF", fontWeight: "700" }}>Chercher</Text>
+                </TouchableOpacity>
+            </LinearGradient>
+
+            {/* RESULTS */}
+            {loading && <Text style={{ color: isLight ? theme.textMuted : colors.mutedText }}>Recherche en cours...</Text>}
+
+            <FlatList
+                style={{ marginTop: 10 }}
+                data={results}
+                keyExtractor={(item) => item.id}
+                ListEmptyComponent={
+                    !loading ? (
+                    <Text style={{ color: isLight ? theme.textMuted : colors.mutedText }}>Aucun utilisateur.</Text>
+                    ) : null
+                }
+                renderItem={({ item }) => {
+                    const isAdded = !!myFriendIds[item.id];
+                    const isRequested = !!requested[item.id];
+                    
+                    return (
+                    <LinearGradient
+                        colors={isLight ? theme.glassCardBg : ["rgba(255,255,255,0.08)", "rgba(255,255,255,0.02)"]}
+                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                        style={[styles.resultRow, { borderColor: isLight ? theme.glassBorder : "transparent", borderWidth: 1 }]}
+                    >
+                        <View>
+                            <Text style={{ color: isLight ? theme.textMain : colors.text, fontWeight: "700", fontSize: 16 }}>
+                                {item.username || item.firstName || "Utilisateur"}
+                            </Text>
+                            <Text style={{ color: isLight ? theme.textMuted : colors.mutedText, fontSize: 12 }}>{item.email}</Text>
+                        </View>
+
+                        {item.id !== auth.currentUser?.uid && (
+                        <TouchableOpacity
+                            disabled={isAdded || isRequested}
+                            onPress={() => handleAddFriend(item.id)}
+                            style={[
+                                styles.addBtn,
+                                { backgroundColor: (isAdded || isRequested) ? (isLight ? "#E0F7EF" : colors.surfaceAlt) : (isLight ? "#008F6B" : colors.accent) },
+                            ]}
+                        >
+                            <Text style={{ color: (isAdded || isRequested) ? (isLight ? theme.textMuted : colors.mutedText) : "#FFF", fontWeight: "700" }}>
+                                {isAdded ? "Amis" : isRequested ? "Demandé" : "Ajouter"}
+                            </Text>
+                        </TouchableOpacity>
+                        )}
+                    </LinearGradient>
+                    );
+                }}
+            />
+        </View>
+      </SafeAreaView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 20, paddingTop: 20 },
+  container: { flex: 1, paddingHorizontal: 20, paddingTop: 10 },
   header: { flexDirection: "row", alignItems: "center", marginBottom: 16 },
-  title: { fontSize: 24, fontWeight: "700" },
+  title: { fontSize: 24, fontWeight: "700", fontFamily: FontFamilies.heading, marginLeft: 10 },
 
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 8,
+    padding: 6,
     borderRadius: 16,
     marginBottom: 10,
   },
-  searchInput: { flex: 1, marginLeft: 8, fontSize: 16, fontWeight: "600" },
+  searchInput: { flex: 1, marginLeft: 12, fontSize: 16, fontWeight: "600", height: 40 },
 
   searchBtn: {
     paddingVertical: 10,
     paddingHorizontal: 16,
-    borderRadius: 14,
+    borderRadius: 12,
     marginLeft: 8,
   },
 
   resultRow: {
-    padding: 12,
-    borderRadius: 14,
+    padding: 16,
+    borderRadius: 18,
     marginBottom: 10,
     flexDirection: "row",
     justifyContent: "space-between",
@@ -178,6 +205,6 @@ const styles = StyleSheet.create({
   addBtn: {
     paddingVertical: 8,
     paddingHorizontal: 16,
-    borderRadius: 10,
+    borderRadius: 12,
   },
 });

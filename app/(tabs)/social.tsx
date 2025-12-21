@@ -1,6 +1,6 @@
 import { useThemeMode } from "@/hooks/theme-context";
 import { useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Image, Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
   
 // Composants UI
@@ -26,8 +26,20 @@ import { useLeagueUsers } from "@/src/classement/hooks/useLeagueUsers";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { collection, doc, getDoc, onSnapshot } from "firebase/firestore";
+import { collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, where } from "firebase/firestore";
 import { useEffect } from "react";
+import { LinearGradient } from "expo-linear-gradient";
+
+// 👇 AJOUTE CE BLOC DE THÈME AVANT LA FONCTION SocialScreen
+const THEME = {
+    bgGradient: ["#DDF7E8", "#F4FDF9"] as const,
+    glassCardBg: ["rgba(240, 253, 244, 0.95)", "rgba(255, 255, 255, 0.85)"] as const,
+    glassBorder: "rgba(255, 255, 255, 0.6)",
+    textMain: "#0A3F33", 
+    textMuted: "#4A665F",
+    accentCoral: "#FF8C66",
+    searchBg: "rgba(255, 255, 255, 0.6)", // Pour les barres de recherche
+};
 
 export default function SocialScreen() {
   const { colors, mode } = useThemeMode();
@@ -158,28 +170,87 @@ export default function SocialScreen() {
   };
 
   // Hierarchical deletion rules: who can delete whom
+  // ✅ LOGIQUE : Annuler une demande d'adhésion à un club
+  const cancelClubRequest = async (clubId: string) => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    try {
+        // Supprime le doc dans la sous-collection du club
+        await deleteDoc(doc(db, "clubs", clubId, "joinRequests", uid));
+        // Met à jour l'état local
+        setRequestedClubIds((prev) => prev.filter((id) => id !== clubId));
+        Alert.alert("Annulé", "Demande d'adhésion annulée.");
+    } catch (e) {
+        console.error(e);
+        Alert.alert("Erreur", "Impossible d'annuler la demande.");
+    }
+  };
+
+  // ✅ LOGIQUE : Annuler une demande d'ami envoyée
+  const cancelFriendReq = async (targetId: string) => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    try {
+        // Dans Firebase, la demande est stockée chez le destinataire
+        // On doit trouver l'ID du doc de demande chez l'autre user où from == moi
+        // C'est complexe sans l'ID direct.
+        // SIMPLIFICATION : On utilise une Cloud Function normalement.
+        // ICI : On suppose qu'on a accès en écriture (règles de sécu à vérifier) ou on utilise une logique connue.
+        // Hack: On ne peut souvent pas annuler facilement sans stocker l'ID de la demande.
+        // Si tu as accès à 'friendRequests' de l'autre :
+        const q = query(collection(db, "users", targetId, "friendRequests"), where("from", "==", uid));
+        const snap = await getDocs(q);
+        snap.forEach(async (d) => {
+            await deleteDoc(d.ref);
+        });
+        
+        setSentRequestIds((prev) => prev.filter((id) => id !== targetId));
+        Alert.alert("Annulé", "Demande d'ami annulée.");
+    } catch (e) {
+        Alert.alert("Erreur", "Impossible d'annuler.");
+    }
+  };
+
+  // ✅ LOGIQUE : Nettoyage automatique des autres demandes quand on rejoint un club
+  const cleanupOtherRequests = async (joinedClubId: string) => {
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
+      // On parcourt tous les clubs où on avait fait une demande (sauf celui qu'on rejoint)
+      const toClean = requestedClubIds.filter(id => id !== joinedClubId);
+      
+      for (const clubId of toClean) {
+          try {
+              await deleteDoc(doc(db, "clubs", clubId, "joinRequests", uid));
+          } catch (e) {
+              console.log("Cleanup error for", clubId, e);
+          }
+      }
+      // On vide la liste locale
+      setRequestedClubIds([]);
+  };
+
+  // ✅ LOGIQUE : Correction de la hiérarchie de suppression
   const canDeleteMember = (actorId: string | null, targetId: string | undefined, club?: ClubInfo | null) => {
     if (!actorId || !targetId || !club) return false;
-    if (actorId === targetId) return false; // cannot delete self
-    const ownerId = club.ownerId ?? null;
-    const officers = Array.isArray(club.officers) ? club.officers : [];
+    if (actorId === targetId) return false; // On ne se supprime pas soi-même ici
+
+    const ownerId = club.ownerId;
+    const officers = club.officers || [];
 
     const actorIsOwner = ownerId === actorId;
     const actorIsOfficer = officers.includes(actorId);
+    
     const targetIsOwner = ownerId === targetId;
     const targetIsOfficer = officers.includes(targetId);
 
-    if (actorIsOwner) {
-      // owner can delete anyone except themself (already prevented)
-      return !targetIsOwner;
-    }
+    // Le Chef peut tout supprimer sauf lui-même (déjà géré)
+    if (actorIsOwner) return true;
 
+    // Un Officier peut supprimer un Membre, mais PAS un autre Officier ni le Chef
     if (actorIsOfficer) {
-      // officer can delete plain members only
-      return !targetIsOfficer && !targetIsOwner;
+        return !targetIsOfficer && !targetIsOwner;
     }
 
-    // regular members cannot delete anyone
     return false;
   };
   const { user } = useUser();
@@ -205,39 +276,27 @@ export default function SocialScreen() {
   const [newOwnerId, setNewOwnerId] = useState<string | null>(null);
   const [pendingLeaveClub, setPendingLeaveClub] = useState<ClubInfo | null>(null);
   const [deleteOnLeave, setDeleteOnLeave] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
 
-  const initFromParams = useRef(false);
+  // ✅ FIX STABILITÉ : Cet effet ne doit se lancer QUE si les params changent, pas le club.
+  // On utilise une ref pour suivre si on a déjà traité les params initiaux.
+  const paramsProcessed = useRef(false);
 
+  useEffect(() => {
+    if (paramsProcessed.current) return; // Ne rien faire si déjà traité
 
-// ... au début de SocialScreen ...
+    const viewParam = (params?.view as string) || "";
+    const tabParam = (params?.tab as string) || "";
 
-const lastTimeRef = useRef<number>(0);
+    if (tabParam === "clubs") setSelectedTab("clubs");
+    if (tabParam === "amis") setSelectedTab("amis");
 
-
-
-useEffect(() => {
-  // On vérifie si un timestamp est fourni et s'il est plus récent que le dernier traité
-  const t = params?.t ? Number(params.t) : 0;
-  
-  // Si c'est une nouvelle demande de navigation venant du Profil
-  if (t > lastTimeRef.current) {
-    lastTimeRef.current = t; // On met à jour pour ne pas le refaire en boucle
-
-    if (params?.tab === "amis") {
-      setSelectedTab("amis");
-      if (params?.reset === "true") {
-        setView("main"); // Ferme les chats/modales
-        setEditingClub(false);
-      }
-    } else if (params?.tab === "clubs") {
-      setSelectedTab("clubs");
-      if (params?.view === "clubRanking") {
+    if (viewParam === "clubRanking") {
+        setSelectedTab("clubs");
         setView("clubRanking");
-      }
+        paramsProcessed.current = true; // On marque comme traité
     }
-  }
-  // Si pas de timestamp nouveau, on ne fait RIEN -> La navigation manuelle fonctionne !
-}, [params]);
+  }, [params]); // On ne dépend PLUS de joinedClub ici
 
   // Realtime clubs listing from Firestore
   useEffect(() => {
@@ -265,30 +324,38 @@ useEffect(() => {
   }, []);
  
   
-  // Support deep-link to club ranking: /social?tab=clubs&view=clubRanking
+  // ✅ FIX: Cet effet ne se lance QUE si les paramètres de navigation changent
+  // Il ne se lancera PLUS quand tu modifies le club ou promeus quelqu'un
   useEffect(() => {
     const viewParam = (params?.view as string) || "";
-    if (viewParam === "clubRanking") {
-      setSelectedTab("clubs");
-      if (joinedClub) setView("clubRanking");
+    // On ne force la vue que si le paramètre est présent ET qu'on n'y est pas déjà
+    if (viewParam === "clubRanking" && view !== "clubRanking" && joinedClub) {
+       setSelectedTab("clubs");
+       setView("clubRanking");
     }
-  }, [params, joinedClub]);
+  }, [params?.view, joinedClub?.id]); // On ne dépend plus de tout l'objet joinedClub
 
   useEffect(() => {
     setInput("");
   }, [selectedChat?.id, joinedClub?.id]);
 
+  // Chargement des membres du club sélectionné
   useEffect(() => {
-    if (
-      view !== "members" ||
-      selectedTab !== "clubs" ||
-      !selectedChat?.id
-    ) {
+    // Si on n'est pas sur la vue membres, on ne fait rien
+    if (view !== "members") {
       return;
     }
+    
+    // Si on regarde notre propre club, on utilise les données du contexte (plus rapide/stable)
+    if (selectedChat?.id && joinedClub?.id === selectedChat.id) {
+        setMembersPreview(members);
+        setMembersPreviewLoading(false);
+        return;
+    }
 
-    if (joinedClub?.id === selectedChat.id) {
-      setMembersPreview(members);
+    // Sinon, logique de chargement existante...
+    if (!selectedChat?.id) {
+      setMembersPreview([]);
       setMembersPreviewLoading(false);
       return;
     }
@@ -391,19 +458,7 @@ useEffect(() => {
     return () => {
       active = false;
     };
-  }, [view, selectedTab, selectedChat?.id, joinedClub?.id, rankingPointsMap]);
-
-  useEffect(() => {
-    if (
-      view === "members" &&
-      selectedTab === "clubs" &&
-      selectedChat?.id &&
-      joinedClub?.id === selectedChat.id
-    ) {
-      setMembersPreview(members);
-      setMembersPreviewLoading(false);
-    }
-  }, [members, view, selectedTab, selectedChat?.id, joinedClub?.id]);
+  }, [view, selectedChat?.id, joinedClub, members, rankingPointsMap]);
 
   useEffect(() => {
     if (view !== "members") {
@@ -463,37 +518,30 @@ useEffect(() => {
 
   const currentUid = auth.currentUser?.uid;
 
-  const promptLeaveClub = (target?: Partial<ClubInfo> & { id: string }) => {
-    const referenceClub = joinedClub ?? (target ? ({
-      id: target.id,
-      participants: target.participants ?? 0,
-      name: target.name ?? "",
-      desc: target.desc,
-      visibility: target.visibility,
-      emoji: target.emoji,
-      photoUri: target.photoUri,
-      city: target.city,
-      ownerId: target.ownerId,
-      officers: target.officers,
-      logo: target.logo,
-    } as ClubInfo) : null);
+  // ✅ FIX RE-APPLIED: TypeScript error "Expected 0 arguments, but got 1" resolved by ensuring the function correctly handles an optional argument.
+  const promptLeaveClub = (targetClub?: ClubInfo) => {
+    const clubToLeave = targetClub || joinedClub;
+    
+    if (!clubToLeave) {
+        Alert.alert("Erreur", "Aucun club sélectionné.");
+        return;
+    }
 
-    if (!referenceClub) return;
-
-    setPendingLeaveClub(referenceClub);
+    setPendingLeaveClub(clubToLeave);
     setNewOwnerId(null);
 
-    const ownerId = referenceClub.ownerId ?? joinedClub?.ownerId ?? null;
+    const isOwner = clubToLeave.ownerId === auth.currentUser?.uid;
+    // On vérifie le nombre de membres via le contexte si c'est notre club, sinon via l'info passée
+    const memberCount = (clubToLeave.id === joinedClub?.id) ? members.length : clubToLeave.participants;
 
     let requiresTransfer = false;
     let shouldDelete = false;
 
-    if (ownerId && ownerId === currentUid) {
-      const candidates = members.filter((member) => member.id !== currentUid);
-      if (candidates.length > 0) {
-        requiresTransfer = true;
+    if (isOwner) {
+      if (memberCount > 1) {
+        requiresTransfer = true; // Il reste du monde, il faut un nouveau chef
       } else {
-        shouldDelete = true;
+        shouldDelete = true; // Je suis tout seul, le club sera supprimé
       }
     }
 
@@ -536,24 +584,46 @@ useEffect(() => {
       return;
     }
 
-    setLeaveConfirmVisible(false);
+    if (!pendingLeaveClub?.id) return;
+
+    // 1. On active le bouclier (écran de chargement)
+    setIsLeaving(true);
+    setLeaveConfirmVisible(false); 
+
     try {
       if (deleteOnLeave) {
-        await deleteClub(pendingLeaveClub?.id);
+        await deleteClub(pendingLeaveClub.id);
       } else {
         if (requireOwnerTransfer && newOwnerId) {
-          await transferOwnership(newOwnerId, pendingLeaveClub?.id);
+          await transferOwnership(newOwnerId, pendingLeaveClub.id);
         }
-        await leaveClub(pendingLeaveClub?.id);
+        await leaveClub(pendingLeaveClub.id);
       }
-      setView("main");
-    } catch (error) {
-      Alert.alert("Erreur", deleteOnLeave ? "Impossible de supprimer le club pour le moment." : "Impossible de quitter le club pour le moment.");
-    } finally {
-      setRequireOwnerTransfer(false);
-      setDeleteOnLeave(false);
-      setNewOwnerId(null);
-      setPendingLeaveClub(null);
+      
+      // À cet instant précis, ton Context a mis joinedClub à NULL.
+      // L'écran derrière a changé, MAIS le spinner (étape 3) le cache.
+
+      // 2. On affiche l'alerte par-dessus le spinner
+      Alert.alert(
+        "Succès", 
+        deleteOnLeave ? "Club supprimé." : "Tu as quitté le club.",
+        [
+          {
+            text: "OK",
+            onPress: () => {
+              // 3. C'est ici qu'on retire le bouclier
+              setPendingLeaveClub(null);
+              setView("main");
+              setIsLeaving(false); 
+            }
+          }
+        ]
+      );
+      
+    } catch (error: any) {
+      console.error(error);
+      setIsLeaving(false); // En cas d'erreur, on enlève le bouclier
+      Alert.alert("Erreur", error.message || "Impossible de quitter le club.");
     }
   };
 
@@ -658,58 +728,133 @@ useEffect(() => {
     }
   }
 
+  // Définition du composant de fond
+  const BackgroundComponent = isLight ? LinearGradient : View;
+  const bgProps = isLight 
+    ? { colors: THEME.bgGradient, style: StyleSheet.absoluteFill } 
+    : { style: [StyleSheet.absoluteFill, { backgroundColor: "#021114" }] };
+
   return (
-    <SafeAreaView style={[
-      styles.container,
-      { backgroundColor: isLight ? colors.background : darkBg },
-    ]}> 
-      <Text style={[styles.title, { color: colors.text }]}>Social</Text>
-      <View style={[styles.tabSwitcher, { backgroundColor: isLight ? colors.surfaceAlt : "rgba(0, 151, 178, 0.1)" }]}>
-        <TouchableOpacity
-          style={[styles.switcherButton, selectedTab==='clubs' && { backgroundColor: colors.accent }]}
-          onPress={() => setSelectedTab('clubs')}
+    <View style={{ flex: 1 }}>
+      {/* Le Fond d'écran global */}
+      <BackgroundComponent {...(bgProps as any)} />
+
+      {/* 👇 BLOC CORRIGÉ : FOND OPAQUE 👇 */}
+      {isLeaving && (
+        <View style={{ 
+          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, 
+          zIndex: 9999, 
+          alignItems: 'center', justifyContent: 'center',
+          // ICI : On utilise une couleur SOLIDE (pas de transparence) pour cacher le changement de page
+          backgroundColor: isLight ? "#F0FDF4" : "#021114" 
+        }}>
+           <ActivityIndicator size="large" color={colors.accent} />
+           <Text style={{ marginTop: 20, fontFamily: FontFamilies.heading, color: colors.text }}>
+             Mise à jour en cours...
+           </Text>
+        </View>
+      )}
+      {/* 👆 FIN DU BLOC */}
+
+      <SafeAreaView style={[styles.container, { backgroundColor: "transparent" }]}> 
+      <Text style={[styles.title, { color: isLight ? THEME.textMain : colors.text }]}>Social</Text>
+      
+      {/* TAB SWITCHER GLASSMORPHISM */}
+      <View style={{ marginTop: 20, marginBottom: 10 }}>
+        <LinearGradient
+            colors={isLight ? THEME.glassCardBg : ["rgba(0, 151, 178, 0.1)", "rgba(0, 151, 178, 0.05)"]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={{ 
+                flexDirection: 'row', 
+                padding: 6, 
+                borderRadius: 24, 
+                borderWidth: 1, 
+                borderColor: isLight ? THEME.glassBorder : "rgba(255,255,255,0.1)" 
+            }}
         >
-          <Text style={[styles.switcherText, { color: selectedTab==='clubs' ? colors.pillActive : colors.mutedText }]}>Club</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.switcherButton, selectedTab==='amis' && { backgroundColor: colors.accent }]}
-          onPress={() => setSelectedTab('amis')}
-        >
-          <Text style={[styles.switcherText, { color: selectedTab==='amis' ? colors.pillActive : colors.mutedText }]}>Amis</Text>
-        </TouchableOpacity>
+            <TouchableOpacity
+                style={[
+                    styles.switcherButton, 
+                    selectedTab === 'clubs' && { 
+                        backgroundColor: isLight ? "#008F6B" : colors.accent,
+                        shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 4, elevation: 2
+                    }
+                ]}
+                onPress={() => setSelectedTab('clubs')}
+            >
+                <Text style={[
+                    styles.switcherText, 
+                    { color: selectedTab === 'clubs' ? '#FFFFFF' : (isLight ? THEME.textMuted : colors.mutedText) }
+                ]}>
+                    Club
+                </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+                style={[
+                    styles.switcherButton, 
+                    selectedTab === 'amis' && { 
+                        backgroundColor: isLight ? "#008F6B" : colors.accent,
+                        shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 4, elevation: 2
+                    }
+                ]}
+                onPress={() => setSelectedTab('amis')}
+            >
+                <Text style={[
+                    styles.switcherText, 
+                    { color: selectedTab === 'amis' ? '#FFFFFF' : (isLight ? THEME.textMuted : colors.mutedText) }
+                ]}>
+                    Amis
+                </Text>
+            </TouchableOpacity>
+        </LinearGradient>
       </View>
 
       {/* CLUBS */}
       {selectedTab === "clubs" && (
         joinedClub ? (
           <View style={{ flex: 1 }}>
-            <TouchableOpacity
-              onPress={() => setView("clubRanking")}
-              style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: 14, padding: 12, marginBottom: 10, marginTop: 18 }}
-            >
-              {joinedClub?.photoUri ? (
-                <Image source={{ uri: joinedClub.photoUri }} style={{ width: 30, height: 30, borderRadius: 15 }} />
-              ) : (
-                <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: colors.pill, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ fontSize: 16 }}>{joinedClub?.emoji || '🌿'}</Text>
-                </View>
-              )}
-              <Text style={{ color: colors.text, fontFamily: FontFamilies.headingMedium, marginLeft: 8, flex: 1 }}>{joinedClub.name}</Text>
-              <TouchableOpacity onPress={() => setShowClubQR(true)} style={{ marginRight: 10 }}>
-                <Ionicons name="share-social-outline" size={18} color={colors.accent} />
-              </TouchableOpacity>
-              {joinedClub && (joinedClub.ownerId === auth.currentUser?.uid || (joinedClub.officers || []).includes(auth.currentUser?.uid ?? "")) && (
-                <TouchableOpacity onPress={() => setView('joinRequests')} style={{ marginRight: 10 }}>
-                  <Ionicons name="person-add" size={18} color={colors.accent} />
-                  {clubJoinRequests.length > 0 && (
-                    <View style={{ position: 'absolute', right: -6, top: -6, backgroundColor: '#D93636', borderRadius: 8, minWidth: 16, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' }}>
-                      <Text style={{ color: '#fff', fontSize: 10 }}>{clubJoinRequests.length}</Text>
+            <TouchableOpacity onPress={() => setView("clubRanking")} activeOpacity={0.9}>
+                <LinearGradient
+                    colors={isLight ? THEME.glassCardBg : ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"]}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={{
+                        flexDirection: 'row', alignItems: 'center', padding: 16, marginBottom: 10, marginTop: 10,
+                        borderRadius: 20,
+                        borderWidth: 1, borderColor: isLight ? THEME.glassBorder : "rgba(255,255,255,0.1)"
+                    }}
+                >
+                    {joinedClub?.photoUri ? (
+                        <Image source={{ uri: joinedClub.photoUri }} style={{ width: 44, height: 44, borderRadius: 22 }} />
+                    ) : (
+                        <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: isLight ? "#E0F7EF" : colors.pill, alignItems: 'center', justifyContent: 'center' }}>
+                            <Text style={{ fontSize: 20 }}>{joinedClub?.emoji || '🌿'}</Text>
+                        </View>
+                    )}
+                    
+                    <View style={{ marginLeft: 12, flex: 1 }}>
+                        <Text style={{ color: isLight ? THEME.textMain : colors.text, fontFamily: FontFamilies.heading, fontSize: 18 }}>{joinedClub.name}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                            <Ionicons name="leaf" size={14} color={isLight ? "#008F6B" : colors.accent} />
+                            <Text style={{ color: isLight ? "#008F6B" : colors.accent, fontFamily: FontFamilies.bodyStrong, marginLeft: 4 }}>{clanTotalPoints} pts</Text>
+                        </View>
                     </View>
-                  )}
-                </TouchableOpacity>
-              )}
-              <Ionicons name="leaf-outline" size={16} color={colors.accent} />
-              <Text style={{ color: colors.accent, fontFamily: FontFamilies.bodyStrong, marginLeft: 6 }}>{clanTotalPoints} pts</Text>
+
+                    {/* Boutons d'action (Share / Requests) */}
+                    <View style={{ flexDirection: 'row', gap: 12 }}>
+                        {joinedClub && (joinedClub.ownerId === auth.currentUser?.uid || (joinedClub.officers || []).includes(auth.currentUser?.uid ?? "")) && (
+                            <TouchableOpacity onPress={() => setView('joinRequests')} style={{ position: 'relative' }}>
+                                <Ionicons name="person-add-outline" size={24} color={isLight ? THEME.textMuted : colors.text} />
+                                {clubJoinRequests.length > 0 && (
+                                    <View style={{ position: 'absolute', top: -4, right: -4, width: 10, height: 10, borderRadius: 5, backgroundColor: THEME.accentCoral }} />
+                                )}
+                            </TouchableOpacity>
+                        )}
+                        <TouchableOpacity onPress={() => setShowClubQR(true)}>
+                            <Ionicons name="qr-code-outline" size={24} color={isLight ? THEME.textMuted : colors.text} />
+                        </TouchableOpacity>
+                    </View>
+                </LinearGradient>
             </TouchableOpacity>
 
             <View style={{ flex: 1 }}>
@@ -732,28 +877,36 @@ useEffect(() => {
           </View>
         ) : (
           <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
-            <View style={[styles.searchContainer, { backgroundColor: colors.surfaceAlt, marginTop: 18 }]}> 
-              <Ionicons name="search" size={18} color={colors.mutedText} />
-              <TextInput
-                value={clubSearch}
-                onChangeText={setClubSearch}
-                placeholder="Rechercher un club ou une ville..."
-                placeholderTextColor={colors.mutedText}
-                style={[styles.searchInput, { color: colors.text }]}
-              />
+          {/* SEARCH CLUB */}
+          <LinearGradient
+            colors={isLight ? ["rgba(240, 253, 244, 0.95)", "rgba(255, 255, 255, 0.85)"] : ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"]}
+            style={{ 
+                flexDirection: 'row', alignItems: 'center', marginTop: 18, marginBottom: 12, 
+                padding: 4, borderRadius: 18, borderWidth: 1, borderColor: isLight ? "rgba(255,255,255,0.6)" : "transparent"
+            }}
+          >
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 }}>
+                <Ionicons name="search" size={20} color={colors.mutedText} />
+                <TextInput
+                    value={clubSearch}
+                    onChangeText={setClubSearch}
+                    placeholder="Trouver un club..."
+                    placeholderTextColor={colors.mutedText}
+                    style={{ flex: 1, marginLeft: 10, color: colors.text, height: 44, fontSize: 15 }}
+                />
             </View>
-            <TouchableOpacity
-              style={{
-                backgroundColor: colors.accent,
-                paddingVertical: 14,
-                borderRadius: 18,
-                alignItems: "center",
-                marginBottom: 16,
-              }}
-              onPress={() => setView("createClub")}
+          </LinearGradient>
+
+          {/* CREATE BUTTON */}
+          <TouchableOpacity onPress={() => setView("createClub")} activeOpacity={0.9}>
+            <LinearGradient
+                colors={isLight ? ["#FF9D7E", "#FF8C66"] : [colors.accent, colors.accent]}
+                start={{x:0, y:0}} end={{x:1, y:0}}
+                style={{ borderRadius: 16, paddingVertical: 14, alignItems: 'center', marginBottom: 16, shadowColor: isLight ? "#FF8C66" : "#000", shadowOpacity: 0.3, shadowRadius: 5, elevation: 3 }}
             >
-              <Text style={{ fontFamily: FontFamilies.heading, color: "#0F3327" }}>➕ Créer un club</Text>
-            </TouchableOpacity>
+                <Text style={{ fontFamily: FontFamilies.heading, color: "#FFF", fontSize: 16 }}>➕ Créer un club</Text>
+            </LinearGradient>
+          </TouchableOpacity>
               {(clubs.some((c) => c.joined) ? clubs.filter((c) => c.joined) : clubs)
               .filter((c: any) => c.name.toLowerCase().includes(clubSearch.toLowerCase()) || ((c.city || "").toLowerCase().includes(clubSearch.toLowerCase())))
               .map((club, i) => (
@@ -761,39 +914,46 @@ useEffect(() => {
                   key={club.id}
                   club={{ ...club, requestPending: requestedClubIds.includes(club.id) }}
                   onJoin={async () => {
+                    // CAS 1: ANNULATION DEMANDE
+                    if (requestedClubIds.includes(club.id)) {
+                        Alert.alert("Annuler", "Veux-tu annuler ta demande ?", [
+                            { text: "Non", style: "cancel" },
+                            { text: "Oui", style: "destructive", onPress: () => cancelClubRequest(club.id) }
+                        ]);
+                        return;
+                    }
+
                     if (!club.joined) {
                       const privateFlag = (club.isPrivate === true) || (club.visibility === 'private');
                       if (privateFlag) {
-                        // send join request only, do NOT navigate to members view
+                        // Demande pour club Privé
                         try {
                           await requestJoinClub(club.id);
                           setRequestedClubIds((s) => Array.from(new Set([...s, club.id])));
-                          Alert.alert('Demande envoyée', "Ta demande a été envoyée au chef du club.");
+                          Alert.alert('Envoyé', "Demande envoyée au chef.");
                         } catch (e) {
                           Alert.alert("Erreur", "Impossible d'envoyer la demande.");
                         }
                       } else {
-                        // public club: add to members
+                        // Rejoindre club Public
                         try {
                           await joinClub(club.id);
-                          // navigate to members/chat view
+                          // ✅ AUTO-CANCEL : On nettoie les autres demandes
+                          cleanupOtherRequests(club.id);
+                          
                           setSelectedChat({ ...club, type: "club" });
                           setView("members");
                         } catch (e) {
-                          Alert.alert('Erreur', 'Impossible de rejoindre le club pour le moment.');
+                          Alert.alert('Erreur', 'Impossible de rejoindre.');
                         }
                       }
                     } else {
                       promptLeaveClub(club);
                     }
                   }}
-                  onMembers={() => {
-                    setSelectedChat({ ...club, type: "club" });
-                    setView("members");
-                  }}
-                  onRanking={() => {
-                    if (club.joined) setView("clubRanking");
-                  }}
+                  // ... le reste des props (onMembers, onRanking...) reste identique
+                  onMembers={() => { setSelectedChat({ ...club, type: "club" }); setView("members"); }}
+                  onRanking={() => { if (club.joined) setView("clubRanking"); }}
                   totalPoints={club.joined ? clanTotalPoints : undefined}
                 />
               ))}
@@ -804,23 +964,39 @@ useEffect(() => {
       {/* LISTE AMIS + RECHERCHE */}
       {selectedTab === "amis" && (
         <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
-          <View style={[styles.searchContainer, { backgroundColor: colors.surfaceAlt, marginTop: 18 }]}> 
-            <TextInput
-              value={friendSearchText}
-              onChangeText={onFriendSearch}
-              placeholder="Rechercher un utilisateur..."
-              placeholderTextColor={colors.mutedText}
-              style={[styles.searchInput, { color: colors.text }]}
-            />
-            <TouchableOpacity onPress={() => setView('requests')} style={{ backgroundColor: colors.accent, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, marginLeft: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Ionicons name="mail-unread-outline" size={16} color={colors.pillActive} />
-              <Text style={{ color: colors.pillActive, fontFamily: FontFamilies.heading }}>Demandes</Text>
-              {friendRequests.length > 0 && (
-                <View style={{ backgroundColor: '#E45353', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2 }}>
-                  <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>{friendRequests.length}</Text>
+          <View style={{ marginTop: 18, marginBottom: 12 }}>
+            <LinearGradient
+                colors={isLight ? THEME.glassCardBg : ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"]}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={{
+                    flexDirection: "row", alignItems: "center", padding: 4, borderRadius: 20,
+                    borderWidth: 1, borderColor: isLight ? THEME.glassBorder : "rgba(255,255,255,0.1)"
+                }}
+            >
+                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 }}>
+                    <Ionicons name="search" size={20} color={colors.mutedText} />
+                    <TextInput
+                        value={friendSearchText}
+                        onChangeText={onFriendSearch}
+                        placeholder="Rechercher un utilisateur..."
+                        placeholderTextColor={colors.mutedText}
+                        style={[styles.searchInput, { color: colors.text, height: 44 }]}
+                    />
                 </View>
-              )}
-            </TouchableOpacity>
+                
+                <TouchableOpacity onPress={() => setView('requests')} style={{ 
+                    backgroundColor: isLight ? "#E0F7EF" : colors.accent, 
+                    paddingVertical: 10, paddingHorizontal: 14, borderRadius: 16, 
+                    flexDirection: 'row', alignItems: 'center', gap: 6, margin: 4
+                }}>
+                    <Ionicons name="mail-unread-outline" size={18} color={isLight ? "#008F6B" : colors.pillActive} />
+                    {friendRequests.length > 0 && (
+                        <View style={{ backgroundColor: '#FF8C66', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2 }}>
+                            <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>{friendRequests.length}</Text>
+                        </View>
+                    )}
+                </TouchableOpacity>
+            </LinearGradient>
           </View>
 
           {/* Search results with add friend */}
@@ -865,10 +1041,13 @@ useEffect(() => {
                   );
                 } else if (hasSentRequest) {
                   actionNode = (
-                    <View style={[styles.statusBadge, { backgroundColor: colors.surfaceAlt }]}> 
-                      <Ionicons name="hourglass" size={16} color={colors.mutedText} />
-                      <Text style={[styles.statusText, { color: colors.mutedText }]}>Demandé</Text>
-                    </View>
+                    <TouchableOpacity 
+                        onPress={() => cancelFriendReq(u.id)}
+                        style={[styles.statusBadge, { backgroundColor: "#FFE4E4", borderWidth: 1, borderColor: "#FFCDCD" }]}
+                    >
+                      <Ionicons name="close-circle" size={16} color="#D93636" />
+                      <Text style={[styles.statusText, { color: "#D93636" }]}>Annuler</Text>
+                    </TouchableOpacity>
                   );
                 } else {
                   actionNode = (
@@ -881,22 +1060,26 @@ useEffect(() => {
                 }
 
                 return (
-                  <View key={u.id} style={[styles.searchResultCard, { backgroundColor: colors.surface }]}> 
+                  <LinearGradient
+                    key={u.id}
+                    colors={isLight ? ["rgba(255,255,255,0.8)", "rgba(255,255,255,0.4)"] : ["rgba(255,255,255,0.05)", "rgba(255,255,255,0.02)"]}
+                    style={[styles.searchResultCard, { borderWidth: 1, borderColor: isLight ? "rgba(255,255,255,0.6)" : "transparent" }]}
+                  >
                     {avatarUri ? (
                       <Image source={{ uri: avatarUri }} style={styles.searchAvatar} />
                     ) : (
-                      <View style={[styles.searchAvatar, styles.searchAvatarFallback]}> 
+                      <View style={[styles.searchAvatar, styles.searchAvatarFallback]}>
                         <Text style={styles.searchInitial}>{initial}</Text>
                       </View>
                     )}
                     <View style={styles.searchNames}>
-                      <Text style={{ color: colors.text, fontFamily: FontFamilies.heading }}>{profileName}</Text>
+                      <Text style={{ color: isLight ? "#0A3F33" : colors.text, fontFamily: FontFamilies.heading }}>{profileName}</Text>
                       {usernameTag ? (
                         <Text style={[styles.searchUsername, { color: colors.mutedText }]}>@{usernameTag}</Text>
                       ) : null}
                     </View>
                     {actionNode}
-                  </View>
+                  </LinearGradient>
                 );
               })}
             </View>
@@ -976,275 +1159,261 @@ useEffect(() => {
           })()}
         </ScrollView>
       )}
-      {/* Friend Requests View */}
       {view === 'requests' && (
-        <View style={{ position: 'absolute', top: 56, left: 0, right: 0, bottom: 0, backgroundColor: colors.background, padding: 16 }}>
-          <TouchableOpacity onPress={() => setView('main')} style={{ marginBottom: 16, flexDirection: 'row', alignItems: 'center' }}>
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
-            <Text style={{ color: colors.text, fontSize: 20, fontFamily: FontFamilies.heading, marginLeft: 10 }}>Demandes d'amis</Text>
-          </TouchableOpacity>
-          <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
-            {friendRequests.length === 0 ? (
-              <View style={{ alignItems: 'center', marginTop: 50 }}>
-                <Ionicons name="mail-open-outline" size={64} color={colors.mutedText} />
-                <Text style={{ color: colors.mutedText, marginTop: 16, fontSize: 16 }}>Aucune demande reçue pour le moment.</Text>
-              </View>
-            ) : (
-              friendRequests.map((r) => {
-                const senderProfile = r.from ? friendProfiles[r.from] : undefined;
-                const displayName =
-                  r.fromName ||
-                  [senderProfile?.firstName, senderProfile?.lastName].filter(Boolean).join(" ") ||
-                  senderProfile?.username ||
-                  senderProfile?.usernameLowercase ||
-                  r.from;
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 60 }}>
+          <LinearGradient colors={isLight ? ["#DDF7E8", "#F4FDF9"] : [darkBg, darkBg]} style={StyleSheet.absoluteFill} />
+          <SafeAreaView style={{ flex: 1, paddingHorizontal: 20 }}>
+            <TouchableOpacity onPress={() => setView('main')} style={{ marginBottom: 16, flexDirection: 'row', alignItems: 'center', marginTop: 10 }}>
+                <Ionicons name="arrow-back" size={24} color={isLight ? "#0A3F33" : colors.text} />
+                <Text style={{ color: isLight ? "#0A3F33" : colors.text, fontSize: 22, fontFamily: FontFamilies.heading, marginLeft: 10 }}>Demandes d'amis</Text>
+            </TouchableOpacity>
 
-                const avatarUri =
-                  r.fromAvatar ||
-                  senderProfile?.photoURL ||
-                  senderProfile?.avatar ||
-                  senderProfile?.photoUri ||
-                  null;
-
-                const initials = displayName ? displayName.charAt(0).toUpperCase() : "?";
-
-                return (
-                  <View key={r.id} style={[styles.requestCard, { backgroundColor: colors.surface, marginBottom: 12 }]}> 
-                    <View style={styles.requestInfo}>
-                      {avatarUri ? (
-                        <Image source={{ uri: avatarUri }} style={styles.requestAvatar} />
-                      ) : (
-                        <View style={[styles.requestAvatar, { backgroundColor: colors.pill }]}> 
-                          <Text style={[styles.requestInitial, { color: colors.text }]}>{initials}</Text>
-                        </View>
-                      )}
-                      <View>
-                        <Text style={[styles.requestName, { color: colors.text }]}>{displayName}</Text>
-                        <Text style={[styles.requestMeta, { color: colors.mutedText }]}>souhaite devenir ton ami</Text>
-                      </View>
+            <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+                {friendRequests.length === 0 ? (
+                    <View style={{ alignItems: 'center', marginTop: 100 }}>
+                        <Ionicons name="mail-open-outline" size={60} color={isLight ? "rgba(0,143,107,0.2)" : colors.mutedText} />
+                        <Text style={{ color: isLight ? "#4A665F" : colors.mutedText, marginTop: 16, fontSize: 16 }}>Aucune demande reçue.</Text>
                     </View>
-                    <View style={styles.requestActions}>
-                      <GradientButton
-                        label="Accepter"
-                        onPress={() => handleAcceptRequest(r)}
-                        style={{ flex: 1 }}
-                      />
-                      <TouchableOpacity
-                        onPress={() => handleRejectRequest(r)}
-                        style={[styles.rejectBtn, { borderColor: "#F06262", backgroundColor: "transparent" }]}
-                      >
-                        <Text style={[styles.rejectText, { color: "#F06262" }]}>Refuser</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                );
-              })
-            )}
-          </ScrollView>
-        </View>
-      )}
+                ) : (
+                    friendRequests.map((r) => {
+                        const senderProfile = r.from ? friendProfiles[r.from] : undefined;
+                        const displayName = r.fromName || [senderProfile?.firstName, senderProfile?.lastName].filter(Boolean).join(" ") || senderProfile?.username || r.from;
+                        const avatarUri = r.fromAvatar || senderProfile?.photoURL || null;
 
-      {/* Club join requests full-page view (for owners/officers) */}
-      {view === 'joinRequests' && (
-        <View style={{ position: 'absolute', top: 56, left: 0, right: 0, bottom: 0, backgroundColor: colors.background, padding: 16 }}>
-          <TouchableOpacity onPress={() => setView('main')} style={{ marginBottom: 16, flexDirection: 'row', alignItems: 'center' }}>
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
-            <Text style={{ color: colors.text, fontSize: 20, fontFamily: FontFamilies.heading, marginLeft: 10 }}>Demandes d'adhésion</Text>
-          </TouchableOpacity>
-          <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
-            {clubJoinRequests.length === 0 ? (
-              <View style={{ alignItems: 'center', marginTop: 50 }}>
-                <Ionicons name="person-add-outline" size={64} color={colors.mutedText} />
-                <Text style={{ color: colors.mutedText, marginTop: 16, fontSize: 16 }}>Aucune demande pour le moment.</Text>
-              </View>
-            ) : (
-              clubJoinRequests.map((r) => {
-                const sender = r.userProfile || {};
-                const displayName = (sender.firstName || sender.username || sender.usernameLowercase) ? ([sender.firstName, sender.lastName].filter(Boolean).join(' ').trim() || sender.username || sender.usernameLowercase) : r.userId;
-                const avatarUri = sender.photoURL || sender.avatar || null;
-                return (
-                  <View key={r.id} style={[styles.requestCard, { backgroundColor: colors.surface, marginBottom: 12 }]}> 
-                    <View style={styles.requestInfo}>
-                      {avatarUri ? (
-                        <Image source={{ uri: avatarUri }} style={styles.requestAvatar} />
-                      ) : (
-                        <View style={[styles.requestAvatar, { backgroundColor: colors.pill }]}> 
-                          <Text style={[styles.requestInitial, { color: colors.text }]}>{(displayName || '?').charAt(0)}</Text>
-                        </View>
-                      )}
-                      <View>
-                        <Text style={[styles.requestName, { color: colors.text }]}>{displayName}</Text>
-                        <Text style={[styles.requestMeta, { color: colors.mutedText }]}>souhaite rejoindre votre club</Text>
-                      </View>
-                    </View>
-                    <View style={styles.requestActions}>
-                      <GradientButton
-                        label="Accepter"
-                        onPress={() => handleAcceptClubRequest(r.userId)}
-                        style={{ flex: 1 }}
-                      />
-                      <TouchableOpacity
-                        onPress={() => handleRejectClubRequest(r.userId)}
-                        style={[styles.rejectBtn, { borderColor: "#F06262", backgroundColor: "transparent" }]}
-                      >
-                        <Text style={[styles.rejectText, { color: "#F06262" }]}>Refuser</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                );
-              })
-            )}
-          </ScrollView>
-        </View>
-      )}
-
-      {/* Create Club overlay */}
-      {view === 'createClub' && (
-        <View style={{ position: 'absolute', top: 56, left: 0, right: 0, bottom: 0, backgroundColor: colors.background, padding: 16 }}>
-          <TouchableOpacity onPress={() => setView('main')} style={{ marginBottom: 16 }}>
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
-            <Text style={{ color: colors.text, fontSize: 22, fontFamily: FontFamilies.heading, marginBottom: 6 }}>{editingClub ? 'Modifier le club' : 'Créer un club'}</Text>
-            <View style={{ alignItems: 'center', marginBottom: 12 }}>
-              {newClubPhoto ? (
-                <Image source={{ uri: newClubPhoto }} style={{ width: 72, height: 72, borderRadius: 36 }} />
-              ) : (
-                <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ fontSize: 28 }}>🌿</Text>
-                </View>
-              )}
-            </View>
-            <Text style={{ color: colors.mutedText, marginBottom: 20 }}>Définis les informations de ton nouveau club.</Text>
-            <View style={{ gap: 14 }}>
-              <View>
-                <Text style={{ color: colors.text, fontFamily: FontFamilies.bodyStrong, marginBottom: 6 }}>Ville</Text>
-                <TextInput
-                  value={newClubCity}
-                  onChangeText={setNewClubCity}
-                  placeholder="Ex: Bruxelles"
-                  placeholderTextColor={colors.mutedText}
-                  style={{ backgroundColor: colors.surfaceAlt, color: colors.text, padding: 14, borderRadius: 14, fontFamily: FontFamilies.bodyStrong }}
-                />
-              </View>
-              <View>
-                <Text style={{ color: colors.text, fontFamily: FontFamilies.bodyStrong, marginBottom: 6 }}>Nom du club</Text>
-                <TextInput
-                  value={newClubName}
-                  onChangeText={setNewClubName}
-                  placeholder="Ex: Eco Warriors"
-                  placeholderTextColor={colors.mutedText}
-                  style={{ backgroundColor: colors.surfaceAlt, color: colors.text, padding: 14, borderRadius: 14, fontFamily: FontFamilies.bodyStrong }}
-                />
-              </View>
-              <View>
-                <Text style={{ color: colors.text, fontFamily: FontFamilies.bodyStrong, marginBottom: 6 }}>Description</Text>
-                <TextInput
-                  multiline
-                  value={newClubDesc}
-                  onChangeText={setNewClubDesc}
-                  numberOfLines={4}
-                  style={{ backgroundColor: colors.surfaceAlt, color: colors.text, padding: 14, borderRadius: 14, minHeight: 110, textAlignVertical: 'top' }}
-                  placeholder="Décris ton club..."
-                  placeholderTextColor={colors.mutedText}
-                />
-              </View>
-              <View>
-                <Text style={{ color: colors.text, fontFamily: FontFamilies.bodyStrong, marginBottom: 6 }}>Photo (optionnel)</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  {newClubPhoto ? (
-                    <>
-                      <Image source={{ uri: newClubPhoto }} style={{ width: 56, height: 56, borderRadius: 12 }} />
-                      <TouchableOpacity
-                        onPress={async () => {
-                          const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                          if (perm.status !== 'granted') return;
-                          const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
-                          if (!res.canceled) setNewClubPhoto(res.assets[0].uri);
-                        }}
-                        style={{ backgroundColor: colors.surfaceAlt, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12 }}
-                      >
-                        <Text style={{ color: colors.text }}>Changer</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => setNewClubPhoto('')} style={{ backgroundColor: colors.surfaceAlt, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12 }}>
-                        <Text style={{ color: colors.text }}>Retirer</Text>
-                      </TouchableOpacity>
-                    </>
-                  ) : (
-                    <TouchableOpacity
-                      onPress={async () => {
-                        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                        if (perm.status !== 'granted') return;
-                        const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
-                        if (!res.canceled) setNewClubPhoto(res.assets[0].uri);
-                      }}
-                      style={{ backgroundColor: colors.surfaceAlt, paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12 }}
-                    >
-                      <Text style={{ color: colors.text }}>Ajouter une photo</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-              {(() => {
-                const accentHex = (colors.accent || '#22C55E').replace('#', '');
-                const seeds = ['eco','leaf','earth','water','forest','sun','star','recycle','planet','nature','green','club1','club2','club3','city','river'];
-                return (
-                  <View>
-                    <Text style={{ color: colors.text, fontFamily: FontFamilies.bodyStrong, marginBottom: 8 }}>Choisir un avatar</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 4 }}>
-                      {seeds.map((s) => {
-                        const url = `https://api.dicebear.com/9.x/icons/png?seed=${encodeURIComponent(s)}&size=64&backgroundColor=${accentHex}`;
                         return (
-                          <TouchableOpacity key={s} onPress={() => setNewClubPhoto(url)} style={{ marginRight: 10 }}>
-                            <Image source={{ uri: url }} style={{ width: 56, height: 56, borderRadius: 12, backgroundColor: colors.surfaceAlt }} />
-                          </TouchableOpacity>
+                            <LinearGradient
+                                key={r.id}
+                                colors={isLight ? ["rgba(255,255,255,0.9)", "rgba(255,255,255,0.6)"] : ["rgba(255,255,255,0.05)", "rgba(255,255,255,0.02)"]}
+                                style={{ padding: 16, borderRadius: 20, marginBottom: 12, borderWidth: 1, borderColor: isLight ? "rgba(255,255,255,0.6)" : "transparent" }}
+                            >
+                                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 16 }}>
+                                    {avatarUri ? (
+                                        <Image source={{ uri: avatarUri }} style={{ width: 50, height: 50, borderRadius: 25, marginRight: 12 }} />
+                                    ) : (
+                                        <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: isLight ? "#E0F7EF" : colors.pill, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                                            <Text style={{ color: isLight ? "#008F6B" : colors.text, fontSize: 20, fontWeight: 'bold' }}>{(displayName || '?').charAt(0).toUpperCase()}</Text>
+                                        </View>
+                                    )}
+                                    <View>
+                                        <Text style={{ color: isLight ? "#0A3F33" : colors.text, fontSize: 17, fontFamily: FontFamilies.heading }}>{displayName}</Text>
+                                        <Text style={{ color: isLight ? "#4A665F" : colors.mutedText }}>veut être ton ami</Text>
+                                    </View>
+                                </View>
+                                <View style={{ flexDirection: "row", gap: 10 }}>
+                                    <GradientButton label="Accepter" onPress={() => handleAcceptRequest(r)} style={{ flex: 1, height: 44, borderRadius: 14 }} />
+                                    <TouchableOpacity onPress={() => handleRejectRequest(r)} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: "#F45B69", borderRadius: 14, height: 44 }}>
+                                        <Text style={{ color: "#F45B69", fontWeight: "bold" }}>Refuser</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </LinearGradient>
                         );
-                      })}
-                    </ScrollView>
-                  </View>
-                );
-              })()}
-              <View>
-                <Text style={{ color: colors.text, fontFamily: FontFamilies.bodyStrong, marginBottom: 10 }}>Visibilité</Text>
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <TouchableOpacity
-                    style={{ flex: 1, backgroundColor: newClubVisibility === 'public' ? colors.accent : colors.surfaceAlt, padding: 14, borderRadius: 14, alignItems: 'center' }}
-                    onPress={() => setNewClubVisibility('public')}
-                  >
-                    <Text style={{ color: newClubVisibility === 'public' ? '#0F3327' : colors.text, fontFamily: FontFamilies.heading }}>Public</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={{ flex: 1, backgroundColor: newClubVisibility === 'private' ? colors.accent : colors.surfaceAlt, padding: 14, borderRadius: 14, alignItems: 'center' }}
-                    onPress={() => setNewClubVisibility('private')}
-                  >
-                    <Text style={{ color: newClubVisibility === 'private' ? '#0F3327' : colors.text, fontFamily: FontFamilies.heading }}>Privé</Text>
-                  </TouchableOpacity>
+                    })
+                )}
+            </ScrollView>
+          </SafeAreaView>
+        </View>
+      )}
+
+      {view === 'joinRequests' && (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 60 }}>
+          <LinearGradient colors={isLight ? ["#DDF7E8", "#F4FDF9"] : [darkBg, darkBg]} style={StyleSheet.absoluteFill} />
+          <SafeAreaView style={{ flex: 1, paddingHorizontal: 20 }}>
+            <TouchableOpacity onPress={() => setView('main')} style={{ marginBottom: 16, flexDirection: 'row', alignItems: 'center', marginTop: 10 }}>
+                <Ionicons name="arrow-back" size={24} color={isLight ? "#0A3F33" : colors.text} />
+                <Text style={{ color: isLight ? "#0A3F33" : colors.text, fontSize: 22, fontFamily: FontFamilies.heading, marginLeft: 10 }}>Adhésions Club</Text>
+            </TouchableOpacity>
+
+            <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+                {clubJoinRequests.length === 0 ? (
+                    <View style={{ alignItems: 'center', marginTop: 100 }}>
+                        <Ionicons name="people-outline" size={60} color={isLight ? "rgba(0,143,107,0.2)" : colors.mutedText} />
+                        <Text style={{ color: isLight ? "#4A665F" : colors.mutedText, marginTop: 16, fontSize: 16 }}>Aucune demande d'adhésion.</Text>
+                    </View>
+                ) : (
+                    clubJoinRequests.map((r) => {
+                        const sender = r.userProfile || {};
+                        const displayName = (sender.firstName || sender.username) ? [sender.firstName, sender.lastName].filter(Boolean).join(' ') : r.userId;
+                        const avatarUri = sender.photoURL || null;
+
+                        return (
+                            <LinearGradient
+                                key={r.id}
+                                colors={isLight ? ["rgba(255,255,255,0.9)", "rgba(255,255,255,0.6)"] : ["rgba(255,255,255,0.05)", "rgba(255,255,255,0.02)"]}
+                                style={{ padding: 16, borderRadius: 20, marginBottom: 12, borderWidth: 1, borderColor: isLight ? "rgba(255,255,255,0.6)" : "transparent" }}
+                            >
+                                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 16 }}>
+                                    {avatarUri ? (
+                                        <Image source={{ uri: avatarUri }} style={{ width: 50, height: 50, borderRadius: 25, marginRight: 12 }} />
+                                    ) : (
+                                        <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: isLight ? "#E0F7EF" : colors.pill, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                                            <Text style={{ color: isLight ? "#008F6B" : colors.text, fontSize: 20, fontWeight: 'bold' }}>{(displayName || '?').charAt(0).toUpperCase()}</Text>
+                                        </View>
+                                    )}
+                                    <View>
+                                        <Text style={{ color: isLight ? "#0A3F33" : colors.text, fontSize: 17, fontFamily: FontFamilies.heading }}>{displayName}</Text>
+                                        <Text style={{ color: isLight ? "#4A665F" : colors.mutedText }}>veut rejoindre le club</Text>
+                                    </View>
+                                </View>
+                                <View style={{ flexDirection: "row", gap: 10 }}>
+                                    <GradientButton label="Accepter" onPress={() => handleAcceptClubRequest(r.userId)} style={{ flex: 1, height: 44, borderRadius: 14 }} />
+                                    <TouchableOpacity onPress={() => handleRejectClubRequest(r.userId)} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: "#F45B69", borderRadius: 14, height: 44 }}>
+                                        <Text style={{ color: "#F45B69", fontWeight: "bold" }}>Refuser</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </LinearGradient>
+                        );
+                    })
+                )}
+            </ScrollView>
+          </SafeAreaView>
+        </View>
+      )}
+
+      {view === 'createClub' && (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 50 }}>
+          {/* Fond Dégradé */}
+          <LinearGradient colors={isLight ? ["#F0FDF4", "#FFF"] : [darkBg, darkBg]} style={StyleSheet.absoluteFill} />
+          
+          {/* ✅ MAGIE ICI : On ferme le clavier si on touche le fond */}
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <SafeAreaView style={{ flex: 1 }}>
+                
+                <View style={{ paddingHorizontal: 20, paddingTop: 10 }}>
+                    <TouchableOpacity onPress={() => setView('main')} style={{ marginBottom: 16, width: 40 }}>
+                        <Ionicons name="arrow-back" size={24} color={isLight ? "#0A3F33" : colors.text} />
+                    </TouchableOpacity>
+                    <Text style={{ color: isLight ? "#0A3F33" : colors.text, fontSize: 24, fontFamily: FontFamilies.heading, marginBottom: 20 }}>
+                        {editingClub ? 'Modifier le club' : 'Créer un club'}
+                    </Text>
                 </View>
-              </View>
-              <TouchableOpacity
-                style={{ backgroundColor: (newClubName.trim() && newClubCity.trim()) ? colors.accent : colors.surfaceAlt, paddingVertical: 16, borderRadius: 18, alignItems: 'center' }}
-                disabled={!(newClubName.trim() && newClubCity.trim())}
-                onPress={async () => {
-                  if (!(newClubName.trim() && newClubCity.trim())) return;
-                  if (editingClub && joinedClub) {
-                    await updateClub({ name: newClubName.trim(), desc: newClubDesc.trim(), visibility: newClubVisibility, photoUri: newClubPhoto || undefined, city: newClubCity.trim() });
-                    setClubs((prev: any) => prev.map((c: any) => c.id === joinedClub.id ? { ...c, name: newClubName.trim(), desc: newClubDesc.trim(), city: newClubCity.trim(), photoUri: newClubPhoto || c.photoUri } : c));
-                  } else {
-                    await createClub({ name: newClubName.trim(), desc: newClubDesc.trim(), visibility: newClubVisibility, photoUri: newClubPhoto || undefined, city: newClubCity.trim() });
-                  }
-                  setEditingClub(false);
-                  setNewClubName('');
-                  setNewClubDesc('');
-                  setNewClubVisibility('public');
-                  setNewClubPhoto('');
-                  setNewClubCity('');
-                  setView('main');
-                }}
-              >
-                <Text style={{ fontFamily: FontFamilies.heading, color: newClubName.trim() ? '#0F3327' : colors.mutedText }}>{editingClub ? 'Enregistrer' : 'Créer le club'}</Text>
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
+
+                {/* ✅ AJOUT : keyboardShouldPersistTaps="handled" permet de cliquer sur les boutons même clavier ouvert */}
+                <ScrollView 
+                    contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }} 
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                >
+                    {/* PHOTO */}
+                    <View style={{ alignItems: 'center', marginBottom: 24 }}>
+                        <TouchableOpacity onPress={async () => {
+                            const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                            if (perm.status !== 'granted') return;
+                            const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
+                            if (!res.canceled) setNewClubPhoto(res.assets[0].uri);
+                        }}>
+                            {newClubPhoto ? (
+                                <Image source={{ uri: newClubPhoto }} style={{ width: 100, height: 100, borderRadius: 50, borderWidth: 4, borderColor: "#FFF" }} />
+                            ) : (
+                                <LinearGradient
+                                    colors={isLight ? ["#D1FAE5", "#A7F3D0"] : [colors.surfaceAlt, colors.surface]}
+                                    style={{ width: 100, height: 100, borderRadius: 50, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: isLight ? "#FFF" : "transparent" }}
+                                >
+                                    <Ionicons name="camera" size={40} color={isLight ? "#059669" : colors.mutedText} />
+                                </LinearGradient>
+                            )}
+                            <View style={{ position: 'absolute', bottom: 0, right: 0, backgroundColor: isLight ? "#008F6B" : colors.accent, padding: 8, borderRadius: 20, borderWidth: 2, borderColor: "#FFF" }}>
+                                <Ionicons name="pencil" size={14} color="#FFF" />
+                            </View>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* CHAMPS DE TEXTE */}
+                    <View style={{ gap: 16 }}>
+                        <View>
+                            <Text style={{ color: isLight ? "#4A665F" : colors.mutedText, marginBottom: 6, fontWeight: '600' }}>Nom du club</Text>
+                            <TextInput
+                                value={newClubName}
+                                onChangeText={setNewClubName}
+                                placeholder="Ex: Les Éco-Warriors"
+                                placeholderTextColor={colors.mutedText}
+                                style={{ 
+                                    backgroundColor: isLight ? "rgba(255,255,255,0.7)" : colors.surfaceAlt, 
+                                    borderWidth: 1, borderColor: isLight ? "rgba(0,143,107,0.2)" : "transparent",
+                                    borderRadius: 16, padding: 14, fontSize: 16, color: isLight ? "#0A3F33" : colors.text 
+                                }}
+                            />
+                        </View>
+
+                        <View>
+                            <Text style={{ color: isLight ? "#4A665F" : colors.mutedText, marginBottom: 6, fontWeight: '600' }}>Ville</Text>
+                            <TextInput
+                                value={newClubCity}
+                                onChangeText={setNewClubCity}
+                                placeholder="Ex: Paris"
+                                placeholderTextColor={colors.mutedText}
+                                style={{ 
+                                    backgroundColor: isLight ? "rgba(255,255,255,0.7)" : colors.surfaceAlt, 
+                                    borderWidth: 1, borderColor: isLight ? "rgba(0,143,107,0.2)" : "transparent",
+                                    borderRadius: 16, padding: 14, fontSize: 16, color: isLight ? "#0A3F33" : colors.text 
+                                }}
+                            />
+                        </View>
+
+                        <View>
+                            <Text style={{ color: isLight ? "#4A665F" : colors.mutedText, marginBottom: 6, fontWeight: '600' }}>Description</Text>
+                            <TextInput
+                                value={newClubDesc}
+                                onChangeText={setNewClubDesc}
+                                placeholder="Décrivez votre mission..."
+                                placeholderTextColor={colors.mutedText}
+                                multiline
+                                // blurOnSubmit={true} // Optionnel : ferme le clavier si on appuie sur Entrée (mais empêche les sauts de ligne)
+                                style={{ 
+                                    backgroundColor: isLight ? "rgba(255,255,255,0.7)" : colors.surfaceAlt, 
+                                    borderWidth: 1, borderColor: isLight ? "rgba(0,143,107,0.2)" : "transparent",
+                                    borderRadius: 16, padding: 14, fontSize: 16, color: isLight ? "#0A3F33" : colors.text,
+                                    height: 100, textAlignVertical: 'top'
+                                }}
+                            />
+                        </View>
+
+                        {/* VISIBILITÉ */}
+                        <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+                            {['public', 'private'].map((v) => (
+                                <TouchableOpacity 
+                                    key={v}
+                                    onPress={() => setNewClubVisibility(v as any)}
+                                    style={{ 
+                                        flex: 1, padding: 14, borderRadius: 16, alignItems: 'center',
+                                        backgroundColor: newClubVisibility === v ? (isLight ? "#008F6B" : colors.accent) : (isLight ? "rgba(255,255,255,0.5)" : colors.surfaceAlt),
+                                        borderWidth: 1, borderColor: newClubVisibility === v ? "transparent" : (isLight ? "rgba(0,143,107,0.1)" : "transparent")
+                                    }}
+                                >
+                                    <Text style={{ 
+                                        color: newClubVisibility === v ? "#FFF" : (isLight ? "#4A665F" : colors.mutedText), 
+                                        fontWeight: 'bold', textTransform: 'capitalize' 
+                                    }}>{v === 'public' ? 'Public' : 'Privé'}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        {/* BOUTON VALIDATION */}
+                        <TouchableOpacity
+                            style={{ 
+                                marginTop: 20, backgroundColor: (newClubName.trim() && newClubCity.trim()) ? (isLight ? "#FF8C66" : colors.accent) : colors.surfaceAlt,
+                                paddingVertical: 16, borderRadius: 20, alignItems: 'center',
+                                shadowColor: isLight ? "#FF8C66" : "#000", shadowOpacity: 0.3, shadowOffset: {width: 0, height: 4}, shadowRadius: 8
+                            }}
+                            disabled={!(newClubName.trim() && newClubCity.trim())}
+                            onPress={async () => {
+                                if (!(newClubName.trim() && newClubCity.trim())) return;
+                                if (editingClub && joinedClub) {
+                                    await updateClub({ name: newClubName.trim(), desc: newClubDesc.trim(), visibility: newClubVisibility, photoUri: newClubPhoto || undefined, city: newClubCity.trim() });
+                                    setClubs((prev: any) => prev.map((c: any) => c.id === joinedClub.id ? { ...c, name: newClubName.trim(), desc: newClubDesc.trim(), city: newClubCity.trim(), photoUri: newClubPhoto || c.photoUri } : c));
+                                } else {
+                                    await createClub({ name: newClubName.trim(), desc: newClubDesc.trim(), visibility: newClubVisibility, photoUri: newClubPhoto || undefined, city: newClubCity.trim() });
+                                }
+                                setEditingClub(false); setNewClubName(''); setNewClubDesc(''); setNewClubVisibility('public'); setNewClubPhoto(''); setNewClubCity(''); setView('main');
+                            }}
+                        >
+                            <Text style={{ fontSize: 18, fontFamily: FontFamilies.heading, color: "#FFF" }}>
+                                {editingClub ? 'Enregistrer les modifications' : 'Créer le club'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                </ScrollView>
+            </SafeAreaView>
+          </TouchableWithoutFeedback>
         </View>
       )}
       {joinedClub && (
@@ -1259,277 +1428,249 @@ useEffect(() => {
         />
       )}
 
-      {/* Members overlay below tabs */}
       {selectedTab === 'clubs' && view === 'members' && (
-        <View style={{ position: 'absolute', top: 56, left: 0, right: 0, bottom: 0, backgroundColor: colors.background, padding: 16 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-            <TouchableOpacity onPress={() => setView('main')} style={{ marginRight: 8 }}>
-              <Ionicons name="arrow-back" size={22} color={colors.text} />
+        <View style={{ position: 'absolute', top: 56, left: 0, right: 0, bottom: 0, backgroundColor: isLight ? colors.background : darkBg, padding: 16 }}>
+          {/* Header Membres */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+            <TouchableOpacity onPress={() => setView('main')} style={{ marginRight: 12 }}>
+              <Ionicons name="arrow-back" size={24} color={isLight ? "#0A3F33" : colors.text} />
             </TouchableOpacity>
-            <Text style={{ color: colors.text, fontSize: 18, fontFamily: FontFamilies.heading, flex: 1 }}>
-              Membres {selectedChat?.name ? `de ${selectedChat.name}` : 'du club'}
+            <Text style={{ color: isLight ? "#0A3F33" : colors.text, fontSize: 20, fontFamily: FontFamilies.heading, flex: 1 }}>
+              Membres
             </Text>
-            {/* Show join requests icon only for owner or officers */}
-              {joinedClub && (joinedClub.ownerId === auth.currentUser?.uid || (joinedClub.officers || []).includes(auth.currentUser?.uid ?? "")) && ( 
-                <TouchableOpacity style={{ marginLeft: 8 }} onPress={() => setView('joinRequests')}>
-                <Ionicons name="person-add" size={20} color={colors.accent} />
-                {clubJoinRequests.length > 0 && (
-                  <View style={{ position: 'absolute', right: -6, top: -6, backgroundColor: '#D93636', borderRadius: 8, minWidth: 16, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={{ color: '#fff', fontSize: 10 }}>{clubJoinRequests.length}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
+            {/* Icône demandes (Admin only) */}
+            {joinedClub && (joinedClub.ownerId === auth.currentUser?.uid || (joinedClub.officers || []).includes(auth.currentUser?.uid ?? "")) && ( 
+                <TouchableOpacity style={{ backgroundColor: isLight ? "#E0F7EF" : colors.surfaceAlt, padding: 8, borderRadius: 12 }} onPress={() => setView('joinRequests')}>
+                    <Ionicons name="person-add" size={20} color={isLight ? "#008F6B" : colors.accent} />
+                    {clubJoinRequests.length > 0 && (
+                        <View style={{ position: 'absolute', right: -4, top: -4, backgroundColor: '#FF8C66', borderRadius: 6, minWidth: 12, height: 12, alignItems: 'center', justifyContent: 'center' }} />
+                    )}
+                </TouchableOpacity>
             )}
           </View>
+
           {membersPreviewLoading ? (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-              <ActivityIndicator size="small" color={colors.accent} />
-            </View>
+            <ActivityIndicator size="large" color={isLight ? "#008F6B" : colors.accent} style={{ marginTop: 40 }} />
           ) : (
             <FlatList
               data={membersPreview}
               keyExtractor={(item) => String(item.id)}
+              contentContainerStyle={{ paddingBottom: 100 }}
               renderItem={({ item, index }) => {
-                const role = joinedClub?.ownerId === item.id 
-                  ? 'Chef' 
-                  : (joinedClub?.officers || []).includes(item.id) 
-                  ? 'Adjoint' 
-                  : 'Membre';
+                const role = joinedClub?.ownerId === item.id ? 'Chef' : (joinedClub?.officers || []).includes(item.id) ? 'Adjoint' : 'Membre';
                 const canDelete = canDeleteMember(currentUid || null, item.id, joinedClub ?? null);
-
+                
                 return (
-                  <View style={{
-                    backgroundColor: colors.surface,
-                    borderRadius: 16,
-                    padding: 12,
-                    marginBottom: 10,
-                    flexDirection: 'row',
-                    alignItems: 'center'
-                  }}>
-                    <Text style={{
-                      fontFamily: FontFamilies.heading,
-                      fontSize: 16,
-                      color: colors.mutedText,
-                      marginRight: 12,
-                      width: 32,
-                      textAlign: 'center',
-                    }}>
-                      #{index + 1}
-                    </Text>
-
+                  <LinearGradient
+                    colors={isLight ? ["rgba(255,255,255,0.9)", "rgba(255,255,255,0.6)"] : ["rgba(255,255,255,0.05)", "rgba(255,255,255,0.02)"]}
+                    style={{
+                        flexDirection: 'row', alignItems: 'center', padding: 12, marginBottom: 10, borderRadius: 18,
+                        borderWidth: 1, borderColor: isLight ? "rgba(255,255,255,0.6)" : "transparent"
+                    }}
+                  >
+                    <Text style={{ width: 24, textAlign: 'center', color: isLight ? "#008F6B" : colors.accent, fontWeight: 'bold' }}>{index + 1}</Text>
+                    
                     {item.avatar ? (
-                      <Image
-                        source={{ uri: item.avatar }}
-                        style={{ width: 40, height: 40, borderRadius: 20, marginRight: 12 }}
-                      />
+                      <Image source={{ uri: item.avatar }} style={{ width: 40, height: 40, borderRadius: 20, marginHorizontal: 12 }} />
                     ) : (
-                      <View style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 20,
-                        marginRight: 12,
-                        backgroundColor: colors.pill,
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        <Text style={{ color: colors.text, fontFamily: FontFamilies.heading }}>
-                          {(item.name || '?').charAt(0).toUpperCase()}
-                        </Text>
+                      <View style={{ width: 40, height: 40, borderRadius: 20, marginHorizontal: 12, backgroundColor: isLight ? "#E0F7EF" : colors.pill, alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ color: isLight ? "#008F6B" : colors.text, fontWeight: 'bold' }}>{(item.name || '?').charAt(0)}</Text>
                       </View>
                     )}
 
-                    <View style={{ flex: 1, marginRight: 8 }}>
-                      <Text
-                        style={{
-                          color: colors.text,
-                          fontFamily: FontFamilies.headingMedium,
-                          fontSize: 15,
-                        }}
-                        numberOfLines={1}
-                      >
-                        {item.name || item.id}
-                      </Text>
-                      <Text style={{
-                        color: colors.mutedText,
-                        fontSize: 12,
-                        marginTop: 2
-                      }}>
-                        {role}
-                      </Text>
+                    <View style={{ flex: 1 }}>
+                        <Text style={{ color: isLight ? "#0A3F33" : colors.text, fontFamily: FontFamilies.headingMedium, fontSize: 16 }}>{item.name || item.id}</Text>
+                        <Text style={{ color: isLight ? "#4A665F" : colors.mutedText, fontSize: 12 }}>{role}</Text>
                     </View>
 
-                    <Text style={{
-                      color: colors.accent,
-                      fontFamily: FontFamilies.bodyStrong,
-                      fontSize: 14,
-                      marginRight: canDelete ? 8 : 0,
-                    }}>
-                      {rankingPointsMap.get(item.id) || 0} pts
-                    </Text>
-                    
-                    {canDelete && (
-                      <TouchableOpacity 
-                        onPress={() => {
-                          Alert.alert('Supprimer le membre', 'Êtes-vous sûr de vouloir supprimer ce membre ?', [
-                            { text: 'Annuler', style: 'cancel' },
-                            { text: 'Supprimer', style: 'destructive', onPress: () => handleRemoveMember(item.id) },
-                          ]);
-                        }} 
-                        style={{ padding: 4 }}
-                      >
-                        <Ionicons name="trash-outline" size={20} color="#D93636" />
-                      </TouchableOpacity>
-                    )}
-                  </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={{ color: isLight ? "#008F6B" : colors.accent, fontWeight: 'bold' }}>{rankingPointsMap.get(item.id) || 0} pts</Text>
+                        {canDelete && (
+                            <TouchableOpacity onPress={() => handleRemoveMember(item.id)} style={{ marginTop: 4 }}>
+                                <Ionicons name="trash-outline" size={18} color="#F45B69" />
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                  </LinearGradient>
                 );
               }}
-              contentContainerStyle={{ paddingBottom: 140 }}
-              ListEmptyComponent={(
-                <Text style={{ color: colors.mutedText, textAlign: 'center', marginTop: 24 }}>
-                  Aucun membre à afficher.
-                </Text>
-              )}
             />
           )}
-          {/* Global join requests modal (accessible from club header or members view) */}
-          {joinRequestsVisible && (
-            <View style={styles.modalOverlay}>
-              <View style={[styles.modalCard, { backgroundColor: colors.surface }]}> 
-                <Text style={[styles.modalTitle, { color: colors.text }]}>Demandes d'adhésion</Text>
-                <View style={{ marginTop: 8 }}>
-                  {clubJoinRequests.length === 0 ? (
-                    <Text style={{ color: colors.mutedText, marginTop: 12 }}>Aucune demande.</Text>
-                  ) : clubJoinRequests.map((r) => (
-                    <View key={r.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        {r.userProfile?.photoURL ? (
-                          <Image source={{ uri: r.userProfile.photoURL }} style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10 }} />
-                        ) : (
-                          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.pill, alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
-                            <Text style={{ color: '#fff' }}>{(r.userProfile?.firstName || 'U').charAt(0)}</Text>
-                          </View>
-                        )}
-                        <Text style={{ color: colors.text }}>{r.userProfile?.firstName || r.userId}</Text>
-                      </View>
-                      <View style={{ flexDirection: 'row', gap: 8 }}>
-                        <TouchableOpacity onPress={() => handleAcceptClubRequest(r.userId)} style={[styles.modalBtn, { backgroundColor: colors.accent }]}> 
-                          <Text style={{ color: '#0F3327' }}>Accepter</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => handleRejectClubRequest(r.userId)} style={[styles.modalBtn, { backgroundColor: '#D93636' }]}> 
-                          <Text style={{ color: '#fff' }}>Refuser</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-                <View style={styles.modalButtons}>
-                  <TouchableOpacity style={[styles.modalBtn, { backgroundColor: colors.surfaceAlt }]} onPress={() => setJoinRequestsVisible(false)}>
-                    <Text style={{ color: colors.text }}>Fermer</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          )}
-          {/* duplicate join-requests modal removed (handlers already defined above) */}
         </View>
       )}
 
-      {/* Club ranking overlay below tabs */}
       {selectedTab === 'clubs' && view === 'clubRanking' && (
-        <View style={{ position: 'absolute', top: 56, left: 0, right: 0, bottom: 0, backgroundColor: colors.background, padding: 16 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-            <TouchableOpacity onPress={() => setView('main')} style={{ marginRight: 8 }}>
-              <Ionicons name="arrow-back" size={22} color={colors.text} />
-            </TouchableOpacity>
-              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                {joinedClub?.photoUri ? (
-                  <Image source={{ uri: joinedClub.photoUri }} style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10 }} />
-                ) : (
-                  <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.pill, alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
-                    <Text style={{ fontSize: 16 }}>{joinedClub?.emoji || '🌿'}</Text>
-                  </View>
-                )}
-                <Text style={{ color: colors.text, fontSize: 18, fontFamily: FontFamilies.heading, flex: 1 }}>{joinedClub?.name ?? ''}</Text>
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 50 }}>
+          {/* FOND GLOBAL */}
+          <LinearGradient colors={isLight ? ["#DDF7E8", "#F4FDF9"] : [darkBg, darkBg]} style={StyleSheet.absoluteFill} />
+          
+          <SafeAreaView style={{ flex: 1, paddingHorizontal: 20 }}>
+            {/* HEADER */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20, marginTop: 10 }}>
+              <TouchableOpacity onPress={() => setView('main')} style={{ marginRight: 12, padding: 4 }}>
+                <Ionicons name="arrow-back" size={24} color={isLight ? "#0A3F33" : colors.text} />
+              </TouchableOpacity>
+              
+              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+                 {joinedClub?.photoUri ? (
+                    <Image source={{ uri: joinedClub.photoUri }} style={{ width: 40, height: 40, borderRadius: 20, marginRight: 10 }} />
+                 ) : (
+                    <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: isLight ? "#E0F7EF" : colors.pill, alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                        <Text style={{ fontSize: 18 }}>{joinedClub?.emoji || '🌿'}</Text>
+                    </View>
+                 )}
+                 <Text style={{ color: isLight ? "#0A3F33" : colors.text, fontSize: 20, fontFamily: FontFamilies.heading }} numberOfLines={1}>
+                    {joinedClub?.name}
+                 </Text>
               </View>
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 8 }}>
-              <TouchableOpacity onPress={() => setShowClubQR(true)} style={{ backgroundColor: colors.surfaceAlt, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, marginRight: 8 }}>
-                <Text style={{ color: colors.text, fontFamily: FontFamilies.bodyStrong }}>Partager</Text>
-              </TouchableOpacity>
-              {joinedClub?.ownerId === auth.currentUser?.uid && (
-              <TouchableOpacity onPress={() => {
-                if (!joinedClub) return;
-                setEditingClub(true);
-                setNewClubName(joinedClub.name || '');
-                setNewClubDesc(joinedClub.desc || '');
-                setNewClubVisibility((joinedClub.visibility as any) || 'public');
-                setNewClubPhoto(joinedClub.photoUri || '');
-                setNewClubCity(joinedClub.city || '');
-                setView('createClub');
-              }} style={{ backgroundColor: colors.surfaceAlt, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, marginRight: 8 }}>
-                <Text style={{ color: colors.text, fontFamily: FontFamilies.bodyStrong }}>Modifier</Text>
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              onPress={() => promptLeaveClub(joinedClub ?? undefined)}
-              style={{ backgroundColor: '#D93636', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10 }}
-            >
-              <Text style={{ color: '#fff', fontFamily: FontFamilies.heading }}>Quitter</Text>
-            </TouchableOpacity>
-          </View>
-          <FlatList
-            data={clubRankingData}
-            keyExtractor={(item) => String(item.id) + String(item.rank)}
-            renderItem={({ item }) => (
-              <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 8, borderRadius: 12, backgroundColor: item.isMe ? colors.accent : 'transparent' }}>
-                <Text style={{ width: 30, textAlign: 'center', color: item.isMe ? '#0F3327' : colors.text, fontFamily: FontFamilies.heading }}>{item.rank}</Text>
-                {(() => {
-                  const avatarUri = item.isMe ? (user?.photoURL ?? null) : (item.avatar ?? null);
-                  const displayLabel = item.isMe
-                    ? (user?.firstName || user?.username || auth.currentUser?.email || "Moi")
-                    : item.name || item.id;
-                  const initials = displayLabel ? String(displayLabel).charAt(0).toUpperCase() : "?";
-                  if (avatarUri) {
-                    return (
-                      <Image source={{ uri: avatarUri }} style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10 }} />
-                    );
-                  }
-                  return (
-                    <View style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.pill }}>
-                      <Text style={{ color: item.isMe ? '#0F3327' : colors.text, fontFamily: FontFamilies.heading }}>{initials}</Text>
-                    </View>
-                  );
-                })()}
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: item.isMe ? '#0F3327' : colors.text, fontFamily: item.isMe ? FontFamilies.heading : FontFamilies.body }}>{item.isMe ? (user?.firstName ?? "Utilisateur") : item.name}</Text>
-                  {joinedClub && (
-                    <Text style={{ color: item.isMe ? '#0F3327' : colors.mutedText, fontSize: 12 }}>
-                      {joinedClub.ownerId === item.id
-                        ? 'Chef'
-                        : (joinedClub.officers || []).includes(item.id)
-                          ? 'Adjoint'
-                          : 'Membre'}
-                    </Text>
-                  )}
-                </View>
-                <Text style={{ color: item.isMe ? '#0F3327' : colors.accent, fontFamily: FontFamilies.bodyStrong }}>{rankingPointsMap.get(item.id) || 0} pts</Text>
-                {joinedClub?.ownerId === auth.currentUser?.uid && !item.isMe && (
-                  (joinedClub?.officers || []).includes(item.id)
-                    ? (
-                      <TouchableOpacity onPress={() => demoteOfficer(item.id)} style={{ marginLeft: 10, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: colors.surfaceAlt }}>
-                        <Text style={{ color: colors.text, fontSize: 12 }}>Rétrograder</Text>
-                      </TouchableOpacity>
+
+            {/* BOUTONS ACTIONS (Logique Chef/Membre) */}
+            <View style={{ flexDirection: 'row', marginBottom: 20, gap: 10 }}>
+               {joinedClub?.ownerId === auth.currentUser?.uid ? (
+                   // 👑 MODE CHEF : Bouton MODIFIER
+                   <TouchableOpacity 
+                      onPress={() => {
+                        if (!joinedClub) return;
+                        setEditingClub(true);
+                        setNewClubName(joinedClub.name || '');
+                        setNewClubDesc(joinedClub.desc || '');
+                        setNewClubVisibility((joinedClub.visibility as any) || 'public');
+                        setNewClubPhoto(joinedClub.photoUri || '');
+                        setNewClubCity(joinedClub.city || '');
+                        setView('createClub');
+                      }} 
+                      style={{ flex: 1, backgroundColor: isLight ? "rgba(255,255,255,0.6)" : colors.surfaceAlt, paddingVertical: 12, borderRadius: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: isLight ? "rgba(255,255,255,0.8)" : "transparent" }}
+                   >
+                      <Ionicons name="create-outline" size={20} color={isLight ? "#0A3F33" : colors.text} />
+                      <Text style={{ color: isLight ? "#0A3F33" : colors.text, fontFamily: FontFamilies.headingMedium }}>Modifier</Text>
+                   </TouchableOpacity>
+               ) : (
+                   // 👤 MODE MEMBRE : Bouton PARTAGER
+                   <TouchableOpacity 
+                      onPress={() => setShowClubQR(true)} 
+                      style={{ flex: 1, backgroundColor: isLight ? "rgba(255,255,255,0.6)" : colors.surfaceAlt, paddingVertical: 12, borderRadius: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: isLight ? "rgba(255,255,255,0.8)" : "transparent" }}
+                   >
+                      <Ionicons name="share-social-outline" size={20} color={isLight ? "#0A3F33" : colors.text} />
+                      <Text style={{ color: isLight ? "#0A3F33" : colors.text, fontFamily: FontFamilies.headingMedium }}>Partager</Text>
+                   </TouchableOpacity>
+               )}
+
+               {/* Bouton QUITTER (Commun) */}
+               <TouchableOpacity
+                  onPress={() => promptLeaveClub(joinedClub ?? undefined)}
+                  style={{ flex: 1, backgroundColor: "#FFE4E4", paddingVertical: 12, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: "#FFCDCD" }}
+               >
+                  <Text style={{ color: "#D93636", fontFamily: FontFamilies.headingMedium }}>Quitter</Text>
+               </TouchableOpacity>
+            </View>
+
+            {/* LISTE DES MEMBRES AVEC GESTION HIERARCHIQUE */}
+            <FlatList
+              data={clubRankingData}
+              keyExtractor={(item) => String(item.id) + String(item.rank)}
+              contentContainerStyle={{ paddingBottom: 100 }}
+              showsVerticalScrollIndicator={false}
+              renderItem={({ item }) => {
+                // --- 1. IDENTIFICATION DES RÔLES ---
+                const targetIsOwner = joinedClub?.ownerId === item.id;
+                const targetIsOfficer = (joinedClub?.officers || []).includes(item.id);
+                const targetIsMember = !targetIsOwner && !targetIsOfficer;
+                
+                const roleLabel = targetIsOwner ? '👑 Chef' : targetIsOfficer ? '⭐ Adjoint' : 'Membre';
+
+                // --- 2. IDENTIFICATION DE "MOI" ---
+                const myUid = auth.currentUser?.uid;
+                const iAmOwner = joinedClub?.ownerId === myUid;
+                const iAmOfficer = (joinedClub?.officers || []).includes(myUid ?? "");
+                const isMe = item.id === myUid;
+
+                // --- 3. LOGIQUE DE PERMISSION ---
+                // Le Chef peut agir sur tout le monde (sauf lui-même)
+                // L'Adjoint peut agir UNIQUEMENT sur les Membres simples
+                const canManageUser = !isMe && (iAmOwner || (iAmOfficer && targetIsMember));
+
+                return (
+                  <LinearGradient
+                    colors={isLight ? (isMe ? ["#D1FAE5", "#E0F7EF"] : ["rgba(255,255,255,0.8)", "rgba(255,255,255,0.5)"]) : ["rgba(255,255,255,0.05)", "rgba(255,255,255,0.02)"]}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={{ 
+                        flexDirection: 'row', alignItems: 'center', padding: 14, marginBottom: 10, borderRadius: 18,
+                        borderWidth: 1, borderColor: isLight ? (isMe ? "#A7F3D0" : "rgba(255,255,255,0.6)") : "transparent",
+                        shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 6, elevation: 1
+                    }}
+                  >
+                    {/* RANG */}
+                    <Text style={{ width: 30, textAlign: 'center', color: isMe ? "#008F6B" : (isLight ? "#4A665F" : colors.mutedText), fontFamily: FontFamilies.heading, fontSize: 16 }}>{item.rank}</Text>
+                    
+                    {/* AVATAR */}
+                    {item.avatar ? (
+                      <Image source={{ uri: item.avatar }} style={{ width: 40, height: 40, borderRadius: 20, marginHorizontal: 12 }} />
                     ) : (
-                      <TouchableOpacity onPress={() => promoteToOfficer(item.id)} style={{ marginLeft: 10, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: colors.surfaceAlt }}>
-                        <Text style={{ color: colors.text, fontSize: 12 }}>Nommer adjoint</Text>
-                      </TouchableOpacity>
-                    )
-                )}
-              </View>
-            )}
-            contentContainerStyle={{ paddingBottom: 140 }}
-            ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: colors.surfaceAlt }} />}
-          />
+                      <View style={{ width: 40, height: 40, borderRadius: 20, marginHorizontal: 12, backgroundColor: isLight ? "#FFF" : colors.pill, alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ color: isLight ? "#008F6B" : colors.text, fontFamily: FontFamilies.heading }}>{(item.name || '?').charAt(0).toUpperCase()}</Text>
+                      </View>
+                    )}
+
+                    {/* NOM ET ROLE */}
+                    <View style={{ flex: 1 }}>
+                        <Text style={{ color: isMe ? "#008F6B" : (isLight ? "#0A3F33" : colors.text), fontFamily: FontFamilies.headingMedium, fontSize: 16 }} numberOfLines={1}>
+                            {isMe ? "Moi" : item.name}
+                        </Text>
+                        <Text style={{ color: isLight ? "#6E8580" : colors.mutedText, fontSize: 12 }}>{roleLabel}</Text>
+                    </View>
+
+                    {/* ACTIONS ET POINTS */}
+                    <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={{ color: isLight ? "#008F6B" : colors.accent, fontFamily: FontFamilies.heading, fontSize: 15, marginBottom: canManageUser ? 6 : 0 }}>
+                            {rankingPointsMap.get(item.id) || 0} pts
+                        </Text>
+
+                        {/* BOUTONS D'ACTION (Si j'ai la permission) */}
+                        {canManageUser && (
+                            <View style={{ flexDirection: 'row', gap: 12 }}>
+                                
+                                {/* CAS 1 : CIBLE EST MEMBRE (Je peux le promouvoir) */}
+                                {targetIsMember && (
+                                    <TouchableOpacity 
+                                        onPress={() => Alert.alert("Promouvoir", `Nommer ${item.name} Adjoint ?`, [
+                                            { text: "Annuler", style: "cancel" },
+                                            { text: "Oui", onPress: () => promoteToOfficer(item.id) }
+                                        ])}
+                                    >
+                                        <Ionicons name="arrow-up-circle-outline" size={22} color="#008F6B" />
+                                    </TouchableOpacity>
+                                )}
+
+                                {/* CAS 2 : CIBLE EST ADJOINT (Seul le CHEF peut rétrograder) */}
+                                {targetIsOfficer && iAmOwner && (
+                                    <TouchableOpacity 
+                                        onPress={() => Alert.alert("Rétrograder", `Retirer le grade d'adjoint à ${item.name} ?`, [
+                                            { text: "Annuler", style: "cancel" },
+                                            { text: "Oui", onPress: () => demoteOfficer(item.id) }
+                                        ])}
+                                    >
+                                        <Ionicons name="arrow-down-circle-outline" size={22} color="#F59E0B" />
+                                    </TouchableOpacity>
+                                )}
+
+                                {/* SUPPRIMER (Possible pour Chef ou Adjoint sur Membre) */}
+                                <TouchableOpacity 
+                                    onPress={() => Alert.alert("Exclure", `Retirer ${item.name} du club ?`, [
+                                        { text: "Annuler", style: "cancel" },
+                                        { text: "Exclure", style: "destructive", onPress: () => handleRemoveMember(item.id) }
+                                    ])}
+                                >
+                                    <Ionicons name="trash-outline" size={22} color="#F45B69" />
+                                </TouchableOpacity>
+                            </View>
+                        )}
+                    </View>
+                  </LinearGradient>
+                );
+              }}
+            />
+          </SafeAreaView>
         </View>
       )}
       {leaveConfirmVisible && (
@@ -1599,6 +1740,7 @@ useEffect(() => {
         </View>
       )}
     </SafeAreaView>
+  </View>
   );
 }
 

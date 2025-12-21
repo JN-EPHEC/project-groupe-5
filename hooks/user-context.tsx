@@ -108,7 +108,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     return unsub;
   }, [firebaseUser]);
 
-  // 3️⃣ Listen to clubs
+  // 3️⃣ Listen to clubs. This effect is now only responsible for setting the userClub.
   useEffect(() => {
     if (!firebaseUser) {
       setUserClub(null);
@@ -121,10 +121,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             const data: any = d.data();
             const club = { id: d.id, name: data.name ?? "Club", isPrivate: Boolean(data.isPrivate) };
             setUserClub(club);
-            setUserProfile((prev) => prev ? { ...prev, clubId: club.id } : null);
         } else {
             setUserClub(null);
-            setUserProfile((prev) => prev ? { ...prev, clubId: null } : null);
         }
     });
     return unsub;

@@ -1,10 +1,9 @@
-// hooks/club-context.tsx
 import React, {
-    createContext,
-    useContext,
-    useEffect,
-    useRef,
-    useState,
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
 } from "react";
 
 import { db } from "@/firebaseConfig";
@@ -12,19 +11,18 @@ import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 
 import { useUser } from "@/hooks/user-context";
 import {
-    createClub,
-    deleteClub as deleteClubService,
-    demoteOfficer,
-    joinClub,
-    leaveClub as leaveClubService,
-    promoteOfficer,
-    transferOwnership as transferOwnershipService,
-    updateClubFirebase,
+  createClub,
+  deleteClub as deleteClubService,
+  demoteOfficer,
+  joinClub,
+  leaveClub as leaveClubService,
+  promoteOfficer,
+  removeMember as removeMemberService,
+  transferOwnership as transferOwnershipService,
+  updateClubFirebase,
 } from "@/services/clubs";
 
-// -------------------------------------------------------------
 // TYPES
-// -------------------------------------------------------------
 export type ClubVisibility = "public" | "private";
 
 export type ClubInfo = {
@@ -48,37 +46,20 @@ export type ClubMember = {
   points: number;
 };
 
-// This is the ONLY ClubContextType we keep
 interface ClubContextType {
   joinedClub: ClubInfo | null;
   members: ClubMember[];
-
-  // all async to match your current usage
-  createClub: (c: {
-    name: string;
-    desc: string;
-    visibility: ClubVisibility;
-    emoji?: string;
-    photoUri?: string;
-    city: string;
-  }) => Promise<ClubInfo | void>;
-
+  createClub: (c: any) => Promise<ClubInfo | void>;
   joinClub: (clubId: string) => Promise<void>;
   leaveClub: (clubId?: string) => Promise<void>;
-
-  updateClub: (
-    data: Partial<Omit<ClubInfo, "id" | "participants">>
-  ) => Promise<void>;
-
+  updateClub: (data: any) => Promise<void>;
   promoteToOfficer: (uid: string) => Promise<void>;
   demoteOfficer: (uid: string) => Promise<void>;
   transferOwnership: (uid: string, clubId?: string) => Promise<void>;
   deleteClub: (clubId?: string) => Promise<void>;
+  removeMember: (uid: string) => Promise<void>;
 }
 
-// -------------------------------------------------------------
-// CONTEXT + DEFAULT VALUE
-// -------------------------------------------------------------
 const ClubContext = createContext<ClubContextType>({
   joinedClub: null,
   members: [],
@@ -90,17 +71,16 @@ const ClubContext = createContext<ClubContextType>({
   demoteOfficer: async () => {},
   transferOwnership: async () => {},
   deleteClub: async () => {},
+  removeMember: async () => {},
 });
 
-// -------------------------------------------------------------
-// PROVIDER
-// -------------------------------------------------------------
 export const ClubProvider = ({ children }: { children: React.ReactNode }) => {
   const [joinedClub, setJoinedClub] = useState<ClubInfo | null>(null);
   const [members, setMembers] = useState<ClubMember[]>([]);
   const { user } = useUser();
   const memberUnsubs = useRef<Record<string, () => void>>({});
 
+  // Nettoyage des écouteurs membres
   const cleanupMemberListeners = () => {
     Object.values(memberUnsubs.current).forEach((unsub) => unsub());
     memberUnsubs.current = {};
@@ -118,18 +98,10 @@ export const ClubProvider = ({ children }: { children: React.ReactNode }) => {
   const attachMember = (uid: string) => {
     if (memberUnsubs.current[uid]) return;
 
-    // placeholder entry to keep ordering while profile loads
+    // Placeholder pour éviter le saut visuel
     setMembers((prev) => {
       if (prev.some((m) => m.id === uid)) return prev;
-      const placeholder: ClubMember = {
-        id: uid,
-        name: "Membre",
-        avatar: null,
-        points: 0,
-      };
-      const next = [...prev, placeholder];
-      next.sort((a, b) => (b.points || 0) - (a.points || 0));
-      return next;
+      return [...prev, { id: uid, name: "...", avatar: null, points: 0 }];
     });
 
     const memberRef = doc(db, "users", uid);
@@ -139,20 +111,8 @@ export const ClubProvider = ({ children }: { children: React.ReactNode }) => {
         detachMember(uid);
         return;
       }
-
-      const displayName =
-        data.firstName ||
-        data.username ||
-        data.usernameLowercase ||
-        data.displayName ||
-        uid;
-
-      const avatarUri =
-        typeof data.photoURL === "string" && data.photoURL.length > 0
-          ? data.photoURL
-          : typeof data.avatar === "string" && data.avatar.length > 0
-          ? data.avatar
-          : null;
+      const displayName = data.firstName || data.username || data.usernameLowercase || uid;
+      const avatarUri = data.photoURL || data.avatar || data.photoUri || null;
 
       const nextMember: ClubMember = {
         id: uid,
@@ -172,20 +132,15 @@ export const ClubProvider = ({ children }: { children: React.ReactNode }) => {
 
   const syncClubMembers = (ids: string[]) => {
     const uniqueIds = Array.from(new Set(ids.filter((id) => typeof id === "string" && id.length > 0)));
-
     Object.keys(memberUnsubs.current).forEach((trackedId) => {
-      if (!uniqueIds.includes(trackedId)) {
-        detachMember(trackedId);
-      }
+      if (!uniqueIds.includes(trackedId)) detachMember(trackedId);
     });
-
-    uniqueIds.forEach((uid) => {
-      attachMember(uid);
-    });
+    uniqueIds.forEach((uid) => attachMember(uid));
   };
 
-  // Subscribe to the current user's club (via user context to ensure reactivity)
+  // Écouteur principal
   useEffect(() => {
+    // Si déconnecté, on vide tout
     if (!user?.uid) {
       setJoinedClub(null);
       cleanupMemberListeners();
@@ -194,37 +149,58 @@ export const ClubProvider = ({ children }: { children: React.ReactNode }) => {
 
     let unsubscribeClub: (() => void) | undefined;
 
+    // Fonction interne pour s'abonner
+    const subscribeToClubDoc = (clubId: string) => {
+        return onSnapshot(doc(db, "clubs", clubId), (snap) => {
+            const data: any = snap.data();
+            if (!data) {
+                // Le club n'existe plus ou erreur
+                setJoinedClub(null);
+                cleanupMemberListeners();
+                return;
+            }
+
+            const memberIds: string[] = Array.isArray(data.members) ? data.members : [];
+
+            setJoinedClub({
+                id: clubId,
+                name: data.name,
+                desc: data.description ?? data.desc,
+                city: data.city,
+                photoUri: data.photoUrl,
+                ownerId: data.ownerId,
+                visibility: data.isPrivate ? 'private' : 'public',
+                officers: data.officers || [],
+                participants: memberIds.length,
+                logo: data.logo,
+            });
+
+            syncClubMembers(memberIds);
+        });
+    };
+
     if (user.clubId) {
-      unsubscribeClub = subscribeToClub(user.clubId);
+      // Cas 1: On a l'ID direct
+      unsubscribeClub = subscribeToClubDoc(user.clubId);
     } else {
-      // If no explicit clubId on user, watch clubs collection for a club that contains this user
-      setJoinedClub(null);
-      cleanupMemberListeners();
+      // Cas 2: Fallback (recherche du club où on est membre)
       const q = query(collection(db, 'clubs'), where('members', 'array-contains', user.uid));
       const unsubQuery = onSnapshot(q, (snap) => {
         if (snap.docs.length > 0) {
-          const clubId = snap.docs[0].id;
-          // unsubscribe previous club listener if any
+          const foundClubId = snap.docs[0].id;
           if (unsubscribeClub) unsubscribeClub();
-          unsubscribeClub = subscribeToClub(clubId);
+          unsubscribeClub = subscribeToClubDoc(foundClubId);
         } else {
-          if (unsubscribeClub) {
-            unsubscribeClub();
-            unsubscribeClub = undefined;
-          }
           setJoinedClub(null);
           cleanupMemberListeners();
         }
       });
-
-      // ensure we clean the query listener on unmount
-      const origUnsub = unsubscribeClub;
-      const wrappedUnsubscribe = () => {
-        try { unsubQuery(); } catch (e) {}
-        try { if (origUnsub) origUnsub(); } catch (e) {}
+      // Cleanup spécial pour ce cas
+      return () => {
+          unsubQuery();
+          if (unsubscribeClub) unsubscribeClub();
+          cleanupMemberListeners();
       };
-      // replace unsubscribeClub with wrapped so outer return() will call it
-      unsubscribeClub = wrappedUnsubscribe;
     }
 
     return () => {
@@ -233,117 +209,55 @@ export const ClubProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, [user?.uid, user?.clubId]);
 
-  // subscribe to club doc itself
-  const subscribeToClub = (clubId: string) => {
-    const clubRef = doc(db, "clubs", clubId);
-    const unsubscribe = onSnapshot(clubRef, (snap) => {
-      const data: any = snap.data();
-      if (!data) {
-        setJoinedClub(null);
-        cleanupMemberListeners();
-        return;
-      }
-
-      const memberIds: string[] = Array.isArray(data.members)
-        ? data.members
-        : [];
-
-      setJoinedClub({
-        id: clubId,
-        name: data.name,
-        desc: data.description ?? data.desc,
-        city: data.city,
-        photoUri: data.photoUrl,
-        ownerId: data.ownerId,
-        visibility: data.isPrivate ? 'private' : 'public',
-        officers: data.officers || [],
-        participants: memberIds.length,
-        logo: data.logo,
-      });
-
-      syncClubMembers(memberIds);
-    });
-    return () => {
-      unsubscribe();
-      cleanupMemberListeners();
-    };
-  };
-
-  // -----------------------------------------------------------
-  // VALUE IMPLEMENTATION (using services/clubs.ts)
-  // -----------------------------------------------------------
   const value: ClubContextType = {
     joinedClub,
     members,
-
     createClub: async (c) => {
-      // services/clubs.ts → createClub(name, city, description, photoUri?, isPrivate?)
-      const created = await createClub(
-        c.name,
-        c.city,
-        c.desc,
-        c.photoUri,
-        (c.visibility === 'private')
-      );
-      // created has same shape as payload + id
-      return {
-        ...created,
-        participants: 1, // creator is first participant
-      } as ClubInfo;
-
+      const created = await createClub(c.name, c.city, c.desc, c.photoUri, (c.visibility === 'private'));
+      return { ...created, participants: 1 } as ClubInfo;
     },
-
-    joinClub: async (clubId) => {
-      await joinClub(clubId);
-    },
-
+    joinClub: async (clubId) => await joinClub(clubId),
     leaveClub: async (clubId) => {
       const targetId = clubId ?? joinedClub?.id;
       if (!targetId) return;
-      await leaveClubService(targetId);
+      
+      try {
+          await leaveClubService(targetId);
+          // ✅ FORCER LE RESET LOCAL IMMÉDIATEMENT
+          if (targetId === joinedClub?.id) {
+              setJoinedClub(null);
+              setMembers([]);
+          }
+      } catch (e) {
+          throw e;
+      }
     },
-
     updateClub: async (data) => {
       if (!joinedClub?.id) return;
       await updateClubFirebase(joinedClub.id, {
         name: data.name,
-        description: data.desc,   // FIXED HERE
+        description: data.desc,
         city: data.city,
         photoUri: data.photoUri,
-        isPrivate: (data as any).visibility === 'private' || (data as any).isPrivate,
+        isPrivate: (data as any).visibility === 'private',
       });
     },
-
-
-    promoteToOfficer: async (uid) => {
-      if (!joinedClub?.id) return;
-      await promoteOfficer(joinedClub.id, uid);
-    },
-
-    demoteOfficer: async (uid) => {
-      if (!joinedClub?.id) return;
-      await demoteOfficer(joinedClub.id, uid);
-    },
-
+    promoteToOfficer: async (uid) => { if (joinedClub?.id) await promoteOfficer(joinedClub.id, uid); },
+    demoteOfficer: async (uid) => { if (joinedClub?.id) await demoteOfficer(joinedClub.id, uid); },
     transferOwnership: async (uid, clubId) => {
       const targetId = clubId ?? joinedClub?.id;
-      if (!targetId) return;
-      await transferOwnershipService(targetId, uid);
+      if (targetId) await transferOwnershipService(targetId, uid);
     },
-
     deleteClub: async (clubId) => {
       const targetId = clubId ?? joinedClub?.id;
-      if (!targetId) return;
-      await deleteClubService(targetId);
+      if (targetId) { await deleteClubService(targetId); setJoinedClub(null); }
     },
+    removeMember: async (uid) => {
+        if (joinedClub?.id) await removeMemberService(joinedClub.id, uid);
+    }
   };
 
-  return (
-    <ClubContext.Provider value={value}>{children}</ClubContext.Provider>
-  );
+  return <ClubContext.Provider value={value}>{children}</ClubContext.Provider>;
 };
 
-// -------------------------------------------------------------
-// HOOK
-// -------------------------------------------------------------
 export const useClub = () => useContext(ClubContext);
