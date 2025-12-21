@@ -11,12 +11,22 @@ type Props = {
   onSubscribe?: () => void;
 };
 
+// 🎨 LE NOUVEAU THEME (Juste les couleurs, pas de logique)
+const premiumTheme = {
+    glassBg: ["rgba(240, 253, 244, 0.95)", "rgba(255, 255, 255, 0.85)"] as const, // Fond Menthe
+    borderColor: "rgba(255, 255, 255, 0.6)",
+    price: "#008F6B", 
+    coralGradient: ["#FF9D7E", "#FF8C66"] as const, // Bouton Corail
+    textMain: "#0A3F33",
+    textMuted: "#4A665F"
+};
+
 export function PremiumCard({ onSubscribe }: Props) {
   const { colors, mode } = useThemeMode();
   const { user } = useUser(); // ✅ Récupération de l'utilisateur
   const [isPremium, setIsPremium] = useState(false); // ✅ État pour gérer la visibilité
 
-  // ✅ ÉCOUTEUR EN TEMPS RÉEL (Copie de la logique du Header)
+  // ✅ ÉCOUTEUR EN TEMPS RÉEL (Ta logique exacte conservée)
   useEffect(() => {
     if (!user?.uid) return;
 
@@ -40,28 +50,27 @@ export function PremiumCard({ onSubscribe }: Props) {
     return null;
   }
 
-  // --- Le reste du code d'affichage normal pour les non-premium ---
+  // --- RENDU VISUEL (Mise à jour Design uniquement) ---
 
   const isLight = mode === "light";
   const darkCardGradient = ["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"] as const;
-  const gradientColors = isLight
-    ? ([colors.cardAlt, colors.card] as const)
+  
+  // Changement ici : On utilise le thème Menthe si Light
+  const gradientColors = isLight 
+    ? premiumTheme.glassBg 
     : darkCardGradient;
-  const borderColor = isLight ? "rgba(255,255,255,0.12)" : "rgba(0, 151, 178, 0.3)";
-  const textPrimary = isLight ? colors.cardText : colors.text;
-  const textMuted = isLight ? colors.cardMuted : colors.mutedText;
-  const priceColor = colors.accent;
-  const buttonGradient = [
-    "#99E2B4",
-    "#88D4AB",
-    "#78C6A3",
-    "#67B99A",
-    "#56AB91",
-    "#469D89",
-    "#358F80",
-    "#248277",
-    "#14746F",
-  ] as const;
+    
+  const borderColor = isLight ? premiumTheme.borderColor : "rgba(0, 151, 178, 0.3)";
+  
+  const textPrimary = isLight ? premiumTheme.textMain : colors.text;
+  const textMuted = isLight ? premiumTheme.textMuted : colors.mutedText;
+  const priceColor = isLight ? premiumTheme.price : colors.accent;
+  
+  // Bouton : Corail en Light, Vert en Dark
+  const buttonGradient = isLight 
+    ? premiumTheme.coralGradient 
+    : ["#99E2B4", "#14746F"] as const;
+    
   const buttonTextColor = "#FFFFFF";
 
   return (
@@ -69,7 +78,11 @@ export function PremiumCard({ onSubscribe }: Props) {
       colors={gradientColors}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={[styles.card, { borderColor }]}
+      style={[
+          styles.card, 
+          { borderColor },
+          isLight && styles.lightShadow // Ajout de l'ombre douce
+      ]}
     >
       <Text style={[styles.title, { color: textPrimary }]}>Premium Green+</Text>
       <Text style={[styles.subtitle, { color: textMuted }]}>Masque les publicités et reroll tes défis quotidiens </Text>
@@ -99,6 +112,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     position: "relative",
   },
+  // Style ajouté pour l'effet "glace" en relief
+  lightShadow: { 
+      shadowColor: "#005c4b", 
+      shadowOffset: { width: 0, height: 8 }, 
+      shadowOpacity: 0.06, 
+      shadowRadius: 16, 
+      elevation: 3 
+  },
   title: { fontSize: 20, fontFamily: FontFamilies.heading },
   subtitle: { marginTop: 8, lineHeight: 20, fontFamily: FontFamilies.headingMedium },
   price: { marginTop: 14, fontSize: 22, fontFamily: FontFamilies.heading },
@@ -106,6 +127,12 @@ const styles = StyleSheet.create({
   button: {
     marginTop: 16,
     borderRadius: 22,
+    // Ombre sous le bouton pour le peps
+    shadowColor: "rgba(255, 140, 102, 0.4)", 
+    shadowOffset: { width: 0, height: 4 }, 
+    shadowOpacity: 0.5, 
+    shadowRadius: 8, 
+    elevation: 3 
   },
   buttonGradient: {
     borderRadius: 22,
@@ -116,4 +143,5 @@ const styles = StyleSheet.create({
   buttonText: { fontSize: 16, fontFamily: FontFamilies.heading },
 });
 
+// Gardé pour compatibilité si tu l'utilises avec import default ailleurs
 export default PremiumCard;
