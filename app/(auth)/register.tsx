@@ -1,33 +1,48 @@
+import { FontFamilies } from "@/constants/fonts";
+import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient"; // ✅ AJOUT
 import { useRouter } from "expo-router";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { collection, doc, getDocs, query, serverTimestamp, setDoc, where } from "firebase/firestore";
 import React, { useMemo, useState } from "react";
 import {
-    Alert,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
 import { auth, db } from "../../firebaseConfig";
-import { useThemeMode } from "../../hooks/theme-context";
+
+// 🎨 THEME AUTH (Même que Login)
+const authTheme = {
+    bgGradient: ["#DDF7E8", "#F4FDF9"] as const,
+    glassCardBg: ["rgba(255, 255, 255, 0.9)", "rgba(255, 255, 255, 0.7)"] as const,
+    glassBorder: "rgba(255, 255, 255, 0.8)",
+    inputBg: "rgba(255, 255, 255, 0.6)",
+    inputBorder: "rgba(0, 143, 107, 0.15)",
+    textMain: "#0A3F33", 
+    textMuted: "#4A665F",
+    accent: "#008F6B",
+    error: "#EF4444",
+};
 
 export default function Register() {
   const router = useRouter();
   const { colors, mode } = useThemeMode();
+  const isLight = mode === "light";
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [postalCode, setPostalCode] = useState("");
   const [postalErrorMessage, setPostalErrorMessage] = useState<string | null>(null);
   const [birthErrorMessage, setBirthErrorMessage] = useState<string | null>(null);
-  const [birthDate, setBirthDate] = useState(""); // dd/mm/yyyy
+  const [birthDate, setBirthDate] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [policyAccepted, setPolicyAccepted] = useState(false);
@@ -43,7 +58,6 @@ export default function Register() {
   }
 
   function formatBirthInput(raw: string) {
-    // keep digits only and insert slashes dd/mm/yyyy
     const digits = raw.replace(/[^0-9]/g, "");
     let out = digits.slice(0, 8);
     if (out.length >= 5) {
@@ -55,7 +69,6 @@ export default function Register() {
   }
 
   function validateBirthDate(input: string) {
-    // expect dd/mm/yyyy
     const parts = input.split("/");
     if (parts.length !== 3) return false;
     const d = parseInt(parts[0], 10);
@@ -66,7 +79,6 @@ export default function Register() {
     if (m < 1 || m > 12) return false;
     const maxDay = new Date(y, m, 0).getDate();
     if (d < 1 || d > maxDay) return false;
-    // age >= 13
     const birth = new Date(y, m - 1, d);
     const minDate = new Date();
     minDate.setFullYear(minDate.getFullYear() - 13);
@@ -79,7 +91,7 @@ export default function Register() {
     const match = addr.trim().toLowerCase().match(/^([a-z0-9._%+-]+)@([a-z0-9.-]+)$/i);
     if (!match) return false;
     const domain = match[2];
-    const allowed = ["gmail.com", "yahoo.com", "outlook.com", "hotmail.com"];
+    const allowed = ["gmail.com", "yahoo.com", "outlook.com", "hotmail.com", "icloud.com"]; // Ajout icloud
     return allowed.includes(domain);
   }
 
@@ -88,8 +100,6 @@ export default function Register() {
     const digits = code.trim();
     if (!/^\d{4}$/.test(digits)) return false;
     const n = parseInt(digits, 10);
-    // Belgian postal codes are four-digit numbers (typically 1000-9999)
-    // Require between 1000 and 9999 to avoid leading-zero or too-small values.
     if (n < 1000 || n > 9999) return false;
     return true;
   }
@@ -107,49 +117,29 @@ export default function Register() {
   }, [firstName, lastName, postalCode, birthDate, email, password, policyAccepted]);
 
   async function handleRegister() {
-    // validate fields and mark errors
     let hasError = false;
     setErrors({});
     let emailInvalid = false;
 
     if (!firstName || firstName.trim().length < 2) { setFieldError("firstName"); hasError = true; }
     if (!lastName || lastName.trim().length < 2) { setFieldError("lastName"); hasError = true; }
-    if (!validateBelgianPostal(postalCode)) { setFieldError("postalCode"); hasError = true; setPostalErrorMessage("Format requis : 4 chiffres (code postal belge)"); }
+    if (!validateBelgianPostal(postalCode)) { setFieldError("postalCode"); hasError = true; setPostalErrorMessage("Format requis : 4 chiffres"); }
     if (!validateBirthDate(birthDate)) {
-      // Determine whether it's a format issue or the user is too young
-      const parts = birthDate.split("/");
-      let birthTooYoung = false;
-      if (parts.length === 3) {
-        const d = parseInt(parts[0], 10);
-        const m = parseInt(parts[1], 10);
-        const y = parseInt(parts[2], 10);
-        if (!isNaN(d) && !isNaN(m) && !isNaN(y)) {
-          const birth = new Date(y, m - 1, d);
-          const minDate = new Date();
-          minDate.setFullYear(minDate.getFullYear() - 13);
-          if (birth > minDate) birthTooYoung = true;
-        }
-      }
       setFieldError("birthDate");
       hasError = true;
-      if (birthTooYoung) setBirthErrorMessage("Minimum 13 ans");
-      else setBirthErrorMessage("Date invalide (JJ/MM/AAAA)");
+      setBirthErrorMessage("Date invalide (JJ/MM/AAAA) ou < 13 ans");
     }
-    if (!validateEmailDomain(email)) { setFieldError("email"); hasError = true; emailInvalid = true; setEmailErrorMessage("Format requis : @gmail.com, @hotmail.com, @yahoo.com ou @outlook.com"); }
+    if (!validateEmailDomain(email)) { setFieldError("email"); hasError = true; emailInvalid = true; setEmailErrorMessage("Domaine non autorisé (@gmail, @outlook...)"); }
     if (!password || password.length < 6) { setFieldError("password"); hasError = true; }
     if (!policyAccepted) { setFieldError("policy"); hasError = true; }
 
     if (hasError) {
-      // If any inline error messages are set, avoid showing a blocking alert
-      if (emailInvalid || postalErrorMessage || birthErrorMessage) {
-        // inline messages will guide the user
-      } else {
-        Alert.alert("Informations invalides", "Veuillez corriger les champs en rouge.");
+      if (!emailInvalid && !postalErrorMessage && !birthErrorMessage) {
+        Alert.alert("Oups !", "Veuillez corriger les champs en rouge.");
       }
       return;
     }
 
-    // Check if email already exists in Firestore users collection
     try {
       const q = query(collection(db, "users"), where("email", "==", email.trim().toLowerCase()));
       const snaps = await getDocs(q);
@@ -159,20 +149,13 @@ export default function Register() {
         return;
       }
     } catch (err) {
-      console.warn("Erreur vérification email existant", err);
+      console.warn("Erreur vérification email", err);
     }
 
     try {
-      // 1️⃣ Create account in Firebase Auth
-      const result = await createUserWithEmailAndPassword(
-        auth,
-        email.trim(),
-        password
-      );
-
+      const result = await createUserWithEmailAndPassword(auth, email.trim(), password);
       const uid = result.user.uid;
 
-      // 2️⃣ Create Firestore user profile (include friend system fields)
       await setDoc(doc(db, "users", uid), {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -192,12 +175,12 @@ export default function Register() {
         pendingReceived: [],
       });
 
-      Alert.alert("Compte créé", "Votre compte a été créé avec succès !");
+      Alert.alert("Bienvenue !", "Votre compte a été créé avec succès.");
       router.replace("/acceuil");
 
     } catch (e: any) {
       const code = e?.code || "";
-      if (code.includes("email-already-in-use") || code.includes("auth/email-already-in-use")) {
+      if (code.includes("email-already-in-use")) {
         setFieldError("email");
         setEmailErrorMessage("Compte déjà existant");
       } else {
@@ -206,68 +189,87 @@ export default function Register() {
     }
   }
 
+  // Couleurs dynamiques
+  const textColor = isLight ? authTheme.textMain : colors.text;
+  const mutedColor = isLight ? authTheme.textMuted : colors.mutedText;
+  const inputBg = isLight ? authTheme.inputBg : colors.surfaceAlt;
+  const inputBorder = isLight ? authTheme.inputBorder : "transparent";
+
+  const Wrapper = isLight ? LinearGradient : View;
+  const wrapperProps = isLight 
+    ? { colors: authTheme.bgGradient, style: styles.root } 
+    : { style: [styles.root, { backgroundColor: "#021114" }] };
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <Wrapper {...(wrapperProps as any)}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          <View style={styles.logoRow}>
-            <Image
-              source={
-                mode === "light"
-                  ? require("../../assets/images/logo_Green_UP_noir_degradé-removebg-preview.png")
-                  : require("../../assets/images/logo_fond_vert_degradé__1_-removebg-preview.png")
-              }
-              style={{ width: 340, height: 152 }}
-              resizeMode="contain"
-            />
+          {/* HEADER AVEC RETOUR */}
+          <View style={styles.header}>
+             <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+                <Ionicons name="arrow-back" size={24} color={textColor} />
+             </TouchableOpacity>
+             <Text style={[styles.headerTitle, { color: textColor }]}>Créer un compte</Text>
+             <View style={{ width: 40 }} />
           </View>
 
-          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardAlt }]}>
-            <Text style={[styles.title, { color: colors.text }]}>Créer un compte</Text>
+          {/* CARD FORMULAIRE */}
+          <LinearGradient
+            colors={isLight ? authTheme.glassCardBg : ["rgba(255,255,255,0.05)", "rgba(255,255,255,0.02)"]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={[
+                styles.card, 
+                { borderColor: isLight ? authTheme.glassBorder : "rgba(255,255,255,0.1)", borderWidth: 1 }
+            ]}
+          >
+            {/* PRÉNOM & NOM */}
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+                <View style={{ flex: 1 }}>
+                    <TextInput
+                        style={[styles.input, { backgroundColor: inputBg, borderColor: errors["firstName"] ? authTheme.error : inputBorder, color: textColor }]}
+                        placeholder="Prénom"
+                        placeholderTextColor={mutedColor}
+                        value={firstName}
+                        onChangeText={(t) => { setFirstName(t); if (errors["firstName"]) clearFieldError("firstName"); }}
+                    />
+                </View>
+                <View style={{ flex: 1 }}>
+                    <TextInput
+                        style={[styles.input, { backgroundColor: inputBg, borderColor: errors["lastName"] ? authTheme.error : inputBorder, color: textColor }]}
+                        placeholder="Nom"
+                        placeholderTextColor={mutedColor}
+                        value={lastName}
+                        onChangeText={(t) => { setLastName(t); if (errors["lastName"]) clearFieldError("lastName"); }}
+                    />
+                </View>
+            </View>
 
+            {/* CODE POSTAL */}
             <TextInput
-              style={[styles.input, { backgroundColor: colors.surfaceAlt, borderColor: colors.cardAlt, color: colors.text }, errors["firstName"] && { borderColor: "#FF4D4F" }]}
-              placeholder="Prénom"
-              placeholderTextColor={colors.mutedText}
-              value={firstName}
-              onChangeText={(t) => { setFirstName(t); if (errors["firstName"]) clearFieldError("firstName"); }}
-            />
-
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.surfaceAlt, borderColor: colors.cardAlt, color: colors.text }, errors["lastName"] && { borderColor: "#FF4D4F" }]}
-              placeholder="Nom"
-              placeholderTextColor={colors.mutedText}
-              value={lastName}
-              onChangeText={(t) => { setLastName(t); if (errors["lastName"]) clearFieldError("lastName"); }}
-            />
-
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.surfaceAlt, borderColor: colors.cardAlt, color: colors.text }, errors["postalCode"] && { borderColor: "#FF4D4F" }]}
-              placeholder="Code postal"
-              placeholderTextColor={colors.mutedText}
+              style={[styles.input, { backgroundColor: inputBg, borderColor: errors["postalCode"] ? authTheme.error : inputBorder, color: textColor }]}
+              placeholder="Code postal (Belgique)"
+              placeholderTextColor={mutedColor}
               keyboardType="numeric"
+              maxLength={4}
               value={postalCode}
               onChangeText={(t) => { setPostalCode(t); if (errors["postalCode"]) clearFieldError("postalCode"); if (postalErrorMessage) setPostalErrorMessage(null); }}
             />
+            {postalErrorMessage && <Text style={[styles.errorText, { color: authTheme.error }]}>{postalErrorMessage}</Text>}
 
-            {postalErrorMessage ? (
-              <Text style={[styles.errorTextInline, { color: "#FF4D4F", marginBottom: 10 }]}>{postalErrorMessage}</Text>
-            ) : null}
-
+            {/* DATE DE NAISSANCE */}
             <TextInput
-              style={[
-                styles.input,
-                { backgroundColor: colors.surfaceAlt, borderColor: colors.cardAlt, color: colors.text },
-                errors["birthDate"] && { borderColor: "#FF4D4F" },
-              ]}
+              style={[styles.input, { backgroundColor: inputBg, borderColor: errors["birthDate"] ? authTheme.error : inputBorder, color: textColor }]}
               placeholder="Date de naissance (JJ/MM/AAAA)"
-              placeholderTextColor={colors.mutedText}
+              placeholderTextColor={mutedColor}
+              keyboardType="numeric"
+              maxLength={10}
               value={birthDate}
               onChangeText={(t) => {
                 const f = formatBirthInput(t);
@@ -276,103 +278,83 @@ export default function Register() {
                 if (birthErrorMessage) setBirthErrorMessage(null);
               }}
             />
+            {birthErrorMessage && <Text style={[styles.errorText, { color: authTheme.error }]}>{birthErrorMessage}</Text>}
 
-            {birthErrorMessage ? (
-              <Text style={[styles.errorTextInline, { color: "#FF4D4F", marginBottom: 10 }]}>{birthErrorMessage}</Text>
-            ) : null}
-
+            {/* EMAIL */}
             <TextInput
-              style={[styles.input, { backgroundColor: colors.surfaceAlt, borderColor: colors.cardAlt, color: colors.text }, errors["email"] && { borderColor: "#FF4D4F" }]}
+              style={[styles.input, { backgroundColor: inputBg, borderColor: errors["email"] ? authTheme.error : inputBorder, color: textColor }]}
               placeholder="Email"
-              placeholderTextColor={colors.mutedText}
+              placeholderTextColor={mutedColor}
               autoCapitalize="none"
               keyboardType="email-address"
               value={email}
               onChangeText={(t) => { setEmail(t); if (errors["email"]) clearFieldError("email"); if (emailErrorMessage) setEmailErrorMessage(null); }}
             />
+            {emailErrorMessage && <Text style={[styles.errorText, { color: authTheme.error }]}>{emailErrorMessage}</Text>}
 
-            {emailErrorMessage ? (
-              <Text style={[styles.errorTextInline, { color: "#FF4D4F", marginBottom: 10 }]}>{emailErrorMessage}</Text>
-            ) : null}
-
+            {/* MOT DE PASSE */}
             <TextInput
-              style={[styles.input, { backgroundColor: colors.surfaceAlt, borderColor: colors.cardAlt, color: colors.text }, errors["password"] && { borderColor: "#FF4D4F" }]}
+              style={[styles.input, { backgroundColor: inputBg, borderColor: errors["password"] ? authTheme.error : inputBorder, color: textColor }]}
               placeholder="Mot de passe (min. 6 caractères)"
-              placeholderTextColor={colors.mutedText}
+              placeholderTextColor={mutedColor}
               secureTextEntry
               value={password}
               onChangeText={(t) => { setPassword(t); if (errors["password"]) clearFieldError("password"); }}
             />
 
-            <View style={styles.policyRow}>
-              <Pressable
-                onPress={() => setPolicyAccepted((prev) => !prev)}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: policyAccepted }}
-              >
-                <View style={[styles.checkbox, { borderColor: colors.accent, backgroundColor: policyAccepted ? colors.accent : "transparent" }]}>
-                  {policyAccepted ? <Ionicons name="checkmark" size={16} color="#00231A" /> : null}
+            {/* CHECKBOX POLICY */}
+            <TouchableOpacity onPress={() => setPolicyAccepted(!policyAccepted)} style={styles.policyRow}>
+                <View style={[
+                    styles.checkbox, 
+                    { borderColor: errors["policy"] ? authTheme.error : (policyAccepted ? authTheme.accent : mutedColor), backgroundColor: policyAccepted ? authTheme.accent : "transparent" }
+                ]}>
+                  {policyAccepted && <Ionicons name="checkmark" size={14} color="#FFF" />}
                 </View>
-              </Pressable>
-              <Text style={[styles.policyText, { color: colors.mutedText }]}>
-                J&apos;accepte la
-                {" "}
-                <Text
-                  style={[styles.policyLink, { color: colors.accent }]}
-                  onPress={() => router.push("/politique-de-confidentialite")}
-                >
-                  politique de confidentialité
+                <Text style={[styles.policyText, { color: mutedColor }]}>
+                  J'accepte la <Text style={{ color: isLight ? authTheme.accent : colors.accent, fontWeight: "700" }} onPress={() => router.push("/politique-de-confidentialite")}>politique de confidentialité</Text> de GreenUp.
                 </Text>
-                {" "}
-                de GreenUp.
-              </Text>
-            </View>
+            </TouchableOpacity>
 
-            <Pressable
-              style={[styles.btn, { backgroundColor: colors.accent }, !canSubmit && styles.btnDisabled]}
+            {/* REGISTER BUTTON */}
+            <TouchableOpacity
               onPress={handleRegister}
+              disabled={!canSubmit}
+              activeOpacity={0.9}
+              style={{ shadowColor: authTheme.accent, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: {width: 0, height: 4}, elevation: 4, marginTop: 10 }}
             >
-              <Text style={styles.btnText}>Créer un compte</Text>
-            </Pressable>
+                <LinearGradient
+                    colors={!canSubmit ? ["#A0AEC0", "#CBD5E0"] : ["#008F6B", "#10B981"]}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                    style={styles.primaryBtn}
+                >
+                    <Text style={styles.btnText}>Créer un compte</Text>
+                    {canSubmit && <Ionicons name="arrow-forward" size={18} color="#FFF" style={{ marginLeft: 8 }} />}
+                </LinearGradient>
+            </TouchableOpacity>
 
-            <Pressable onPress={() => router.push("/login")}> 
-              <Text style={[styles.link, { color: colors.accent }]}>Déjà un compte ? Se connecter</Text>
-            </Pressable>
-          </View>
+            {/* LOGIN LINK */}
+            <TouchableOpacity onPress={() => router.push("/login")} style={{ marginTop: 20, alignItems: 'center' }}>
+                <Text style={{ color: isLight ? authTheme.accent : colors.accent, fontWeight: "700", fontSize: 14 }}>Déjà un compte ? Se connecter</Text>
+            </TouchableOpacity>
+
+          </LinearGradient>
         </ScrollView>
-      </View>
+      </Wrapper>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 24,
-    paddingBottom: 48,
-    paddingTop: 70,
-  },
-  logoRow: {
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  logo: {
-    width: 340,
-    height: 152,
-  },
+  root: { flex: 1 },
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 40, paddingTop: 60 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
+  backBtn: { padding: 8, borderRadius: 12, backgroundColor: "rgba(0,0,0,0.05)" },
+  headerTitle: { fontSize: 22, fontWeight: "800", fontFamily: FontFamilies.heading },
   card: {
-    borderRadius: 28,
+    borderRadius: 30,
     paddingHorizontal: 24,
-    paddingVertical: 32,
-    borderWidth: 1,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    textAlign: "center",
-    marginBottom: 24,
+    paddingVertical: 30,
+    shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 20, elevation: 5
   },
   input: {
     borderRadius: 16,
@@ -380,50 +362,13 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderWidth: 1,
     fontWeight: "600",
+    fontSize: 15,
     marginBottom: 16,
   },
-  btn: {
-    paddingVertical: 16,
-    borderRadius: 24,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  btnDisabled: {
-    opacity: 0.5,
-  },
-  btnText: { color: "#00231A", fontWeight: "700", fontSize: 16 },
-  policyRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 12,
-  },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  checkboxChecked: {
-    // Handled dynamically
-  },
-  policyText: {
-    fontSize: 12,
-    lineHeight: 18,
-    flex: 1,
-  },
-  policyLink: {
-    fontWeight: "700",
-    textDecorationLine: "underline",
-  },
-  link: { marginTop: 18, textAlign: "center", fontWeight: "600" },
-  inputError: {
-    borderColor: "#FF4D4F",
-  },
-  errorTextInline: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
+  primaryBtn: { borderRadius: 20, paddingVertical: 16, flexDirection: 'row', alignItems: "center", justifyContent: 'center' },
+  btnText: { fontSize: 16, fontWeight: "700", color: "#FFFFFF", letterSpacing: 0.5 },
+  policyRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: 20, marginTop: 4 },
+  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, alignItems: "center", justifyContent: "center", marginRight: 10, marginTop: 2 },
+  policyText: { fontSize: 13, lineHeight: 20, flex: 1 },
+  errorText: { fontSize: 12, fontWeight: "600", marginTop: -12, marginBottom: 12, marginLeft: 4 },
 });

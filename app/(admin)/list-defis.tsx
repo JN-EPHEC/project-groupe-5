@@ -1,5 +1,6 @@
 import { AdminNav } from "@/components/ui/(admin)/AdminNav";
 import { DeleteConfirmModal } from "@/components/ui/(admin)/DeleteConfirmModal";
+import { FontFamilies } from "@/constants/fonts";
 import { db } from "@/firebaseConfig";
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,6 +19,19 @@ import {
   UIManager,
   View,
 } from "react-native";
+
+// 🎨 THEME ADMIN LIST
+const listTheme = {
+    bgGradient: ["#F9FAFB", "#F3F4F6"] as const,
+    glassCardBg: ["#FFFFFF", "rgba(255, 255, 255, 0.8)"] as const,
+    borderColor: "rgba(0, 0, 0, 0.05)",
+    textMain: "#111827",
+    textMuted: "#6B7280",
+    accent: "#008F6B",
+    danger: "#EF4444",
+    tagBg: "#E0F2FE", // Bleu clair pour catégorie
+    tagText: "#0284C7",
+};
 
 type Defi = {
   id: string;
@@ -45,7 +59,6 @@ export default function ListDefisScreen() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "rotation" | "inactive">("all");
 
-  // DELETE MODAL STATE
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
@@ -66,41 +79,52 @@ export default function ListDefisScreen() {
     .filter((d) => (filter === "all" ? true : d.statut === filter));
 
   const difficultyColor = (d: string) =>
-    d === "facile" ? "#52D192" : d === "moyen" ? "#F4C95D" : "#F45B69";
+    d === "facile" ? "#10B981" : d === "moyen" ? "#F59E0B" : "#EF4444";
+
+  // Couleurs dynamiques
+  const titleColor = isDark ? "#FFF" : listTheme.textMain;
+  const mutedColor = isDark ? "#9CA3AF" : listTheme.textMuted;
+  const cardBorder = isDark ? "rgba(255,255,255,0.1)" : listTheme.borderColor;
+  const bgColors = isDark ? [colors.background, "#1F2937"] : listTheme.bgGradient;
 
   return (
     <View style={{ flex: 1 }}>
       <Stack.Screen options={{ headerShown: false }} />
 
-       {/* 🟢 BACKGROUND LIQUIDE */}
+       {/* FOND */}
        <LinearGradient
-        colors={isDark ? [colors.background, "#0f2027", "#203a43"] : ["#d1fae5", "#cffafe", "#ffffff"]}
+        colors={bgColors as any}
         style={StyleSheet.absoluteFill}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       />
 
       <View style={styles.headerContainer}>
-        {/* Suppression du bouton back ici car il est dans le layout */}
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
+        {/* Bouton retour personnalisé pour cohérence */}
+        <TouchableOpacity onPress={() => router.back()} style={[styles.backBtn, { backgroundColor: isDark ? "rgba(255,255,255,0.1)" : "#FFF" }]}>
+            <Ionicons name="arrow-back" size={20} color={titleColor} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: titleColor }]}>
           Catalogue Défis
         </Text>
+        <View style={{ width: 40 }} /> 
       </View>
 
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
+        contentContainerStyle={{ padding: 24, paddingBottom: 100 }}
+        showsVerticalScrollIndicator={false}
       >
         {/* SEARCH BAR */}
         <View style={[styles.searchContainer, { 
-            backgroundColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.6)",
-            borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.5)"
+            backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "#FFF",
+            borderColor: cardBorder
         }]}>
-          <Ionicons name="search" size={20} color={colors.mutedText} />
+          <Ionicons name="search" size={20} color={mutedColor} />
           <TextInput
-            style={[styles.searchInput, { color: colors.text }]}
+            style={[styles.searchInput, { color: titleColor }]}
             placeholder="Rechercher un défi..."
-            placeholderTextColor={colors.mutedText}
+            placeholderTextColor={mutedColor}
             value={search}
             onChangeText={setSearch}
           />
@@ -118,18 +142,17 @@ export default function ListDefisScreen() {
               style={[
                 styles.filterBtn,
                 { 
-                    backgroundColor: filter === f.key ? colors.accent : "rgba(0,0,0,0.05)",
-                    borderWidth: 1,
-                    borderColor: filter === f.key ? colors.accent : "rgba(0,0,0,0.05)"
+                    backgroundColor: filter === f.key ? listTheme.accent : (isDark ? "rgba(255,255,255,0.05)" : "#FFF"),
+                    borderColor: filter === f.key ? listTheme.accent : cardBorder
                 },
               ]}
               onPress={() => setFilter(f.key as any)}
             >
               <Text
                 style={{
-                  color: filter === f.key ? "#fff" : colors.mutedText,
+                  color: filter === f.key ? "#fff" : mutedColor,
                   fontWeight: "700",
-                  fontSize: 10,
+                  fontSize: 11,
                 }}
               >
                 {f.label}
@@ -139,7 +162,7 @@ export default function ListDefisScreen() {
         </View>
 
         {/* LIST */}
-        <View style={{ gap: 12 }}>
+        <View style={{ gap: 16 }}>
         {filtered.map((d) => {
           const isOpen = expanded === d.id;
 
@@ -154,8 +177,8 @@ export default function ListDefisScreen() {
               style={[
                   styles.glassCard, 
                   { 
-                      backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.65)",
-                      borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.5)"
+                      backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "#FFF",
+                      borderColor: cardBorder
                   }
               ]}
             >
@@ -166,75 +189,80 @@ export default function ListDefisScreen() {
                 <View style={[styles.iconBox, { backgroundColor: d.categorie === 'club' ? "#E0F2FE" : "#F3E8FF" }]}>
                     <Ionicons 
                         name={d.categorie === 'club' ? "people" : "person"} 
-                        size={18} 
+                        size={20} 
                         color={d.categorie === 'club' ? "#0284C7" : "#9333EA"} 
                     />
                 </View>
 
                 <View style={{ flex: 1 }}>
-                    <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={1}>
+                    <Text style={[styles.rowTitle, { color: titleColor }]} numberOfLines={1}>
                         {d.titre}
                     </Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
                         <View
                             style={[
                                 styles.statusBadge,
-                                { backgroundColor: d.statut === "rotation" ? "#3498DB" : "#94A3B8" },
+                                { backgroundColor: d.statut === "rotation" ? "#DCFCE7" : "#F3F4F6" },
                             ]}
                             >
-                            <Text style={styles.statusText}>
+                            <Text style={[styles.statusText, { color: d.statut === "rotation" ? "#15803D" : "#6B7280" }]}>
                                 {d.statut === "rotation" ? "ACTIF" : "OFF"}
                             </Text>
                         </View>
-                        <Text style={{ fontSize: 11, color: colors.mutedText }}>• {d.points} pts</Text>
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: listTheme.accent }}>{d.points} pts</Text>
                     </View>
                 </View>
 
                 {/* Bouton Chevron */}
-                <Ionicons 
-                    name={isOpen ? "chevron-up" : "chevron-down"} 
-                    size={20} 
-                    color={colors.mutedText} 
-                />
+                <View style={[styles.arrowBox, { backgroundColor: isDark ? "rgba(255,255,255,0.1)" : "#F9FAFB" }]}>
+                    <Ionicons 
+                        name={isOpen ? "chevron-up" : "chevron-down"} 
+                        size={16} 
+                        color={mutedColor} 
+                    />
+                </View>
               </View>
 
               {/* CONTENU ÉTENDU */}
               {isOpen && (
                 <View style={styles.expandedContent}>
-                  <View style={styles.divider} />
+                  <View style={[styles.divider, { backgroundColor: cardBorder }]} />
                   
-                  <Text style={{ color: colors.text, lineHeight: 20 }}>
+                  <Text style={{ color: mutedColor, lineHeight: 22, fontSize: 14 }}>
                     {d.description}
                   </Text>
 
                   <View style={styles.metaRow}>
                     <View style={styles.metaItem}>
                         <Text style={styles.metaLabel}>DIFFICULTÉ</Text>
-                        <Text style={{ color: difficultyColor(d.difficulte), fontWeight: "700" }}>
-                            {d.difficulte.toUpperCase()}
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: difficultyColor(d.difficulte) }} />
+                            <Text style={{ color: titleColor, fontWeight: "600", fontSize: 13, textTransform: 'capitalize' }}>
+                                {d.difficulte}
+                            </Text>
+                        </View>
                     </View>
                     <View style={styles.metaItem}>
                         <Text style={styles.metaLabel}>DURÉE</Text>
-                        <Text style={{ color: colors.text }}>{d.duree} jour(s)</Text>
+                        <Text style={{ color: titleColor, fontWeight: '600', fontSize: 13 }}>{d.duree} jours</Text>
                     </View>
                   </View>
 
                   {d.preuve && (
-                     <View style={[styles.preuveBox, { backgroundColor: isDark ? "rgba(0,0,0,0.3)" : "rgba(255,255,255,0.5)" }]}>
-                        <Text style={{ fontSize: 12, color: colors.mutedText, fontStyle: 'italic' }}>
-                            <Ionicons name="camera-outline" /> Preuve : {d.preuve}
+                      <View style={[styles.preuveBox, { backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "#F9FAFB", borderColor: cardBorder }]}>
+                        <Ionicons name="camera-outline" size={16} color={mutedColor} />
+                        <Text style={{ fontSize: 12, color: mutedColor, marginLeft: 6 }}>
+                            Preuve requise : {d.preuve}
                         </Text>
-                     </View>
+                      </View>
                   )}
 
                   {/* ACTIONS */}
                   <View style={styles.actionRow}>
                     <TouchableOpacity
                         onPress={() => router.push({ pathname: "/(admin)/create-defi", params: { id: d.id } })}
-                        style={[styles.actionBtn, { backgroundColor: colors.accent }]}
+                        style={[styles.actionBtn, { backgroundColor: listTheme.accent }]}
                     >
-                        <Ionicons name="pencil" size={16} color="#fff" />
                         <Text style={styles.actionBtnText}>Modifier</Text>
                     </TouchableOpacity>
 
@@ -244,10 +272,9 @@ export default function ListDefisScreen() {
                             setDeleteTargetId(d.id);
                             setDeleteModalVisible(true);
                         }}
-                        style={[styles.actionBtn, { backgroundColor: "#EF4444" }]}
+                        style={[styles.actionBtn, { backgroundColor: "#FFF", borderWidth: 1, borderColor: listTheme.danger }]}
                     >
-                        <Ionicons name="trash-outline" size={16} color="#fff" />
-                        <Text style={styles.actionBtnText}>Supprimer</Text>
+                        <Text style={[styles.actionBtnText, { color: listTheme.danger }]}>Supprimer</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -283,117 +310,136 @@ export default function ListDefisScreen() {
 const styles = StyleSheet.create({
   headerContainer: {
     paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 10,
+    paddingHorizontal: 24,
+    paddingBottom: 16,
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
   },
+  backBtn: {
+      padding: 8,
+      borderRadius: 12,
+      shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 4, elevation: 1
+  },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "800",
-    letterSpacing: 0.5,
-    marginLeft: 60, // Marge pour laisser la place au bouton retour flottant
+    fontFamily: FontFamilies.heading,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    height: 50,
-    borderRadius: 25,
+    height: 52,
+    borderRadius: 16,
     borderWidth: 1,
     marginBottom: 20,
   },
   searchInput: {
     flex: 1,
     marginLeft: 10,
-    fontSize: 16,
+    fontSize: 15,
+    fontFamily: FontFamilies.body
   },
   filterRow: {
     flexDirection: "row",
     gap: 8,
-    marginBottom: 20,
+    marginBottom: 24,
   },
   filterBtn: {
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
+    borderWidth: 1,
   },
   glassCard: {
-    borderRadius: 24,
+    borderRadius: 20,
     borderWidth: 1,
     padding: 16,
-    overflow: 'hidden'
+    overflow: 'hidden',
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
   },
   rowHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 16,
   },
   iconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
+    width: 48,
+    height: 48,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
   rowTitle: {
     fontSize: 16,
     fontWeight: "700",
-    marginBottom: 2,
+    fontFamily: FontFamilies.heading,
   },
   statusBadge: {
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
   },
   statusText: {
-    color: "#fff",
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: "800",
+    textTransform: 'uppercase'
+  },
+  arrowBox: {
+      width: 32, height: 32, borderRadius: 10,
+      alignItems: 'center', justifyContent: 'center'
   },
   expandedContent: {
-    marginTop: 12,
+    marginTop: 16,
   },
   divider: {
     height: 1,
-    backgroundColor: "rgba(0,0,0,0.05)",
-    marginBottom: 12,
+    marginBottom: 16,
   },
   metaRow: {
     flexDirection: 'row',
-    marginTop: 12,
-    gap: 20,
+    marginTop: 16,
+    gap: 32,
   },
   metaItem: {
-    gap: 2
+    gap: 4
   },
   metaLabel: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#9CA3AF'
+    color: '#9CA3AF',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5
   },
   preuveBox: {
-    marginTop: 12,
-    padding: 10,
-    borderRadius: 10,
+    marginTop: 16,
+    padding: 12,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
   },
   actionRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: 10,
-    marginTop: 16,
+    gap: 12,
+    marginTop: 20,
   },
   actionBtn: {
-    flexDirection: 'row',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 12,
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 14,
-    gap: 6
+    justifyContent: 'center'
   },
   actionBtnText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700'
   }
 });

@@ -1,4 +1,5 @@
 import { AdminNav } from "@/components/ui/(admin)/AdminNav";
+import { FontFamilies } from "@/constants/fonts";
 import { db } from "@/firebaseConfig";
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,24 +8,36 @@ import { Stack, useRouter } from "expo-router";
 import { collection, deleteDoc, doc, getDocs, orderBy, query, writeBatch } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Image,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from "react-native";
 
-// Type mis à jour avec les infos de preuve
+// 🎨 THEME ADMIN REPORTS
+const reportsTheme = {
+    bgGradient: ["#F9FAFB", "#F3F4F6"] as const,
+    glassCardBg: ["#FFFFFF", "rgba(255, 255, 255, 0.8)"] as const,
+    borderColor: "rgba(0, 0, 0, 0.05)",
+    textMain: "#111827",
+    textMuted: "#6B7280",
+    accent: "#008F6B",
+    danger: "#EF4444",
+    success: "#10B981",
+    warning: "#F59E0B",
+};
+
 type Report = {
   id: string;
   challengeId: string;
   challengeTitle: string;
-  proofId: string;         // ID de la preuve
-  proofContent: string;    // URL image ou Texte
+  proofId: string;
+  proofContent: string;
   proofType: 'image' | 'text';
   reason: string;
   reportedBy: string;
@@ -41,7 +54,6 @@ export default function AdminReports() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // 📥 Charger les signalements
   const loadReports = async () => {
     try {
       const q = query(collection(db, "reports"), orderBy("createdAt", "desc"));
@@ -60,70 +72,51 @@ export default function AdminReports() {
     loadReports();
   }, []);
 
-  // ⚖️ Gérer la modération (Accepter ou Refuser le signalement)
   const handleModeration = async (report: Report, action: 'SANCTION' | 'RESTORE') => {
     try {
       const batch = writeBatch(db);
-      
-      // Références
       const reportRef = doc(db, "reports", report.id);
-      // ⚠️ VERIFIE LE NOM DE TA COLLECTION DE PREUVES ICI (ex: "proofs", "posts", "validatedChallenges")
       const proofRef = doc(db, "preuves", report.proofId); 
 
       if (action === 'SANCTION') {
-        // 🔴 CAS 1 : Le signalement est vrai. On valide la sanction.
         batch.update(reportRef, { status: "accepted" });
-        batch.update(proofRef, { 
-          status: "BANNED", 
-          isVisible: false // Reste masqué
-        });
-        
-        // Mise à jour locale
+        batch.update(proofRef, { status: "BANNED", isVisible: false });
         setReports(prev => prev.map(r => r.id === report.id ? { ...r, status: "accepted" } : r));
-        Alert.alert("Sanctionné", "Le contenu a été définitivement supprimé/masqué.");
-
+        Alert.alert("Sanctionné", "Contenu masqué.");
       } else {
-        // 🟢 CAS 2 : Faux signalement. On restaure le contenu.
         batch.update(reportRef, { status: "rejected" });
-        batch.update(proofRef, { 
-          status: "VALIDATED", // Retour au statut normal
-          isVisible: true // Réapparaît dans le fil
-        });
-
-        // Mise à jour locale
+        batch.update(proofRef, { status: "VALIDATED", isVisible: true });
         setReports(prev => prev.map(r => r.id === report.id ? { ...r, status: "rejected" } : r));
-        Alert.alert("Restauré", "Le signalement a été rejeté et le contenu est de nouveau visible.");
+        Alert.alert("Restauré", "Signalement rejeté.");
       }
-
       await batch.commit();
-
     } catch (error) {
       console.error(error);
-      Alert.alert("Erreur", "Impossible de traiter le signalement.");
+      Alert.alert("Erreur", "Action impossible.");
     }
   };
 
-  // 🗑️ Supprimer le signalement de la liste (nettoyage admin uniquement)
   const handleDeleteReport = async (reportId: string) => {
     try {
       await deleteDoc(doc(db, "reports", reportId));
       setReports((prev) => prev.filter((r) => r.id !== reportId));
     } catch (error) {
-      Alert.alert("Erreur", "Impossible de supprimer le signalement.");
+      Alert.alert("Erreur", "Impossible de supprimer.");
     }
   };
 
-  const glassStyle = {
-    backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.75)",
-    borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.4)",
-  };
+  // Couleurs dynamiques
+  const titleColor = isDark ? "#FFF" : reportsTheme.textMain;
+  const mutedColor = isDark ? "#9CA3AF" : reportsTheme.textMuted;
+  const cardBorder = isDark ? "rgba(255,255,255,0.1)" : reportsTheme.borderColor;
+  const bgColors = isDark ? [colors.background, "#1F2937"] : reportsTheme.bgGradient;
 
   return (
     <View style={{ flex: 1 }}>
       <Stack.Screen options={{ headerShown: false }} />
 
       <LinearGradient
-        colors={isDark ? [colors.background, "#0f2027", "#203a43"] : ["#d1fae5", "#cffafe", "#ffffff"]}
+        colors={bgColors as any}
         style={StyleSheet.absoluteFill}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -131,30 +124,34 @@ export default function AdminReports() {
 
       {/* Header */}
       <View style={styles.headerContainer}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
+        {/* Bouton retour personnalisé pour cohérence */}
+        <TouchableOpacity onPress={() => router.back()} style={[styles.backBtn, { backgroundColor: isDark ? "rgba(255,255,255,0.1)" : "#FFF" }]}>
+            <Ionicons name="arrow-back" size={20} color={titleColor} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: titleColor }]}>
           Signalements
         </Text>
-        <TouchableOpacity onPress={loadReports} style={styles.refreshBtn}>
-          <Ionicons name="refresh" size={20} color={colors.text} />
+        <TouchableOpacity onPress={loadReports} style={[styles.refreshBtn, { backgroundColor: isDark ? "rgba(255,255,255,0.1)" : "#FFF" }]}>
+          <Ionicons name="refresh" size={20} color={titleColor} />
         </TouchableOpacity>
       </View>
 
       {loading ? (
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-          <ActivityIndicator size="large" color={colors.accent} />
+          <ActivityIndicator size="large" color={reportsTheme.accent} />
         </View>
       ) : (
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
+          contentContainerStyle={{ padding: 24, paddingBottom: 100 }}
           refreshControl={
              <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadReports(); }} />
           }
         >
           {reports.length === 0 ? (
-            <View style={[styles.emptyCard, glassStyle]}>
-              <Ionicons name="checkmark-circle-outline" size={48} color={colors.accent} />
-              <Text style={{ color: colors.mutedText, marginTop: 10 }}>Aucun signalement à traiter.</Text>
+            <View style={[styles.emptyCard, { borderColor: cardBorder }]}>
+              <Ionicons name="checkmark-circle-outline" size={48} color={reportsTheme.accent} style={{ opacity: 0.5 }} />
+              <Text style={{ color: mutedColor, marginTop: 12, fontFamily: FontFamilies.body }}>Aucun signalement à traiter.</Text>
             </View>
           ) : (
             reports.map((report) => (
@@ -162,54 +159,58 @@ export default function AdminReports() {
                 key={report.id}
                 style={[
                   styles.card,
-                  glassStyle,
-                  { borderLeftColor: report.status === "pending" ? "#EF4444" : (report.status === "accepted" ? "#EF4444" : "#10B981") }
+                  { 
+                      backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "#FFF",
+                      borderColor: cardBorder,
+                      borderLeftColor: report.status === "pending" ? reportsTheme.warning : (report.status === "accepted" ? reportsTheme.danger : reportsTheme.success) 
+                  }
                 ]}
               >
                 {/* En-tête Badge statut */}
                 <View style={styles.cardHeader}>
                   <View style={styles.badgeContainer}>
                     {report.status === "pending" && (
-                      <View style={[styles.statusBadge, { backgroundColor: "#FEE2E2" }]}>
-                        <Text style={[styles.statusText, { color: "#EF4444" }]}>À TRAITER</Text>
+                      <View style={[styles.statusBadge, { backgroundColor: "#FEF3C7" }]}>
+                        <Text style={[styles.statusText, { color: "#D97706" }]}>À TRAITER</Text>
                       </View>
                     )}
                     {report.status === "accepted" && (
-                      <View style={[styles.statusBadge, { backgroundColor: "#fee2e2" }]}>
-                        <Text style={[styles.statusText, { color: "#b91c1c" }]}>SANCTIONNÉ</Text>
+                      <View style={[styles.statusBadge, { backgroundColor: "#FEE2E2" }]}>
+                        <Text style={[styles.statusText, { color: "#DC2626" }]}>SANCTIONNÉ</Text>
                       </View>
                     )}
                     {report.status === "rejected" && (
                       <View style={[styles.statusBadge, { backgroundColor: "#D1FAE5" }]}>
-                        <Text style={[styles.statusText, { color: "#10B981" }]}>REJETÉ (Rétabli)</Text>
+                        <Text style={[styles.statusText, { color: "#059669" }]}>REJETÉ</Text>
                       </View>
                     )}
                     
-                    <Text style={{ fontSize: 10, color: colors.mutedText, marginLeft: 8 }}>
+                    <Text style={{ fontSize: 11, color: mutedColor, marginLeft: 8 }}>
                        {report.createdAt?.seconds ? new Date(report.createdAt.seconds * 1000).toLocaleDateString() : "Récemment"}
                     </Text>
                   </View>
                   
-                  <TouchableOpacity onPress={() => handleDeleteReport(report.id)}>
-                    <Ionicons name="close" size={18} color={colors.mutedText} />
+                  <TouchableOpacity onPress={() => handleDeleteReport(report.id)} style={{ padding: 4 }}>
+                    <Ionicons name="close" size={18} color={mutedColor} />
                   </TouchableOpacity>
                 </View>
 
-                {/* Titre Défi + Raison */}
-                <Text style={[styles.challengeTitle, { color: colors.text }]}>
+                {/* Titre Défi */}
+                <Text style={[styles.challengeTitle, { color: titleColor }]}>
                   {report.challengeTitle}
                 </Text>
                 
-                <Text style={{fontSize: 12, color: colors.mutedText, marginBottom: 4}}>Motif du signalement :</Text>
-                <View style={[styles.reasonBox, { backgroundColor: isDark ? "rgba(255,0,0,0.15)" : "#fee2e2" }]}>
-                   <Text style={{ color: isDark ? "#ffbaba" : "#b91c1c", fontWeight: "600", fontStyle: 'italic' }}>
+                {/* Motif */}
+                <Text style={{fontSize: 12, color: mutedColor, marginBottom: 4, fontWeight: '600'}}>Motif :</Text>
+                <View style={[styles.reasonBox, { backgroundColor: isDark ? "rgba(239,68,68,0.15)" : "#FEF2F2" }]}>
+                   <Text style={{ color: isDark ? "#FCA5A5" : "#B91C1C", fontWeight: "600", fontStyle: 'italic', fontSize: 13 }}>
                      "{report.reason}"
                    </Text>
                 </View>
 
-                {/* --- ZONE VISUALISATION DU CONTENU --- */}
+                {/* --- CONTENU --- */}
                 <View style={styles.contentPreview}>
-                  <Text style={{fontSize: 12, color: colors.mutedText, marginBottom: 6}}>Contenu incriminé :</Text>
+                  <Text style={{fontSize: 12, color: mutedColor, marginBottom: 8, fontWeight: '600'}}>Contenu signalé :</Text>
                   
                   {report.proofType === 'image' && report.proofContent ? (
                     <Image 
@@ -218,40 +219,42 @@ export default function AdminReports() {
                       resizeMode="cover"
                     />
                   ) : (
-                    <View style={[styles.textBox, { backgroundColor: isDark ? "rgba(255,255,255,0.1)" : "#f3f4f6" }]}>
-                       <Text style={{ color: colors.text }}>{report.proofContent || "Aucun contenu textuel"}</Text>
+                    <View style={[styles.textBox, { backgroundColor: isDark ? "rgba(255,255,255,0.1)" : "#F3F4F6", borderColor: cardBorder }]}>
+                       <Text style={{ color: titleColor, fontStyle: 'italic' }}>"{report.proofContent || "Aucun texte"}"</Text>
                     </View>
                   )}
                 </View>
 
-                {/* Actions - N'apparaissent que si Pending */}
+                {/* Actions */}
                 {report.status === "pending" ? (
                   <View style={styles.actionRow}>
-                    {/* BOUTON 1 : REFUSER / RESTAURER */}
                     <TouchableOpacity
-                      style={[styles.actionButton, { backgroundColor: colors.surfaceAlt, flex: 1, marginRight: 8 }]}
+                      style={[styles.actionButton, { backgroundColor: isDark ? "rgba(255,255,255,0.1)" : "#F3F4F6", flex: 1, marginRight: 8 }]}
                       onPress={() => handleModeration(report, 'RESTORE')}
                     >
-                      <Ionicons name="refresh-outline" size={18} color={colors.text} />
-                      <Text style={[styles.actionButtonText, { color: colors.text }]}>Faux Signalement</Text>
-                      <Text style={{fontSize:9, color:colors.mutedText}}>(Réafficher)</Text>
+                      <Ionicons name="refresh-outline" size={18} color={titleColor} />
+                      <View>
+                          <Text style={[styles.actionButtonText, { color: titleColor }]}>Ignorer</Text>
+                          <Text style={{fontSize:9, color: mutedColor}}>Faux signalement</Text>
+                      </View>
                     </TouchableOpacity>
 
-                    {/* BOUTON 2 : ACCEPTER / SANCTIONNER */}
                     <TouchableOpacity
-                      style={[styles.actionButton, { backgroundColor: "#EF4444", flex: 1, marginLeft: 8 }]}
+                      style={[styles.actionButton, { backgroundColor: reportsTheme.danger, flex: 1, marginLeft: 8 }]}
                       onPress={() => handleModeration(report, 'SANCTION')}
                     >
                       <Ionicons name="trash-outline" size={18} color="white" />
-                      <Text style={[styles.actionButtonText, { color: "white" }]}>Sanctionner</Text>
-                      <Text style={{fontSize:9, color:"white", opacity: 0.8}}>(Supprimer)</Text>
+                      <View>
+                          <Text style={[styles.actionButtonText, { color: "white" }]}>Sanctionner</Text>
+                          <Text style={{fontSize:9, color:"rgba(255,255,255,0.8)"}}>Supprimer contenu</Text>
+                      </View>
                     </TouchableOpacity>
                   </View>
                 ) : (
-                  <View style={{ marginTop: 12, alignItems: 'center' }}>
-                     <Text style={{ fontSize: 12, color: colors.mutedText, fontStyle: 'italic' }}>
-                       Ce signalement a déjà été traité.
-                     </Text>
+                  <View style={{ marginTop: 12, alignItems: 'center', paddingTop: 12, borderTopWidth: 1, borderTopColor: cardBorder }}>
+                      <Text style={{ fontSize: 12, color: mutedColor, fontStyle: 'italic' }}>
+                        Traité le {new Date().toLocaleDateString()}
+                      </Text>
                   </View>
                 )}
 
@@ -269,20 +272,26 @@ export default function AdminReports() {
 const styles = StyleSheet.create({
   headerContainer: {
     paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 10,
+    paddingHorizontal: 24,
+    paddingBottom: 16,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: "800",
+    fontFamily: FontFamilies.heading,
+  },
+  backBtn: {
+      padding: 8,
+      borderRadius: 12,
+      shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 4, elevation: 1
   },
   refreshBtn: {
     padding: 8,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.3)",
+    borderRadius: 12,
+    shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 4, elevation: 1
   },
   emptyCard: {
     padding: 40,
@@ -290,20 +299,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
+    borderStyle: 'dashed'
   },
   card: {
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 20,
+    padding: 20,
     marginBottom: 20,
     borderWidth: 1,
     borderLeftWidth: 4, 
-    overflow: 'hidden'
+    shadowColor: "#000", 
+    shadowOpacity: 0.03, 
+    shadowRadius: 10, 
+    elevation: 2,
   },
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 10,
+    marginBottom: 12,
   },
   badgeContainer: {
     flexDirection: "row",
@@ -319,48 +332,45 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   challengeTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "700",
-    marginBottom: 8,
+    marginBottom: 12,
+    fontFamily: FontFamilies.heading
   },
   reasonBox: {
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 15,
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 16,
   },
   contentPreview: {
-    marginBottom: 15,
+    marginBottom: 16,
   },
   proofImage: {
     width: '100%',
-    height: 180,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0,0,0,0.1)'
+    height: 200,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.05)'
   },
   textBox: {
-    padding: 12,
-    borderRadius: 12,
+    padding: 16,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)'
   },
   actionRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 5,
-    paddingTop: 15,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.05)',
+    marginTop: 8,
   },
   actionButton: {
-    flexDirection: 'column',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 12,
-    gap: 2
+    paddingVertical: 12,
+    borderRadius: 14,
+    gap: 8
   },
   actionButtonText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
   }
 });

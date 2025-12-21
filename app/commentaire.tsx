@@ -1,8 +1,8 @@
-// app/commentaire.tsx
 import { useChallenges } from "@/hooks/challenges-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { submitProof } from "@/services/proofs";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient"; // ✅ AJOUT
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
@@ -16,14 +16,24 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+// 🎨 THEME COMMENTAIRE
+const commentTheme = {
+    bgGradient: ["#DDF7E8", "#F4FDF9"] as const,
+    glassInput: "rgba(255, 255, 255, 0.8)",
+    borderInput: "rgba(0,143,107,0.2)",
+    textMain: "#0A3F33",
+    textMuted: "#4A665F",
+    accent: "#008F6B", // Vert Marque
+};
+
 export default function CommentaireScreen() {
-  const { colors } = useThemeMode();
+  const { colors, mode } = useThemeMode();
   const { current, validateWithPhoto, setPhotoComment } = useChallenges();
   const router = useRouter();
   const params = useLocalSearchParams();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isLight = mode === "light";
 
-  // Cast explicite pour TypeScript
   const photoUri = params.photoUri as string | undefined;
   const [comment, setComment] = useState("");
 
@@ -34,7 +44,6 @@ export default function CommentaireScreen() {
 
   const canSend = wordCount >= 3;
 
-  // Sécurité initiale
   if (!current || !photoUri) {
     router.replace("/(tabs)/defi");
     return null;
@@ -43,7 +52,6 @@ export default function CommentaireScreen() {
   async function sendProof(forcedComment?: string) {
     if (isSubmitting) return; 
     
-    // Vérification stricte pour TypeScript (supprime les erreurs rouges)
     if (!current?.firestoreId || !photoUri) {
       router.replace("/(tabs)/defi");
       return;
@@ -53,18 +61,15 @@ export default function CommentaireScreen() {
     const finalComment = forcedComment !== undefined ? forcedComment : comment.trim();
 
     try {
-      // 1. Envoi à Firebase avec des valeurs garanties non-nulles
       const { id: proofId } = await submitProof(
-        current.firestoreId, // Garanti par le IF au-dessus
-        photoUri,            // Garanti par le IF au-dessus
+        current.firestoreId,
+        photoUri,
         finalComment
       );
 
-      // 2. Mise à jour du contexte
       await validateWithPhoto(photoUri, finalComment, proofId);
       await setPhotoComment(finalComment);
 
-      // 3. Redirection
       router.replace("/(tabs)/defi");
     } catch (e) {
       console.log("❌ Error submitting proof:", e);
@@ -73,87 +78,132 @@ export default function CommentaireScreen() {
     }
   }
 
+  // Wrapper Fond
+  const BackgroundComponent = isLight ? LinearGradient : View;
+  const bgProps = isLight 
+    ? { colors: commentTheme.bgGradient, style: StyleSheet.absoluteFill } 
+    : { style: [StyleSheet.absoluteFill, { backgroundColor: "#021114" }] };
+
+  // Couleurs dynamiques
+  const titleColor = isLight ? commentTheme.textMain : colors.text;
+  const textColor = isLight ? commentTheme.textMuted : colors.mutedText;
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.content}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.title, { color: colors.text }]}>Ta preuve</Text>
-          <View style={{ width: 24 }} />
-        </View>
+    <View style={{ flex: 1 }}>
+      <BackgroundComponent {...(bgProps as any)} />
+      
+      <SafeAreaView style={styles.container}>
+        <View style={styles.content}>
+          {/* Header */}
+          <View style={styles.headerRow}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+              <Ionicons name="arrow-back" size={24} color={titleColor} />
+            </TouchableOpacity>
+            <Text style={[styles.title, { color: titleColor }]}>Ta preuve</Text>
+            <View style={{ width: 24 }} />
+          </View>
 
-        <Image source={{ uri: photoUri }} style={styles.photo} />
+          {/* Photo Preview avec Cadre */}
+          <View style={styles.photoContainer}>
+            <Image source={{ uri: photoUri }} style={styles.photo} resizeMode="cover" />
+          </View>
 
-        <Text style={{ color: colors.mutedText, marginTop: 12 }}>
-          Explique ta preuve (min. 3 mots)
-        </Text>
+          <Text style={{ color: textColor, marginTop: 16, marginBottom: 8, fontWeight: '600' }}>
+            Explique ta preuve (min. 3 mots)
+          </Text>
 
-        <TextInput
-          value={comment}
-          onChangeText={setComment}
-          placeholder="Ex: Je trie des bouteilles au dépôt local"
-          placeholderTextColor={colors.mutedText}
-          multiline
-          numberOfLines={5}
-          editable={!isSubmitting}
-          style={[
-            styles.input,
-            { backgroundColor: colors.surface, color: colors.text },
-          ]}
-        />
-
-        <Text style={{ color: colors.mutedText, alignSelf: "flex-end", marginTop: 6 }}>
-          {wordCount} mot{wordCount > 1 ? "s" : ""}
-        </Text>
-
-        <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
-          <TouchableOpacity
-            disabled={isSubmitting}
-            onPress={() => sendProof("")} 
-            style={[styles.btn, { backgroundColor: colors.surface }]}
-          >
-            {isSubmitting ? (
-              <ActivityIndicator size="small" color={colors.text} />
-            ) : (
-              <Text style={{ color: colors.text, fontWeight: "700" }}>Passer</Text>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            disabled={!canSend || isSubmitting}
-            onPress={() => sendProof()}
+          {/* Input Glassmorphism */}
+          <TextInput
+            value={comment}
+            onChangeText={setComment}
+            placeholder="Ex: Je trie des bouteilles au dépôt local"
+            placeholderTextColor={isLight ? "#8AA39C" : colors.mutedText}
+            multiline
+            numberOfLines={5}
+            editable={!isSubmitting}
             style={[
-              styles.btn,
-              {
-                backgroundColor: canSend && !isSubmitting ? colors.accent : "#2A3431",
-                opacity: isSubmitting ? 0.6 : 1,
+              styles.input,
+              { 
+                backgroundColor: isLight ? commentTheme.glassInput : colors.surfaceAlt, 
+                color: isLight ? commentTheme.textMain : colors.text,
+                borderColor: isLight ? commentTheme.borderInput : "transparent",
+                borderWidth: 1
               },
             ]}
-          >
-            <Text
-              style={{
-                color: canSend ? "#0F3327" : "#8AA39C",
-                fontWeight: "700",
-              }}
+          />
+
+          <Text style={{ color: textColor, alignSelf: "flex-end", marginTop: 6, fontSize: 12 }}>
+            {wordCount} mot{wordCount > 1 ? "s" : ""}
+          </Text>
+
+          {/* Actions */}
+          <View style={{ flexDirection: "row", gap: 12, marginTop: 24 }}>
+            {/* Bouton PASSER */}
+            <TouchableOpacity
+              disabled={isSubmitting}
+              onPress={() => sendProof("")} 
+              style={[styles.btn, { backgroundColor: isLight ? "rgba(255,255,255,0.6)" : colors.surface, borderWidth: 1, borderColor: isLight ? "rgba(0,0,0,0.05)" : "transparent" }]}
             >
-              Envoyer
-            </Text>
-          </TouchableOpacity>
+              {isSubmitting ? (
+                <ActivityIndicator size="small" color={titleColor} />
+              ) : (
+                <Text style={{ color: titleColor, fontWeight: "700" }}>Passer</Text>
+              )}
+            </TouchableOpacity>
+
+            {/* Bouton ENVOYER (Gradient) */}
+            <TouchableOpacity
+              disabled={!canSend || isSubmitting}
+              onPress={() => sendProof()}
+              style={{ flex: 1, borderRadius: 16, opacity: (canSend && !isSubmitting) ? 1 : 0.6 }}
+            >
+                <LinearGradient
+                    colors={isLight ? ["#008F6B", "#10B981"] : [colors.accent, colors.accent]}
+                    style={[styles.btn, { flex: 1, width: '100%' }]}
+                >
+                    <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 16 }}>Envoyer</Text>
+                </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 20 },
   content: { width: "100%", maxWidth: 400, alignSelf: "center" },
-  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 10 },
   backBtn: { padding: 6 },
-  title: { fontSize: 20, fontWeight: "700" },
-  photo: { width: "100%", height: 280, borderRadius: 16, marginTop: 14 },
-  input: { borderRadius: 12, padding: 12, marginTop: 8, textAlignVertical: "top" },
-  btn: { flex: 1, borderRadius: 12, paddingVertical: 12, alignItems: "center", justifyContent: "center" },
+  title: { fontSize: 20, fontWeight: "800", fontFamily: "StylizedTitle" }, // Adapte la police
+  
+  photoContainer: {
+      borderRadius: 20,
+      marginTop: 20,
+      backgroundColor: "#FFF",
+      padding: 6,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 4
+  },
+  photo: { width: "100%", height: 280, borderRadius: 16 },
+  
+  input: { 
+      borderRadius: 16, 
+      padding: 16, 
+      textAlignVertical: "top", 
+      fontSize: 16,
+      minHeight: 120
+  },
+  btn: { 
+      flex: 1, 
+      borderRadius: 16, 
+      paddingVertical: 14, 
+      alignItems: "center", 
+      justifyContent: "center",
+      shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 4, elevation: 2
+  },
 });

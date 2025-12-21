@@ -2,7 +2,8 @@ import { useThemeMode } from "@/hooks/theme-context";
 import { useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, Image, Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-  
+// Trouve cette ligne (vers la ligne 3) et ajoute Modal
+import { Modal } from "react-native";
 // Composants UI
 import { GradientButton } from "@/components/ui/common/GradientButton";
 import { ChatView } from "@/components/ui/social/ChatView";
@@ -25,10 +26,10 @@ import { useCurrentCycle } from "@/src/classement/hooks/useCurrentCycle";
 import { useLeagueUsers } from "@/src/classement/hooks/useLeagueUsers";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, where } from "firebase/firestore";
 import { useEffect } from "react";
-import { LinearGradient } from "expo-linear-gradient";
 
 // 👇 AJOUTE CE BLOC DE THÈME AVANT LA FONCTION SocialScreen
 const THEME = {
@@ -254,9 +255,12 @@ export default function SocialScreen() {
     return false;
   };
   const { user } = useUser();
-  const { cycle: currentCycle } = useCurrentCycle('individuel');
-  const { users: allRankedUsers } = useLeagueUsers(currentCycle?.id ?? null, 'individuel');
 
+  const { cycle: currentCycle } = useCurrentCycle();
+  const { users: allRankedUsers } = useLeagueUsers(currentCycle?.id ?? null, 'individuel') || { users: [] };
+
+
+  // 2. Le useMemo ne doit servir qu'à calculer les points
   const rankingPointsMap = useMemo(() => {
     const map = new Map<string, number>();
     if (allRankedUsers) {
@@ -551,7 +555,7 @@ export default function SocialScreen() {
   };
 
   const clubRankingData = useMemo(() => {
-    const roster = members.map((member) => ({
+    const roster = (members || []).map((member) => ({
       ...member,
       isMe: member.id === currentUid,
       points: rankingPointsMap.get(member.id) ?? 0,
@@ -572,11 +576,10 @@ export default function SocialScreen() {
       .map((m, idx) => ({ ...m, rank: idx + 1 }));
   }, [members, user, currentUid, rankingPointsMap]);
 
-  const clanTotalPoints = useMemo(() => {
-    return members.reduce((sum, member) => sum + (rankingPointsMap.get(member.id) ?? 0), 0);
+const clanTotalPoints = useMemo(() => {
+    // ✅ NOUVEAU CODE SÉCURISÉ (Ajout de || [])
+    return (members || []).reduce((sum, member) => sum + (rankingPointsMap.get(member.id) ?? 0), 0);
   }, [members, rankingPointsMap]);
-
-  // no early return; keep tabs visible in all views
 
   const handleLeaveClub = async () => {
     if (requireOwnerTransfer && !newOwnerId) {
@@ -598,28 +601,30 @@ export default function SocialScreen() {
           await transferOwnership(newOwnerId, pendingLeaveClub.id);
         }
         await leaveClub(pendingLeaveClub.id);
+      }setTimeout(() => {
+          setPendingLeaveClub(null);
+          setIsLeaving(false);
+          setView("main"); // On force la vue liste
+      }, 300);
+      
+    
+  Alert.alert(
+  "Succès",
+  deleteOnLeave ? "Club supprimé." : "Tu as quitté le club.",
+  [
+    {
+      text: "OK",
+      onPress: () => {
+        setPendingLeaveClub(null);
+        setView("main");
       }
-      
-      // À cet instant précis, ton Context a mis joinedClub à NULL.
-      // L'écran derrière a changé, MAIS le spinner (étape 3) le cache.
+    }
+  ]
+);
 
-      // 2. On affiche l'alerte par-dessus le spinner
-      Alert.alert(
-        "Succès", 
-        deleteOnLeave ? "Club supprimé." : "Tu as quitté le club.",
-        [
-          {
-            text: "OK",
-            onPress: () => {
-              // 3. C'est ici qu'on retire le bouclier
-              setPendingLeaveClub(null);
-              setView("main");
-              setIsLeaving(false); 
-            }
-          }
-        ]
-      );
-      
+// Remettre isLeaving à false juste après l’alert
+setIsLeaving(false);
+
     } catch (error: any) {
       console.error(error);
       setIsLeaving(false); // En cas d'erreur, on enlève le bouclier
@@ -754,8 +759,43 @@ export default function SocialScreen() {
            </Text>
         </View>
       )}
-      {/* 👆 FIN DU BLOC */}
 
+    {/* ✅ POPUP GLOBAL */}
+    {leaveConfirmVisible && (
+      <View style={{
+        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+        zIndex: 9998,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        alignItems: 'center', justifyContent: 'center',
+        padding: 20
+      }}>
+        <View style={{
+          backgroundColor: '#fff',
+          borderRadius: 12,
+          padding: 20,
+          width: '100%',
+          maxWidth: 320
+        }}>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>
+            Quitter le club
+          </Text>
+          <Text style={{ marginBottom: 20 }}>
+            Êtes-vous sûr de vouloir quitter le club ?
+          </Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <TouchableOpacity onPress={() => setLeaveConfirmVisible(false)}>
+              <Text style={{ color: '#008F6B', fontWeight: 'bold' }}>Rester</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleLeaveClub}>
+              <Text style={{ color: '#FF4D4D', fontWeight: 'bold' }}>Quitter</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    )}
+   
+
+   
       <SafeAreaView style={[styles.container, { backgroundColor: "transparent" }]}> 
       <Text style={[styles.title, { color: isLight ? THEME.textMain : colors.text }]}>Social</Text>
       
@@ -1428,74 +1468,104 @@ export default function SocialScreen() {
         />
       )}
 
+{/* VUE MEMBRES - STYLE MODERNE */}
       {selectedTab === 'clubs' && view === 'members' && (
-        <View style={{ position: 'absolute', top: 56, left: 0, right: 0, bottom: 0, backgroundColor: isLight ? colors.background : darkBg, padding: 16 }}>
-          {/* Header Membres */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-            <TouchableOpacity onPress={() => setView('main')} style={{ marginRight: 12 }}>
-              <Ionicons name="arrow-back" size={24} color={isLight ? "#0A3F33" : colors.text} />
-            </TouchableOpacity>
-            <Text style={{ color: isLight ? "#0A3F33" : colors.text, fontSize: 20, fontFamily: FontFamilies.heading, flex: 1 }}>
-              Membres
-            </Text>
-            {/* Icône demandes (Admin only) */}
-            {joinedClub && (joinedClub.ownerId === auth.currentUser?.uid || (joinedClub.officers || []).includes(auth.currentUser?.uid ?? "")) && ( 
-                <TouchableOpacity style={{ backgroundColor: isLight ? "#E0F7EF" : colors.surfaceAlt, padding: 8, borderRadius: 12 }} onPress={() => setView('joinRequests')}>
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 50 }}>
+          {/* 1. Fond Dégradé Global */}
+          <LinearGradient colors={isLight ? ["#DDF7E8", "#F4FDF9"] : [darkBg, darkBg]} style={StyleSheet.absoluteFill} />
+          
+          <SafeAreaView style={{ flex: 1, paddingHorizontal: 20 }}>
+            {/* 2. Header Moderne */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20, marginTop: 10 }}>
+              <TouchableOpacity onPress={() => setView('main')} style={{ marginRight: 12, padding: 4, borderRadius: 12, backgroundColor: isLight ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.1)" }}>
+                <Ionicons name="arrow-back" size={24} color={isLight ? "#0A3F33" : colors.text} />
+              </TouchableOpacity>
+              <Text style={{ color: isLight ? "#0A3F33" : colors.text, fontSize: 24, fontFamily: FontFamilies.heading, flex: 1 }}>
+                Membres
+              </Text>
+              
+              {/* Bouton Demandes (Si Admin) */}
+              {joinedClub && (joinedClub.ownerId === auth.currentUser?.uid || (joinedClub.officers || []).includes(auth.currentUser?.uid ?? "")) && ( 
+                <TouchableOpacity 
+                    style={{ backgroundColor: isLight ? "#E0F7EF" : colors.surfaceAlt, padding: 10, borderRadius: 14 }} 
+                    onPress={() => setView('joinRequests')}
+                >
                     <Ionicons name="person-add" size={20} color={isLight ? "#008F6B" : colors.accent} />
                     {clubJoinRequests.length > 0 && (
-                        <View style={{ position: 'absolute', right: -4, top: -4, backgroundColor: '#FF8C66', borderRadius: 6, minWidth: 12, height: 12, alignItems: 'center', justifyContent: 'center' }} />
+                        <View style={{ position: 'absolute', right: -2, top: -2, backgroundColor: '#FF8C66', borderRadius: 6, width: 10, height: 10, borderWidth: 1, borderColor: '#FFF' }} />
                     )}
                 </TouchableOpacity>
-            )}
-          </View>
+              )}
+            </View>
 
-          {membersPreviewLoading ? (
-            <ActivityIndicator size="large" color={isLight ? "#008F6B" : colors.accent} style={{ marginTop: 40 }} />
-          ) : (
-            <FlatList
-              data={membersPreview}
-              keyExtractor={(item) => String(item.id)}
-              contentContainerStyle={{ paddingBottom: 100 }}
-              renderItem={({ item, index }) => {
-                const role = joinedClub?.ownerId === item.id ? 'Chef' : (joinedClub?.officers || []).includes(item.id) ? 'Adjoint' : 'Membre';
-                const canDelete = canDeleteMember(currentUid || null, item.id, joinedClub ?? null);
-                
-                return (
-                  <LinearGradient
-                    colors={isLight ? ["rgba(255,255,255,0.9)", "rgba(255,255,255,0.6)"] : ["rgba(255,255,255,0.05)", "rgba(255,255,255,0.02)"]}
-                    style={{
-                        flexDirection: 'row', alignItems: 'center', padding: 12, marginBottom: 10, borderRadius: 18,
-                        borderWidth: 1, borderColor: isLight ? "rgba(255,255,255,0.6)" : "transparent"
-                    }}
-                  >
-                    <Text style={{ width: 24, textAlign: 'center', color: isLight ? "#008F6B" : colors.accent, fontWeight: 'bold' }}>{index + 1}</Text>
-                    
-                    {item.avatar ? (
-                      <Image source={{ uri: item.avatar }} style={{ width: 40, height: 40, borderRadius: 20, marginHorizontal: 12 }} />
-                    ) : (
-                      <View style={{ width: 40, height: 40, borderRadius: 20, marginHorizontal: 12, backgroundColor: isLight ? "#E0F7EF" : colors.pill, alignItems: 'center', justifyContent: 'center' }}>
-                        <Text style={{ color: isLight ? "#008F6B" : colors.text, fontWeight: 'bold' }}>{(item.name || '?').charAt(0)}</Text>
+            {/* 3. Liste des Membres Stylisée */}
+            {membersPreviewLoading ? (
+              <ActivityIndicator size="large" color={isLight ? "#008F6B" : colors.accent} style={{ marginTop: 40 }} />
+            ) : (
+              <FlatList
+                data={membersPreview}
+                keyExtractor={(item) => String(item.id)}
+                contentContainerStyle={{ paddingBottom: 100 }}
+                showsVerticalScrollIndicator={false}
+                renderItem={({ item, index }) => {
+                  const role = joinedClub?.ownerId === item.id ? '👑 Chef' : (joinedClub?.officers || []).includes(item.id) ? '⭐ Adjoint' : 'Membre';
+                  const canDelete = canDeleteMember(currentUid || null, item.id, joinedClub ?? null);
+                  const isMe = item.id === currentUid;
+                  
+                  return (
+                    <LinearGradient
+                      colors={isLight ? (isMe ? ["#E0F7EF", "#F0FDF4"] : ["rgba(255,255,255,0.8)", "rgba(255,255,255,0.4)"]) : ["rgba(255,255,255,0.05)", "rgba(255,255,255,0.02)"]}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                      style={{
+                          flexDirection: 'row', alignItems: 'center', padding: 14, marginBottom: 12, borderRadius: 20,
+                          borderWidth: 1, borderColor: isLight ? (isMe ? "#A7F3D0" : "rgba(255,255,255,0.6)") : "transparent",
+                          shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 8, elevation: 1
+                      }}
+                    >
+                      {/* Rang */}
+                      <View style={{ width: 32, alignItems: 'center', marginRight: 4 }}>
+                        <Text style={{ color: isLight ? "#008F6B" : colors.accent, fontFamily: FontFamilies.heading, fontSize: 16, fontWeight: 'bold' }}>#{index + 1}</Text>
                       </View>
-                    )}
+                      
+                      {/* Avatar */}
+                      {item.avatar ? (
+                        <Image source={{ uri: item.avatar }} style={{ width: 44, height: 44, borderRadius: 22, marginRight: 12 }} />
+                      ) : (
+                        <View style={{ width: 44, height: 44, borderRadius: 22, marginRight: 12, backgroundColor: isLight ? "#FFF" : colors.pill, alignItems: 'center', justifyContent: 'center' }}>
+                          <Text style={{ color: isLight ? "#008F6B" : colors.text, fontFamily: FontFamilies.heading, fontSize: 18 }}>{(item.name || '?').charAt(0).toUpperCase()}</Text>
+                        </View>
+                      )}
 
-                    <View style={{ flex: 1 }}>
-                        <Text style={{ color: isLight ? "#0A3F33" : colors.text, fontFamily: FontFamilies.headingMedium, fontSize: 16 }}>{item.name || item.id}</Text>
-                        <Text style={{ color: isLight ? "#4A665F" : colors.mutedText, fontSize: 12 }}>{role}</Text>
-                    </View>
+                      {/* Infos */}
+                      <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Text style={{ color: isLight ? "#0A3F33" : colors.text, fontFamily: FontFamilies.headingMedium, fontSize: 16 }} numberOfLines={1}>
+                                {isMe ? "Moi" : item.name || "Utilisateur"}
+                            </Text>
+                            {/* Petit badge rôle si Chef/Adjoint */}
+                            {role.includes('Chef') && <View style={{backgroundColor: '#FFEFD5', paddingHorizontal: 6, borderRadius: 4}}><Text style={{fontSize: 10, color:'#B7791F', fontWeight:'bold'}}>CHEF</Text></View>}
+                          </View>
+                          <Text style={{ color: isLight ? "#4A665F" : colors.mutedText, fontSize: 13 }}>{role.replace(/👑|⭐/g, '').trim()}</Text>
+                      </View>
 
-                    <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={{ color: isLight ? "#008F6B" : colors.accent, fontWeight: 'bold' }}>{rankingPointsMap.get(item.id) || 0} pts</Text>
-                        {canDelete && (
-                            <TouchableOpacity onPress={() => handleRemoveMember(item.id)} style={{ marginTop: 4 }}>
-                                <Ionicons name="trash-outline" size={18} color="#F45B69" />
-                            </TouchableOpacity>
-                        )}
-                    </View>
-                  </LinearGradient>
-                );
-              }}
-            />
-          )}
+                      {/* Points & Actions */}
+                      <View style={{ alignItems: 'flex-end' }}>
+                          <Text style={{ color: isLight ? "#008F6B" : colors.accent, fontFamily: FontFamilies.heading, fontSize: 15 }}>
+                              {rankingPointsMap.get(item.id) || 0} <Text style={{ fontSize: 11, fontWeight: 'normal' }}>Greenies</Text>
+                          </Text>
+                          
+                          {canDelete && (
+                              <TouchableOpacity onPress={() => handleRemoveMember(item.id)} style={{ marginTop: 6, opacity: 0.8 }}>
+                                  <Ionicons name="trash-outline" size={18} color="#F45B69" />
+                              </TouchableOpacity>
+                          )}
+                      </View>
+                    </LinearGradient>
+                  );
+                }}
+              />
+            )}
+          </SafeAreaView>
         </View>
       )}
 
@@ -1671,72 +1741,6 @@ export default function SocialScreen() {
               }}
             />
           </SafeAreaView>
-        </View>
-      )}
-      {leaveConfirmVisible && (
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
-              {requireOwnerTransfer ? "Nommer un nouveau chef" : deleteOnLeave ? "Supprimer le club ?" : "Quitter le club"}
-            </Text>
-            {requireOwnerTransfer ? (
-              <View style={{ marginTop: 12 }}>
-                <Text style={{ color: colors.mutedText, marginBottom: 10 }}>
-                  Choisis le membre qui deviendra chef avant ton départ.
-                </Text>
-                {members
-                  .filter((member) => member.id !== currentUid)
-                  .map((member) => {
-                    const selected = newOwnerId === member.id;
-                    return (
-                      <TouchableOpacity
-                        key={member.id}
-                        onPress={() => setNewOwnerId(member.id)}
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: 12,
-                          borderRadius: 12,
-                          marginBottom: 8,
-                          backgroundColor: selected ? colors.accent : colors.surfaceAlt,
-                        }}
-                      >
-                        <Text style={{ color: selected ? '#0F3327' : colors.text, fontFamily: FontFamilies.headingMedium }}>{member.name}</Text>
-                        <Text style={{ color: selected ? '#0F3327' : colors.mutedText }}>{rankingPointsMap.get(member.id) || 0} pts</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-              </View>
-            ) : (
-              <Text style={{ color: colors.mutedText, marginTop: 6 }}>
-                {deleteOnLeave
-                  ? "Êtes-vous sûr de quitter ce club ? Cela entraînera sa suppression définitive."
-                  : "Êtes-vous sûr de quitter le club ?"}
-              </Text>
-            )}
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalBtn, { backgroundColor: colors.accent }]}
-                onPress={() => {
-                  setLeaveConfirmVisible(false);
-                  setRequireOwnerTransfer(false);
-                  setDeleteOnLeave(false);
-                  setNewOwnerId(null);
-                  setPendingLeaveClub(null);
-                }}
-              >
-                <Text style={{ color: '#0F3327', fontFamily: FontFamilies.heading }}>Rester</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalBtn, { backgroundColor: '#D93636' }]}
-                disabled={requireOwnerTransfer && !newOwnerId}
-                onPress={handleLeaveClub}
-              >
-                <Text style={{ color: '#fff', fontFamily: FontFamilies.heading, opacity: requireOwnerTransfer && !newOwnerId ? 0.5 : 1 }}>Quitter</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
         </View>
       )}
     </SafeAreaView>

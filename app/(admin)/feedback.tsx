@@ -1,4 +1,5 @@
 import { AdminNav } from "@/components/ui/(admin)/AdminNav";
+import { FontFamilies } from "@/constants/fonts";
 import { db } from "@/firebaseConfig";
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,15 +8,27 @@ import { Stack } from "expo-router";
 import { collection, deleteDoc, doc, getDocs, orderBy, query } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from "react-native";
+
+// 🎨 THEME ADMIN FEEDBACK
+const feedbackTheme = {
+    bgGradient: ["#F9FAFB", "#F3F4F6"] as const,
+    glassCardBg: ["#FFFFFF", "rgba(255, 255, 255, 0.8)"] as const,
+    borderColor: "rgba(0, 0, 0, 0.05)",
+    textMain: "#111827",
+    textMuted: "#6B7280",
+    accent: "#008F6B",
+    warning: "#F59E0B",
+    danger: "#EF4444",
+};
 
 type Feedback = {
   id: string;
@@ -34,7 +47,6 @@ export default function AdminFeedback() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   
-  // 🆕 État pour le filtre sélectionné (null = TOUS)
   const [selectedChallenge, setSelectedChallenge] = useState<string | null>(null);
 
   // 📥 Charger les avis
@@ -67,23 +79,20 @@ export default function AdminFeedback() {
   };
 
   // 🧠 LOGIQUE DE FILTRAGE
-  // 1. Récupérer la liste unique des titres de défis pour le sélecteur
   const uniqueTitles = useMemo(() => {
     const titles = feedbacks.map(f => f.challengeTitle).filter(Boolean);
-    return Array.from(new Set(titles)); // Supprime les doublons
+    return Array.from(new Set(titles));
   }, [feedbacks]);
 
-  // 2. Filtrer les avis affichés
   const filteredFeedbacks = useMemo(() => {
-    if (!selectedChallenge) return feedbacks; // Si "TOUS", on renvoie tout
+    if (!selectedChallenge) return feedbacks;
     return feedbacks.filter(f => f.challengeTitle === selectedChallenge);
   }, [selectedChallenge, feedbacks]);
 
-  // 3. Calculer la moyenne (seulement si un défi est sélectionné)
   const averageRating = useMemo(() => {
     if (!selectedChallenge || filteredFeedbacks.length === 0) return 0;
     const sum = filteredFeedbacks.reduce((acc, curr) => acc + curr.rating, 0);
-    return (sum / filteredFeedbacks.length).toFixed(1); // 1 chiffre après la virgule
+    return (sum / filteredFeedbacks.length).toFixed(1);
   }, [selectedChallenge, filteredFeedbacks]);
 
   // Helper pour afficher les étoiles
@@ -95,39 +104,40 @@ export default function AdminFeedback() {
             key={star}
             name={star <= rating ? "star" : (star - 0.5 <= rating ? "star-half" : "star-outline")}
             size={size}
-            color="#F59E0B"
+            color={feedbackTheme.warning}
           />
         ))}
       </View>
     );
   };
 
-  const glassStyle = {
-    backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.65)",
-    borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.4)",
-  };
+  // Couleurs dynamiques
+  const titleColor = isDark ? "#FFF" : feedbackTheme.textMain;
+  const mutedColor = isDark ? "#9CA3AF" : feedbackTheme.textMuted;
+  const cardBorder = isDark ? "rgba(255,255,255,0.1)" : feedbackTheme.borderColor;
+  const bgColors = isDark ? [colors.background, "#1F2937"] : feedbackTheme.bgGradient;
 
   return (
     <View style={{ flex: 1 }}>
       <Stack.Screen options={{ headerShown: false }} />
 
       <LinearGradient
-        colors={isDark ? [colors.background, "#0f2027", "#203a43"] : ["#FAF7F2", "#E8F5E9", "#FFFFFF"]}
+        colors={bgColors as any}
         style={StyleSheet.absoluteFill}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       />
 
       <View style={styles.headerContainer}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Avis Défis</Text>
-        <TouchableOpacity onPress={loadFeedbacks} style={styles.refreshBtn}>
-          <Ionicons name="refresh" size={20} color={colors.text} />
+        <Text style={[styles.headerTitle, { color: titleColor }]}>Avis & Retours</Text>
+        <TouchableOpacity onPress={loadFeedbacks} style={[styles.refreshBtn, { backgroundColor: isDark ? "rgba(255,255,255,0.1)" : "#FFF" }]}>
+          <Ionicons name="refresh" size={20} color={titleColor} />
         </TouchableOpacity>
       </View>
 
       {loading ? (
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-          <ActivityIndicator size="large" color={colors.accent} />
+          <ActivityIndicator size="large" color={feedbackTheme.accent} />
         </View>
       ) : (
         <View style={{ flex: 1 }}>
@@ -137,24 +147,22 @@ export default function AdminFeedback() {
             <ScrollView 
               horizontal 
               showsHorizontalScrollIndicator={false} 
-              contentContainerStyle={{ paddingHorizontal: 20, alignItems: 'center', gap: 10 }}
+              contentContainerStyle={{ paddingHorizontal: 20, alignItems: 'center', gap: 8 }}
             >
-              {/* Bouton TOUS */}
               <TouchableOpacity
                 onPress={() => setSelectedChallenge(null)}
                 style={[
                   styles.filterChip,
                   selectedChallenge === null 
-                    ? { backgroundColor: colors.accent, borderColor: colors.accent } 
-                    : { backgroundColor: isDark ? "rgba(255,255,255,0.1)" : "white", borderColor: isDark ? "rgba(255,255,255,0.2)" : "#E5E7EB" }
+                    ? { backgroundColor: feedbackTheme.accent, borderColor: feedbackTheme.accent } 
+                    : { backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "#FFF", borderColor: cardBorder }
                 ]}
               >
-                <Text style={{ fontWeight: "700", color: selectedChallenge === null ? "#FFF" : colors.text }}>
+                <Text style={{ fontWeight: "700", color: selectedChallenge === null ? "#FFF" : mutedColor, fontSize: 13 }}>
                   TOUS
                 </Text>
               </TouchableOpacity>
 
-              {/* Liste des défis */}
               {uniqueTitles.map((title) => (
                 <TouchableOpacity
                   key={title}
@@ -162,11 +170,11 @@ export default function AdminFeedback() {
                   style={[
                     styles.filterChip,
                     selectedChallenge === title 
-                      ? { backgroundColor: colors.accent, borderColor: colors.accent } 
-                      : { backgroundColor: isDark ? "rgba(255,255,255,0.1)" : "white", borderColor: isDark ? "rgba(255,255,255,0.2)" : "#E5E7EB" }
+                      ? { backgroundColor: feedbackTheme.accent, borderColor: feedbackTheme.accent } 
+                      : { backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "#FFF", borderColor: cardBorder }
                   ]}
                 >
-                  <Text style={{ fontWeight: "600", color: selectedChallenge === title ? "#FFF" : colors.mutedText }}>
+                  <Text style={{ fontWeight: "600", color: selectedChallenge === title ? "#FFF" : mutedColor, fontSize: 13 }}>
                     {title}
                   </Text>
                 </TouchableOpacity>
@@ -174,23 +182,23 @@ export default function AdminFeedback() {
             </ScrollView>
           </View>
 
-          {/* 🆕 PANNEAU DE STATISTIQUES (Visible seulement si un défi est sélectionné) */}
+          {/* 🆕 STATISTIQUES */}
           {selectedChallenge && (
-            <View style={{ paddingHorizontal: 20, marginBottom: 10 }}>
-              <View style={[styles.statsCard, { backgroundColor: isDark ? "rgba(0,0,0,0.3)" : "rgba(255,255,255,0.8)" }]}>
+            <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
+              <View style={[styles.statsCard, { backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "#FFF", borderColor: cardBorder }]}>
                 <View>
-                   <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginBottom: 4 }}>
-                     Moyenne
+                   <Text style={{ color: titleColor, fontSize: 16, fontFamily: FontFamilies.heading, marginBottom: 4 }}>
+                     Note Moyenne
                    </Text>
-                   <Text style={{ color: colors.mutedText, fontSize: 12 }}>
-                     Basé sur {filteredFeedbacks.length} avis
+                   <Text style={{ color: mutedColor, fontSize: 12 }}>
+                     Sur {filteredFeedbacks.length} avis
                    </Text>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
-                   <Text style={{ fontSize: 32, fontWeight: '900', color: colors.accent }}>
+                   <Text style={{ fontSize: 28, fontWeight: '800', color: feedbackTheme.accent }}>
                      {averageRating}
                    </Text>
-                   {renderStars(Number(averageRating), 16)}
+                   {renderStars(Number(averageRating), 14)}
                 </View>
               </View>
             </View>
@@ -205,41 +213,43 @@ export default function AdminFeedback() {
             }
           >
             {filteredFeedbacks.length === 0 ? (
-              <View style={[styles.emptyCard, glassStyle]}>
-                <Ionicons name="chatbox-ellipses-outline" size={48} color={colors.mutedText} />
-                <Text style={{ color: colors.mutedText, marginTop: 10 }}>Aucun avis trouvé.</Text>
+              <View style={[styles.emptyCard, { borderColor: cardBorder }]}>
+                <Ionicons name="chatbox-ellipses-outline" size={48} color={mutedColor} style={{ opacity: 0.5 }} />
+                <Text style={{ color: mutedColor, marginTop: 12, fontFamily: FontFamilies.body }}>Aucun avis pour le moment.</Text>
               </View>
             ) : (
               filteredFeedbacks.map((item) => (
-                <View key={item.id} style={[styles.card, glassStyle]}>
+                <View key={item.id} style={[styles.card, { backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "#FFF", borderColor: cardBorder }]}>
                   
-                  {/* Header Carte : Note + Supprimer */}
+                  {/* Header Carte */}
                   <View style={styles.cardHeader}>
-                    <View style={styles.ratingBadge}>
+                    <View style={[styles.ratingBadge, { backgroundColor: isDark ? "rgba(245, 158, 11, 0.1)" : "#FEF3C7" }]}>
                       {renderStars(item.rating)}
-                      <Text style={{ fontWeight: "700", marginLeft: 6, color: colors.text }}>{item.rating}/5</Text>
+                      <Text style={{ fontWeight: "700", marginLeft: 6, color: isDark ? "#F59E0B" : "#D97706", fontSize: 12 }}>{item.rating}/5</Text>
                     </View>
-                    <TouchableOpacity onPress={() => handleDelete(item.id)}>
-                      <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                    <TouchableOpacity onPress={() => handleDelete(item.id)} style={{ padding: 4 }}>
+                      <Ionicons name="trash-outline" size={18} color={feedbackTheme.danger} />
                     </TouchableOpacity>
                   </View>
 
-                  {/* Titre du défi (Affiché uniquement si on est en mode "TOUS") */}
+                  {/* Titre Défi */}
                   {!selectedChallenge && (
-                    <Text style={[styles.challengeName, { color: colors.accent }]}>
+                    <Text style={[styles.challengeName, { color: feedbackTheme.accent }]}>
                       {item.challengeTitle || "Défi Inconnu"}
                     </Text>
                   )}
 
                   {/* Commentaire */}
-                  <Text style={[styles.comment, { color: colors.text }]}>
+                  <Text style={[styles.comment, { color: titleColor }]}>
                     "{item.comment}"
                   </Text>
 
-                  {/* Footer : Auteur + Date */}
-                  <Text style={{ fontSize: 10, color: colors.mutedText, marginTop: 10, textAlign: "right" }}>
-                    Par {item.userName || "Anonyme"} • {item.createdAt?.seconds ? new Date(item.createdAt.seconds * 1000).toLocaleDateString() : "Récemment"}
-                  </Text>
+                  {/* Footer */}
+                  <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 12 }}>
+                    <Text style={{ fontSize: 11, color: mutedColor, fontStyle: 'italic' }}>
+                      Par {item.userName || "Anonyme"} • {item.createdAt?.seconds ? new Date(item.createdAt.seconds * 1000).toLocaleDateString() : "Récemment"}
+                    </Text>
+                  </View>
                 </View>
               ))
             )}
@@ -255,23 +265,24 @@ export default function AdminFeedback() {
 const styles = StyleSheet.create({
   headerContainer: {
     paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 10,
+    paddingHorizontal: 24,
+    paddingBottom: 16,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
   headerTitle: {
     fontSize: 28,
+    fontFamily: FontFamilies.heading,
     fontWeight: "800",
   },
   refreshBtn: {
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.3)",
+    padding: 10,
+    borderRadius: 12,
+    shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 4, elevation: 1
   },
   filterChip: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
@@ -281,10 +292,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    padding: 20,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.05)",
+    shadowColor: "#000", shadowOpacity: 0.02, shadowRadius: 8, elevation: 1
   },
   emptyCard: {
     padding: 40,
@@ -292,41 +303,42 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
+    borderStyle: 'dashed'
   },
   card: {
-    borderRadius: 24,
+    borderRadius: 20,
     padding: 20,
     marginBottom: 16,
     borderWidth: 1,
-    shadowColor: "#3E2723", 
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
+    shadowColor: "#000", 
+    shadowOpacity: 0.03, 
+    shadowRadius: 10, 
     elevation: 2,
   },
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 10,
   },
   ratingBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(245, 158, 11, 0.1)", // Fond jaune très clair
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
   },
   challengeName: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "700",
-    marginBottom: 6,
+    marginBottom: 8,
     textTransform: "uppercase",
     letterSpacing: 0.5,
+    fontFamily: FontFamilies.heading
   },
   comment: {
     fontSize: 15,
     lineHeight: 22,
-    fontStyle: "italic",
+    fontFamily: FontFamilies.body,
   },
 });

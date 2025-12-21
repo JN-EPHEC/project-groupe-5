@@ -1,5 +1,6 @@
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient"; // ✅ AJOUT
 import React from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { CATEGORY_CONFIG } from "./constants";
@@ -8,7 +9,7 @@ export type ValidationItem = {
   id: number | string;
   title: string;
   description: string;
-  category: string; // Simplifié pour matcher avec ce qui vient de Firebase
+  category: string;
   difficulty: "Facile" | "Moyen" | "Difficile" | string;
   points: number;
   audience: string;
@@ -22,48 +23,57 @@ type Props = {
   item: ValidationItem;
   onValidate: () => void;
   onReject: () => void;
-  onReport?: () => void; // 👇 La fonction qui vient du parent (defi.tsx)
+  onReport?: () => void;
+};
+
+// 🎨 THEME VALIDATION CARD
+const validationTheme = {
+    glassBg: ["rgba(255, 255, 255, 0.95)", "rgba(240, 253, 244, 0.95)"] as const,
+    borderColor: "rgba(255, 255, 255, 0.6)",
+    textMain: "#0A3F33",
+    textMuted: "#4A665F",
+    accent: "#008F6B",
 };
 
 export function ValidationCard({ item, onValidate, onReject, onReport }: Props) {
   const { colors, mode } = useThemeMode();
   const isLight = mode === "light";
   
-  const cardAlt = isLight ? colors.cardAlt : "rgba(0, 151, 178, 0.05)";
-  const cardText = isLight ? colors.cardText : colors.text;
-  const cardMuted = isLight ? colors.cardMuted : colors.mutedText;
+  // Couleurs dynamiques
+  const cardText = isLight ? validationTheme.textMain : colors.text;
+  const cardMuted = isLight ? validationTheme.textMuted : colors.mutedText;
 
-  // Gestion sécurisée de la catégorie (si inconnue, icône par défaut)
+  // Gestion sécurisée de la catégorie
   const categoryConfig = CATEGORY_CONFIG[item.category as keyof typeof CATEGORY_CONFIG] || { 
       label: item.category, 
       icon: "leaf-outline" 
   };
 
-  return (
-    <View style={[
-      styles.card, 
-      { 
-        backgroundColor: colors.glass || colors.card, // Fallback si colors.glass n'est pas défini
-        borderColor: colors.glassBorder || "transparent",
-        borderWidth: colors.glassBorder ? 1 : 0,
-        // Ajout d'une ombre douce si pas de bordure "glass"
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
+  // Wrapper conditionnel (LinearGradient si Light, View si Dark)
+  const Wrapper = isLight ? LinearGradient : View;
+  const wrapperProps = isLight 
+    ? { 
+        colors: validationTheme.glassBg, 
+        start: { x: 0, y: 0 }, 
+        end: { x: 1, y: 1 }, 
+        style: [styles.card, styles.glassEffect] 
       }
-    ]}> 
+    : { 
+        style: [styles.card, { backgroundColor: colors.surface || colors.card, borderColor: 'rgba(0,151,178,0.3)', borderWidth: 1 }] 
+      };
+
+  return (
+    <Wrapper {...(wrapperProps as any)}> 
       {/* HEADER */}
       <View style={styles.header}>
-        <View style={[styles.categoryPill, { backgroundColor: cardAlt }]}> 
-          <Ionicons name={categoryConfig.icon as any} size={16} color="#7DCAB0" />
-          <Text style={styles.categoryText}>{categoryConfig.label}</Text>
+        <View style={[styles.categoryPill, { backgroundColor: isLight ? "rgba(0,143,107,0.1)" : colors.surfaceAlt }]}> 
+          <Ionicons name={categoryConfig.icon as any} size={14} color="#008F6B" />
+          <Text style={[styles.categoryText, { color: "#008F6B" }]}>{categoryConfig.label}</Text>
         </View>
 
-        <View style={styles.pointsBadge}>
-          <Ionicons name="leaf" size={16} color="#0F3327" />
-          <Text style={styles.pointsText}>{item.points} pts</Text>
+        <View style={[styles.pointsBadge, { backgroundColor: isLight ? "#D1FAE5" : "#1F3A33" }]}>
+          <Ionicons name="leaf" size={14} color={isLight ? "#0F3327" : "#52D192"} />
+          <Text style={[styles.pointsText, { color: isLight ? "#0F3327" : "#52D192" }]}>{item.points} pts</Text>
         </View>
       </View>
 
@@ -75,13 +85,15 @@ export function ValidationCard({ item, onValidate, onReject, onReport }: Props) 
 
       {/* PHOTO DE PREUVE */}
       {item.photoUrl && (
-        <Image source={{ uri: item.photoUrl }} style={styles.photo} />
+        <View style={styles.photoContainer}>
+            <Image source={{ uri: item.photoUrl }} style={styles.photo} />
+        </View>
       )}
 
       {/* COMMENTAIRE */}
       {item.comment && (
-        <View style={[styles.commentBox, { backgroundColor: cardAlt }]}>
-            <Text style={{ color: cardText, fontStyle: "italic", fontSize: 13 }}>
+        <View style={[styles.commentBox, { backgroundColor: isLight ? "rgba(255,255,255,0.6)" : colors.surfaceAlt }]}>
+            <Text style={{ color: cardText, fontStyle: "italic", fontSize: 13, textAlign: 'center' }}>
                 "{item.comment}"
             </Text>
         </View>
@@ -90,34 +102,33 @@ export function ValidationCard({ item, onValidate, onReject, onReport }: Props) 
       {/* ACTIONS */}
       <View style={styles.actions}>
         <TouchableOpacity 
-            style={[styles.secondaryButton, { backgroundColor: cardAlt }]}
+            style={[styles.actionBtn, { backgroundColor: isLight ? "#FEF2F2" : "#2A171A", borderColor: "#FCA5A5", borderWidth: 1 }]}
             onPress={onReject}
         > 
-          <Ionicons name="close-circle" size={18} color={cardMuted} style={styles.leadingIcon} />
-          <Text style={[styles.secondaryText, { color: cardMuted }]}>Refuser</Text>
+          <Ionicons name="close-circle" size={18} color="#EF4444" />
+          <Text style={[styles.actionText, { color: "#EF4444" }]}>Refuser</Text>
         </TouchableOpacity>
 
-        {/* 👇 BOUTON SIGNALER CONNECTÉ À onReport */}
+        {/* BOUTON SIGNALER */}
         <TouchableOpacity 
             style={[
-                styles.warnButton, 
-                { backgroundColor: isLight ? '#FEF3C7' : '#451a03', borderColor: '#D97706', borderWidth: 1 }
+                styles.actionBtn, 
+                { backgroundColor: isLight ? '#FFFBEB' : '#451a03', borderColor: '#FCD34D', borderWidth: 1 }
             ]}
-            onPress={onReport} // Appelle la modale globale
+            onPress={onReport}
         >
-          <Ionicons name="flag-outline" size={18} color="#D97706" style={styles.leadingIcon} />
-          <Text style={[styles.warnText, { color: '#D97706' }]}>Signaler</Text>
+          <Ionicons name="flag-outline" size={18} color="#D97706" />
         </TouchableOpacity>
 
         <TouchableOpacity 
-            style={[styles.successButton, { backgroundColor: colors.accent }]} 
+            style={[styles.actionBtn, { backgroundColor: isLight ? "#D1FAE5" : validationTheme.accent, flex: 1.5 }]} 
             onPress={onValidate}
         >
-          <Ionicons name="checkmark-circle" size={18} color="#0F3327" style={styles.leadingIcon} />
-          <Text style={styles.successText}>Valider</Text>
+          <Ionicons name="checkmark-circle" size={18} color="#065F46" style={{ marginRight: 6 }} />
+          <Text style={[styles.actionText, { color: "#065F46" }]}>Valider</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </Wrapper>
   );
 }
 
@@ -127,6 +138,15 @@ const styles = StyleSheet.create({
     padding: 20,
     marginBottom: 18,
   },
+  glassEffect: {
+    borderWidth: 1,
+    borderColor: validationTheme.borderColor,
+    shadowColor: "#005c4b",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+  },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -135,94 +155,75 @@ const styles = StyleSheet.create({
   categoryPill: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
   categoryText: {
-    color: "#7DCAB0",
-    fontWeight: "600",
-    marginLeft: 6,
+    fontWeight: "700",
+    marginLeft: 4,
+    fontSize: 11
   },
   pointsBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#D4F7E7",
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
   pointsText: {
-    color: "#0F3327",
     fontWeight: "700",
-    marginLeft: 6,
+    marginLeft: 4,
+    fontSize: 11
   },
   title: {
     fontSize: 18,
     fontWeight: "700",
-    marginTop: 16,
+    marginTop: 12,
+    fontFamily: "StylizedTitle" // Adapte si besoin
   },
   subtitle: {
-    marginTop: 4,
+    marginTop: 2,
     marginBottom: 12,
-    fontSize: 12,
+    fontSize: 13,
+  },
+  photoContainer: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 12,
+    borderWidth: 4,
+    borderColor: "#fff", // Cadre photo blanc
+    shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 4, elevation: 2
   },
   photo: {
-    borderRadius: 18,
-    height: 180,
+    height: 200,
     width: "100%",
-    marginBottom: 12,
     resizeMode: "cover",
   },
   commentBox: {
     borderRadius: 12,
     padding: 12,
-    marginBottom: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.05)"
   },
   actions: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 8,
-    gap: 8,
+    marginTop: 4,
+    gap: 10,
   },
-  secondaryButton: {
+  actionBtn: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 18,
+    borderRadius: 16,
     paddingVertical: 12,
+    gap: 6
   },
-  warnButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 18,
-    paddingVertical: 12,
-  },
-  successButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 18,
-    paddingVertical: 12,
-  },
-  warnText: {
-    fontWeight: '700',
-    fontSize: 12,
-  },
-  secondaryText: {
-    fontWeight: "600",
-    fontSize: 12,
-  },
-  successText: {
-    color: "#0F3327",
+  actionText: {
     fontWeight: "700",
-    fontSize: 12,
-  },
-  leadingIcon: {
-    marginRight: 6,
+    fontSize: 13,
   },
 });

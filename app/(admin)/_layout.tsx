@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 export default function AdminLayout() {
   const { user } = useUser();
   const router = useRouter();
-  const insets = useSafeAreaInsets(); // Pour gérer l'encoche de l'iPhone
+  const insets = useSafeAreaInsets();
 
   // Si pas admin, on redirige
   if (!user?.isAdmin) return <Redirect href="/profil" />;
@@ -23,18 +23,19 @@ export default function AdminLayout() {
         <Stack.Screen name="feedback" />
       </Stack>
 
-      {/* BOUTON RETOUR FLOTTANT (Z-Index élevé) */}
+      {/* BOUTON "QUITTER ADMIN" FLOTTANT */}
       <TouchableOpacity
-        onPress={() => router.replace("/(tabs)/profil")} // Renvoie vers le profil utilisateur
+        onPress={() => router.replace("/(tabs)/profil")}
+        activeOpacity={0.8}
         style={[
           styles.backButton, 
           { 
-            top: Platform.OS === 'ios' ? insets.top + 10 : 40, // S'adapte à l'écran
+            top: Platform.OS === 'ios' ? insets.top + 10 : 40, 
           }
         ]}
       >
-        <View style={styles.blurCircle}>
-          <Ionicons name="arrow-back" size={24} color="#0F3327" />
+        <View style={styles.buttonContent}>
+          <Ionicons name="arrow-back" size={20} color="#111827" />
         </View>
       </TouchableOpacity>
     </View>
@@ -44,20 +45,24 @@ export default function AdminLayout() {
 const styles = StyleSheet.create({
   backButton: {
     position: "absolute",
-    left: 20,
-    zIndex: 9999, // Très important pour passer au-dessus de tout
+    left: 24, // Alignement avec le padding des pages (souvent 24)
+    zIndex: 9999,
   },
-  blurCircle: {
-    backgroundColor: "rgba(255,255,255,0.8)", // Petit fond blanc semi-transparent pour la lisibilité
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  buttonContent: {
+    backgroundColor: "#FFFFFF",
+    width: 44,
+    height: 44,
+    borderRadius: 14, // Arrondi moderne
     justifyContent: "center",
     alignItems: "center",
+    // Ombre douce et propre
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+    // Bordure très fine
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.05)"
   }
 });
