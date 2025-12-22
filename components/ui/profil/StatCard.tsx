@@ -12,30 +12,48 @@ interface StatCardProps {
   accent?: boolean;
 }
 
+// 🎨 THEME STAT CARD
+const statTheme = {
+    glassBg: ["rgba(255, 255, 255, 0.9)", "rgba(255, 255, 255, 0.7)"] as const,
+    accentBg: ["#008F6B", "#10B981"] as const, // Vert Marque dégradé
+    borderColor: "rgba(255, 255, 255, 0.6)",
+    textMain: "#0A3F33",
+    textMuted: "#4A665F",
+};
+
 export const StatCard: React.FC<StatCardProps> = ({ icon, value, label, accent }) => {
   const { colors, mode } = useThemeMode();
   const isLight = mode === "light";
-  const gradient = accent
-    ? ([colors.accent, colors.success] as const)
-    : isLight
-    ? ([colors.cardAlt, colors.card] as const)
-    : (["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"] as const);
-  const textColor = accent ? "#0F3327" : isLight ? colors.cardText : colors.text;
-  const subTextColor = accent ? "#0F3327" : isLight ? colors.cardMuted : colors.mutedText;
-  const iconTint = accent ? "#0F3327" : isLight ? colors.cardText : colors.accent;
-  const badgeFill = accent ? "rgba(15, 51, 39, 0.12)" : isLight ? colors.cardAlt : "rgba(0, 151, 178, 0.2)";
-  const cardBorderColor = accent ? "rgba(15,51,39,0.1)" : isLight ? "rgba(255,255,255,0.12)" : "rgba(0, 151, 178, 0.3)";
-  const shadowShade = accent ? colors.accent : isLight ? colors.card : colors.accent;
+
+  // Couleurs dynamiques
+  const textColor = accent ? "#FFF" : (isLight ? statTheme.textMain : colors.text);
+  const subTextColor = accent ? "rgba(255,255,255,0.9)" : (isLight ? statTheme.textMuted : colors.mutedText);
+  const iconColor = accent ? "#FFF" : (isLight ? statTheme.textMain : colors.accent);
+  const iconBg = accent ? "rgba(255,255,255,0.2)" : (isLight ? "#E0F7EF" : "rgba(255,255,255,0.1)");
+
+  // Wrapper conditionnel
+  const Wrapper = isLight ? LinearGradient : View;
+  
+  // Props du wrapper
+  const wrapperProps = isLight
+    ? {
+        colors: accent ? statTheme.accentBg : statTheme.glassBg,
+        start: { x: 0, y: 0 },
+        end: { x: 1, y: 1 },
+        style: [styles.card, styles.glassEffect, accent && { borderColor: "transparent" }]
+      }
+    : {
+        style: [styles.card, { backgroundColor: accent ? colors.accent : "rgba(0, 151, 178, 0.1)", borderColor: "rgba(255,255,255,0.1)", borderWidth: 1 }]
+      };
+
   return (
-    <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.card, { shadowColor: shadowShade, borderColor: cardBorderColor }]}>
-      <View
-        style={[styles.iconBadge, { backgroundColor: badgeFill }]}
-      >
-        <Ionicons name={icon as any} size={20} color={iconTint} />
+    <Wrapper {...(wrapperProps as any)}>
+      <View style={[styles.iconBadge, { backgroundColor: iconBg }]}>
+        <Ionicons name={icon as any} size={22} color={iconColor} />
       </View>
       {value && <Text style={[styles.number, { color: textColor }]}>{value}</Text>}
       <Text style={[styles.label, { color: subTextColor }]}>{label}</Text>
-    </LinearGradient>
+    </Wrapper>
   );
 };
 
@@ -43,18 +61,36 @@ const styles = StyleSheet.create({
   card: {
     flex: 1,
     margin: 5,
-    borderRadius: 22,
+    borderRadius: 20,
     alignItems: "center",
-    paddingVertical: 18,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.05)",
-    position: "relative",
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
+    paddingVertical: 20,
+    paddingHorizontal: 10,
   },
-  iconBadge: { width: 36, height: 36, borderRadius: 18, justifyContent: "center", alignItems: "center" },
-  number: { fontSize: 18, fontFamily: FontFamilies.heading, marginTop: 8 },
-  label: { fontSize: 13, fontFamily: FontFamilies.bodyStrong, marginTop: 6 },
+  glassEffect: {
+    borderWidth: 1,
+    borderColor: statTheme.borderColor,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  iconBadge: { 
+      width: 42, height: 42, 
+      borderRadius: 21, 
+      justifyContent: "center", alignItems: "center",
+      marginBottom: 10 
+  },
+  number: { 
+      fontSize: 20, 
+      fontFamily: FontFamilies.heading, 
+      fontWeight: '800',
+      marginBottom: 4 
+  },
+  label: { 
+      fontSize: 12, 
+      fontFamily: FontFamilies.body, 
+      textAlign: 'center',
+      fontWeight: '600'
+  },
 });

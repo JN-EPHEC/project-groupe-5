@@ -4,20 +4,20 @@ import { useUser } from "@/hooks/user-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import * as ImagePicker from "expo-image-picker";
+import { LinearGradient } from "expo-linear-gradient";
 import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp, Unsubscribe } from "firebase/firestore";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-    Alert,
-    FlatList,
-    Image,
-    Keyboard,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -39,6 +39,15 @@ interface ChatViewProps {
   onSendImage?: (uri: string) => void;
 }
 
+const chatTheme = {
+    myBubble: "#008F6B", 
+    myText: "#FFFFFF",
+    otherBubble: ["rgba(255, 255, 255, 0.8)", "rgba(255, 255, 255, 0.6)"] as const,
+    otherText: "#0A3F33",
+    inputBg: ["rgba(255, 255, 255, 0.9)", "rgba(255, 255, 255, 0.7)"] as const,
+    inputBorder: "rgba(255, 255, 255, 0.5)",
+};
+
 export const ChatView: React.FC<ChatViewProps> = ({
   selectedChat,
   input,
@@ -53,6 +62,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const [sending, setSending] = useState(false);
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
+  const isLight = mode === "light";
 
   const currentUserName = useMemo(() => {
     if (!user) return "Moi";
@@ -123,15 +133,11 @@ export const ChatView: React.FC<ChatViewProps> = ({
         text,
         createdAt: serverTimestamp(),
         userId: uid,
-        userName:
-          auth.currentUser?.displayName ||
-          [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
-          user?.username ||
-          "Utilisateur",
-        photoURL: auth.currentUser?.photoURL || user?.photoURL || "",
+        userName: currentUserName, // Utilise le nom calculé correctement
+        photoURL: currentUserAvatar || "",
       });
       setInput("");
-      Keyboard.dismiss();
+      // Ne pas dismiss le clavier ici pour permettre d'enchainer les messages
     } catch (error) {
       console.error("[ChatView] send message failed", error);
     } finally {
@@ -153,223 +159,136 @@ export const ChatView: React.FC<ChatViewProps> = ({
     } catch {}
   };
 
-  const keyboardVerticalOffset = 120;
-  const composerBaseHeight = 72;
-  const listPaddingBottom = composerBaseHeight + tabBarHeight + insets.bottom + 8;
-  const inputPaddingBottom = 20;
-  const borderTone = mode === "light" ? "rgba(15,51,39,0.14)" : "rgba(255,255,255,0.08)";
-  const chatSurfaceBackground = mode === "light" ? "rgba(255,255,255,0.9)" : "rgba(0, 151, 178, 0.1)";
-  const composerBackground = "transparent";
-  const inputBackground = mode === "light" ? "#ffffff" : "rgba(255,255,255,0.06)";
-
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: colors.background, paddingBottom: tabBarHeight }]}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={keyboardVerticalOffset}
+      style={[styles.container, { paddingBottom: 0 }]}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0}
     >
       {showBack && (
-        <>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
           <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
+            <Ionicons name="arrow-back" size={24} color={isLight ? "#0A3F33" : colors.text} />
           </TouchableOpacity>
-          <Text style={[styles.header, { color: colors.text }]}> 
+          <Text style={[styles.header, { color: isLight ? "#0A3F33" : colors.text }]}> 
             {selectedChat?.type === "club"
               ? `Salon ${selectedChat.name}`
               : `Chat avec ${selectedChat.name}`}
           </Text>
-        </>
+        </View>
       )}
 
       {messages.length === 0 && (
-        <Text style={[styles.empty, { color: colors.mutedText }]}>Commencez la discussion 🌿</Text>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <Ionicons name="chatbubbles-outline" size={48} color={colors.mutedText} style={{ opacity: 0.5 }} />
+            <Text style={[styles.empty, { color: colors.mutedText }]}>Commencez la discussion 🌿</Text>
+        </View>
       )}
 
-      <View
-        style={[
-          styles.chatSurface,
-          {
-            backgroundColor: chatSurfaceBackground,
-            borderColor: borderTone,
-            marginBottom: tabBarHeight > 0 ? tabBarHeight * 0.3 : 12,
-          },
-        ]}
-      > 
+      <View style={{ flex: 1 }}> 
         <FlatList
           data={messages}
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
-          keyboardDismissMode="on-drag"
+          // ✅ FIX CLAVIER : "interactive" permet de le baisser en slidant
+          keyboardDismissMode="interactive" 
           keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingVertical: 12, paddingBottom: 20 }}
           renderItem={({ item }) => {
-          const isMe = item.userId === auth.currentUser?.uid;
-          const avatarUri = isMe ? currentUserAvatar : item.photoURL || defaultOtherAvatar;
-          const displayName = isMe ? currentUserName : item.userName || defaultOtherName;
-          const initials = displayName ? displayName.charAt(0).toUpperCase() : "?";
+            const isMe = item.userId === auth.currentUser?.uid;
+            const avatarUri = isMe ? currentUserAvatar : item.photoURL || defaultOtherAvatar;
+            const displayName = isMe ? currentUserName : item.userName || defaultOtherName;
+            // ✅ FIX INITIALES : Gestion sécurisée
+            const initials = (displayName && typeof displayName === 'string') 
+                ? displayName.charAt(0).toUpperCase() 
+                : "?";
 
-          return (
-            <View
-              style={[styles.messageRow, { justifyContent: isMe ? "flex-end" : "flex-start" }]}
-            >
-              {!isMe && (
-                <TouchableOpacity onPress={() => Alert.alert(displayName)} style={styles.avatarTouch}>
-                  {avatarUri ? (
-                    <Image source={{ uri: avatarUri }} style={styles.avatar} />
-                  ) : (
-                    <View
-                      style={[
-                        styles.avatar,
-                        styles.avatarPlaceholder,
-                        { backgroundColor: colors.pill },
-                      ]}
-                    >
-                      <Text style={[styles.avatarInitial, { color: colors.text }]}>
-                        {initials}
-                      </Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              )}
+            const BubbleComponent = (!isMe && isLight) ? LinearGradient : View;
+            const bubbleProps = (!isMe && isLight)
+                ? { colors: chatTheme.otherBubble, style: [styles.message, styles.otherBubbleLight] }
+                : { style: [styles.message, { backgroundColor: isMe ? (isLight ? chatTheme.myBubble : colors.accent) : colors.surfaceAlt }] };
 
-              <View style={styles.messageContent}>
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                >
-                  <View
-                    style={[
-                      styles.message,
-                      {
-                        backgroundColor: isMe ? colors.accent : colors.surfaceAlt,
-                        alignSelf: "flex-start",
-                      },
-                    ]}
-                  >
-                    {item.imageUrl ? (
-                      <Image
-                        source={{ uri: item.imageUrl }}
-                        style={{ width: 180, height: 180, borderRadius: 10 }}
-                      />
+            const textColor = isMe 
+                ? (isLight ? chatTheme.myText : "#000") 
+                : (isLight ? chatTheme.otherText : colors.text);
+
+            return (
+              <View style={[styles.messageRow, { justifyContent: isMe ? "flex-end" : "flex-start" }]}>
+                {!isMe && (
+                  <TouchableOpacity onPress={() => Alert.alert(displayName)} style={styles.avatarTouch}>
+                    {avatarUri ? (
+                      <Image source={{ uri: avatarUri }} style={styles.avatar} />
                     ) : (
-                      <Text style={[styles.text, { color: colors.text }]}>{item.text}</Text>
+                      <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: isLight ? "#E0F7EF" : colors.pill }]}>
+                        {/* ✅ FIX INITIALES : Couleur forcée pour être visible */}
+                        <Text style={[styles.avatarInitial, { color: "#008F6B" }]}>{initials}</Text>
+                      </View>
                     )}
-                  </View>
-                </TouchableOpacity>
-              </View>
+                  </TouchableOpacity>
+                )}
 
-              {isMe && (
-                <TouchableOpacity onPress={() => Alert.alert(displayName)} style={styles.avatarTouch}>
-                  {avatarUri ? (
-                    <Image source={{ uri: avatarUri }} style={styles.avatar} />
-                  ) : (
-                    <View
-                      style={[
-                        styles.avatar,
-                        styles.avatarPlaceholder,
-                        { backgroundColor: colors.pill },
-                      ]}
-                    >
-                      <Text style={[styles.avatarInitial, { color: colors.text }]}>
-                        {initials}
-                      </Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              )}
-            </View>
-          );
-        }}
-          contentContainerStyle={{ paddingVertical: 12, paddingBottom: listPaddingBottom }}
-          ListEmptyComponent={() => (
-            <Text style={[styles.empty, { color: colors.mutedText }]}>Démarre la conversation avec ton club</Text>
-          )}
-          style={{ flex: 1 }}
+                <View style={styles.messageContent}>
+                    <BubbleComponent {...(bubbleProps as any)}>
+                        {item.imageUrl ? (
+                        <Image source={{ uri: item.imageUrl }} style={{ width: 180, height: 180, borderRadius: 10 }} />
+                        ) : (
+                        <Text style={[styles.text, { color: textColor }]}>{item.text}</Text>
+                        )}
+                    </BubbleComponent>
+                </View>
+              </View>
+            );
+          }}
         />
       </View>
 
-      <View
-        style={[
-          styles.inputRow,
-          {
-            paddingBottom: inputPaddingBottom,
-            borderColor: "transparent",
-            backgroundColor: composerBackground,
-          },
-        ]}
-      >
-        {onSendImage ? (
-          <TouchableOpacity
-            onPress={pickImage}
-            style={[styles.attach, { backgroundColor: colors.surfaceAlt }]}
-          >
-            <Ionicons name="image-outline" size={20} color={colors.text} />
-          </TouchableOpacity>
-        ) : (
-          <View style={{ width: 0, height: 0 }} />
-        )}
-        <TextInput
-          value={input}
-          onChangeText={setInput}
-          placeholder="Écrire un message..."
-          placeholderTextColor={colors.mutedText}
-          style={[styles.input, { backgroundColor: inputBackground, color: colors.text, borderColor: mode === "light" ? "rgba(15,51,39,0.1)" : "rgba(255,255,255,0.08)" }]}
-          multiline
-        />
-        <TouchableOpacity
-          onPress={() => Keyboard.dismiss()}
-          style={styles.dismiss}
+      <View style={{ paddingBottom: insets.bottom + 12, paddingHorizontal: 16, paddingTop: 8 }}>
+        <LinearGradient
+            colors={isLight ? ["rgba(255, 255, 255, 0.9)", "rgba(240, 253, 244, 0.9)"] : ["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.1)"]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={[styles.inputRow, { borderColor: isLight ? "rgba(255, 255, 255, 1)" : "rgba(255, 255, 255, 0.1)", borderWidth: 1 }]}
         >
-          <Ionicons name="chevron-down" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={send}
-          disabled={sending || !input.trim().length}
-          style={[
-            styles.send,
-            {
-              backgroundColor: sending || !input.trim().length ? colors.surfaceAlt : colors.accent,
-            },
-          ]}
-        >
-          <Ionicons
-            name="send"
-            size={20}
-            color={sending || !input.trim().length ? colors.mutedText : colors.text}
-          />
-        </TouchableOpacity>
+            {onSendImage && (
+            <TouchableOpacity onPress={pickImage} style={{ padding: 10 }}>
+                <Ionicons name="image-outline" size={24} color={isLight ? "#008F6B" : colors.text} />
+            </TouchableOpacity>
+            )}
+            <TextInput
+                value={input}
+                onChangeText={setInput}
+                placeholder="Écrire un message..."
+                placeholderTextColor={isLight ? "#6E8580" : colors.mutedText}
+                style={[styles.input, { color: isLight ? "#0A3F33" : colors.text }]}
+                multiline
+            />
+            <TouchableOpacity
+                onPress={send}
+                disabled={sending || !input.trim().length}
+                style={[styles.send, { backgroundColor: sending || !input.trim().length ? (isLight ? "#E2E8F0" : colors.surfaceAlt) : "#008F6B" }]}
+            >
+                <Ionicons name="send" size={18} color="#FFF" style={{ marginLeft: 2 }} />
+            </TouchableOpacity>
+        </LinearGradient>
       </View>
     </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingTop: 8, paddingHorizontal: 12 },
-  backBtn: { marginBottom: 10 },
-  header: { fontSize: 18, fontWeight: "600", textAlign: "center", marginBottom: 10 },
-  messageRow: { flexDirection: "row", alignItems: "flex-end", marginVertical: 6 },
-  messageContent: { maxWidth: "78%" },
-  message: { padding: 10, borderRadius: 12, marginVertical: 4, maxWidth: "100%" },
-  text: { fontSize: 14 },
-  empty: { textAlign: "center", marginTop: 40, fontSize: 15, fontWeight: "600" },
-  inputRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingTop: 8,
-  },
-  input: { flex: 1, borderRadius: 20, padding: 10, fontSize: 14, borderWidth: StyleSheet.hairlineWidth },
-  attach: { marginRight: 8, borderRadius: 20, padding: 10 },
-  send: { marginLeft: 8, borderRadius: 20, padding: 10 },
-  dismiss: { marginLeft: 8, padding: 10 },
-  avatar: { width: 36, height: 36, borderRadius: 18 },
-  avatarTouch: { marginHorizontal: 8 },
+  container: { flex: 1 },
+  backBtn: { marginRight: 10 },
+  header: { fontSize: 18, fontWeight: "600" },
+  messageRow: { flexDirection: "row", alignItems: "flex-end", marginVertical: 4, marginHorizontal: 12 },
+  messageContent: { maxWidth: "75%" },
+  message: { padding: 12, borderRadius: 18, marginBottom: 2 },
+  otherBubbleLight: { borderWidth: 1, borderColor: "rgba(255,255,255,0.5)", shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 },
+  text: { fontSize: 15, lineHeight: 20 },
+  empty: { textAlign: "center", marginTop: 10, fontSize: 15, fontWeight: "600" },
+  inputRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 6, paddingVertical: 6, borderRadius: 30, shadowColor: "#005c4b", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 },
+  input: { flex: 1, fontSize: 15, paddingHorizontal: 8, paddingVertical: 8, maxHeight: 100 },
+  send: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginLeft: 4 },
+  avatar: { width: 32, height: 32, borderRadius: 16 },
+  avatarTouch: { marginRight: 8, paddingBottom: 4 },
   avatarPlaceholder: { alignItems: "center", justifyContent: "center" },
-  avatarInitial: { fontWeight: "700" },
-  chatSurface: {
-    flex: 1,
-    borderRadius: 22,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    marginBottom: 12,
-  },
+  avatarInitial: { fontWeight: "700", fontSize: 14 },
 });

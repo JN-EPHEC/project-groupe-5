@@ -1,8 +1,11 @@
+import { FontFamilies } from "@/constants/fonts";
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient"; // ✅ AJOUT
 import { Stack, useRouter } from "expo-router";
 import React from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const sections = [
   {
@@ -39,86 +42,106 @@ const sections = [
   },
 ];
 
+// 🎨 THEME CGU
+const cguTheme = {
+    bgGradient: ["#DDF7E8", "#F4FDF9"] as const,
+    glassCardBg: ["rgba(255, 255, 255, 0.85)", "rgba(255, 255, 255, 0.65)"] as const,
+    glassBorder: "rgba(255, 255, 255, 0.8)",
+    textMain: "#0A3F33", 
+    textMuted: "#4A665F",
+    accent: "#008F6B",
+};
+
 export default function TermsScreen() {
   const { colors, mode } = useThemeMode();
   const router = useRouter();
-  const heroBackground = mode === "light" ? "#0F3327" : colors.surfaceAlt;
+  const isLight = mode === "light";
+
+  // Couleurs dynamiques
+  const titleColor = isLight ? cguTheme.textMain : colors.text;
+  const textColor = isLight ? cguTheme.textMuted : colors.mutedText;
+
+  // Wrapper Fond
+  const BackgroundComponent = isLight ? LinearGradient : View;
+  const bgProps = isLight 
+    ? { colors: cguTheme.bgGradient, style: StyleSheet.absoluteFill } 
+    : { style: [StyleSheet.absoluteFill, { backgroundColor: "#021114" }] };
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}> 
+    <View style={{ flex: 1 }}>
       <Stack.Screen options={{ headerShown: false }} />
-      <View style={[styles.hero, { backgroundColor: heroBackground }]}> 
-        <TouchableOpacity
-          style={styles.heroBack}
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel="Revenir"
-        >
-          <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
-        </TouchableOpacity>
-        <Text style={styles.heroTitle}>CONDITIONS GÉNÉRALES D'UTILISATION – GREENUP</Text>
-        <Text style={styles.heroSubtitle}>Dernière mise à jour : 2025</Text>
-      </View>
-      <ScrollView contentContainerStyle={styles.content}>
-        {sections.map((section) => (
-          <View key={section.title} style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>{section.title}</Text>
-            <Text style={[styles.sectionBody, { color: colors.mutedText }]}>{section.body}</Text>
-          </View>
-        ))}
-      </ScrollView>
+      <BackgroundComponent {...(bgProps as any)} />
+
+      <SafeAreaView style={styles.root}>
+        {/* HEADER SIMPLE */}
+        <View style={styles.header}>
+            <TouchableOpacity
+              style={styles.backBtn}
+              onPress={() => router.back()}
+            >
+              <Ionicons name="arrow-back" size={24} color={titleColor} />
+            </TouchableOpacity>
+            <Text style={[styles.headerTitle, { color: titleColor }]}>CGU</Text>
+            <View style={{ width: 40 }} />
+        </View>
+
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {/* CARD CONTENU */}
+          <LinearGradient
+            colors={isLight ? cguTheme.glassCardBg : ["rgba(255,255,255,0.05)", "rgba(255,255,255,0.02)"]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={[
+                styles.card, 
+                { borderColor: isLight ? cguTheme.glassBorder : "rgba(255,255,255,0.1)", borderWidth: 1 }
+            ]}
+          >
+            {sections.map((section, index) => (
+                <View key={index} style={[styles.section, index === sections.length - 1 && { marginBottom: 0 }]}>
+                <Text style={[styles.sectionTitle, { color: titleColor }]}>{section.title}</Text>
+                <Text style={[styles.sectionBody, { color: textColor }]}>{section.body}</Text>
+                </View>
+            ))}
+          </LinearGradient>
+        </ScrollView>
+      </SafeAreaView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
+  root: { flex: 1 },
+  header: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: 20, paddingTop: 10, marginBottom: 10
   },
-  hero: {
-    paddingHorizontal: 24,
-    paddingTop: 54,
-    paddingBottom: 28,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
+  backBtn: { padding: 8, borderRadius: 12 },
+  headerTitle: { fontSize: 20, fontFamily: FontFamilies.heading, fontWeight: '700' },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    paddingTop: 10,
   },
-  heroBack: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.25)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 18,
-  },
-  heroTitle: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "700",
-    letterSpacing: 0.6,
-    textTransform: "uppercase",
-  },
-  heroSubtitle: {
-    marginTop: 8,
-    color: "rgba(255,255,255,0.7)",
-    fontWeight: "600",
-  },
-  content: {
-    paddingHorizontal: 24,
-    paddingVertical: 28,
+  card: {
+    borderRadius: 24,
+    padding: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 4
   },
   section: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: "700",
     marginBottom: 8,
+    fontFamily: FontFamilies.heading
   },
   sectionBody: {
     fontSize: 14,
-    lineHeight: 20,
-    fontWeight: "500",
+    lineHeight: 22,
+    fontFamily: FontFamilies.body
   },
 });

@@ -1,7 +1,7 @@
 import { useThemeMode } from "@/hooks/theme-context";
 import { useUser } from "@/hooks/user-context";
 import { Ionicons } from "@expo/vector-icons";
-import { Redirect, Tabs } from "expo-router";
+import { Tabs } from "expo-router"; // ⚠️ Plus de "Redirect" ici !
 import React, { useEffect } from "react";
 import { ActivityIndicator, Platform, View } from "react-native";
 import Animated, {
@@ -14,12 +14,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 // 🎨 THEME NAVBAR
 const navTheme = {
   light: {
-    bg: "rgba(240, 253, 244, 0.95)", // Le même fond "Menthe" que tes cartes
+    bg: "rgba(240, 253, 244, 0.95)",
     border: "rgba(255, 255, 255, 0.8)",
-    activeIconBg: "#008F6B", // Vert Marque pour la pastille active
-    activeIconColor: "#FFFFFF", // Icône blanche sur fond vert
-    inactiveColor: "#6E8580", // Gris vert
-    activeText: "#0A3F33", // Vert Forêt
+    activeIconBg: "#008F6B",
+    activeIconColor: "#FFFFFF",
+    inactiveColor: "#6E8580",
+    activeText: "#0A3F33",
     shadow: "#005c4b",
   },
   dark: {
@@ -36,7 +36,6 @@ const navTheme = {
 function CircleIcon({ name, color, focused, light }: any) {
   const scale = useSharedValue(focused ? 1 : 0.9);
   
-  // Animation plus fluide
   useEffect(() => {
     scale.value = withTiming(focused ? 1 : 1, { duration: 200 });
   }, [focused]);
@@ -52,14 +51,12 @@ function CircleIcon({ name, color, focused, light }: any) {
       <Animated.View
         style={[
           {
-            width: 42, // Un peu plus grand pour être confortable
+            width: 42,
             height: 42,
             borderRadius: 21,
             justifyContent: "center",
             alignItems: "center",
-            // Si actif : Fond Vert Marque. Sinon : Transparent.
             backgroundColor: focused ? theme.activeIconBg : "transparent",
-            // Petit effet de bordure en mode Dark
             borderWidth: focused && !light ? 1 : 0,
             borderColor: theme.border,
           },
@@ -69,7 +66,6 @@ function CircleIcon({ name, color, focused, light }: any) {
         <Ionicons
           name={name}
           size={22}
-          // Si actif : Blanc. Sinon : Couleur inactive du thème.
           color={focused ? theme.activeIconColor : color}
         />
       </Animated.View>
@@ -79,11 +75,12 @@ function CircleIcon({ name, color, focused, light }: any) {
 
 export default function TabLayout() {
   const { colors, mode } = useThemeMode();
-  const { user, loading } = useUser();
+  const { loading } = useUser(); // On n'a besoin que du loading ici
   const insets = useSafeAreaInsets();
   const isLight = mode === "light";
   const theme = isLight ? navTheme.light : navTheme.dark;
 
+  // Affichage du loader uniquement si on charge
   if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background }}>
@@ -92,7 +89,7 @@ export default function TabLayout() {
     );
   }
 
-  if (!user) return <Redirect href="/(auth)/login" />;
+  // ❌ SUPPRESSION DE LA REDIRECTION ICI : C'est le RootLayout qui s'en charge maintenant.
 
   return (
     <Tabs
@@ -101,31 +98,24 @@ export default function TabLayout() {
         tabBarShowLabel: true,
         tabBarStyle: {
           position: "absolute",
-          // On la décolle du bas pour l'effet flottant
           bottom: Platform.OS === "ios" ? insets.bottom + 10 : 20,
           left: 15,
           right: 15,
-          height: 84, // Hauteur confortable
-          borderRadius: 42, // Très arrondi
-          
-          // --- STYLE GLASSMORPHISM ---
+          height: 84,
+          borderRadius: 42,
           backgroundColor: theme.bg,
           borderTopWidth: 0,
-          borderWidth: 1, // Bordure fine "verre"
+          borderWidth: 1,
           borderColor: theme.border,
-          
-          // --- OMBRES DOUCES ---
           elevation: 8,
           shadowColor: theme.shadow,
           shadowOffset: { width: 0, height: 8 },
           shadowOpacity: isLight ? 0.1 : 0.3,
           shadowRadius: 16,
-          
-          paddingBottom: 16, // Espace pour le texte
+          paddingBottom: 16,
           paddingTop: 8,
         },
         tabBarItemStyle: {
-          // Centrage vertical
           justifyContent: 'center',
           alignItems: 'center',
         },
@@ -134,7 +124,6 @@ export default function TabLayout() {
           fontWeight: "600",
           marginTop: 6,
         },
-        // Couleurs des textes
         tabBarActiveTintColor: theme.activeText,
         tabBarInactiveTintColor: theme.inactiveColor,
       }}

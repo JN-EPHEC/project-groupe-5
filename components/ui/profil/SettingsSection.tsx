@@ -12,6 +12,17 @@ import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Linking, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { auth, db, storage } from "../../../firebaseConfig";
 import { SettingSwitch } from "./SettingSwitch";
+import { LinearGradient } from "expo-linear-gradient";
+
+// 🎨 AJOUTER CE THÈME AVANT LE COMPOSANT
+const settingsTheme = {
+    glassBg: ["rgba(255, 255, 255, 0.85)", "rgba(255, 255, 255, 0.65)"] as const,
+    borderColor: "rgba(255, 255, 255, 0.6)",
+    textMain: "#0A3F33", 
+    textMuted: "#4A665F",
+    accent: "#008F6B",
+    danger: "#EF4444",
+};
 
 export const SettingsSection = () => {
   const { colors, mode, toggle } = useThemeMode();
@@ -278,41 +289,44 @@ export const SettingsSection = () => {
     }
   };
 
-  const gradientColors = isLight
-    ? ([colors.glass, colors.glass] as const)
-    : (["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"] as const);
-  const cardBackground = isLight ? colors.glass : "rgba(0, 151, 178, 0.1)";
-  const titleColor = isLight ? colors.cardText : colors.text;
-  const mutedColor = isLight ? colors.cardMuted : colors.mutedText;
-  const dividerColor = isLight ? colors.glassBorder : "rgba(0, 151, 178, 0.2)";
+  // Couleurs dynamiques pour le rendu
+  const titleColor = isLight ? settingsTheme.textMain : colors.text;
+  const mutedColor = isLight ? settingsTheme.textMuted : colors.mutedText;
+  const accentColor = isLight ? settingsTheme.accent : colors.accent;
+
+  // Wrapper conditionnel (Gradient si Light, View si Dark)
+  const Wrapper = isLight ? LinearGradient : View;
+  const wrapperProps = isLight 
+    ? { 
+        colors: settingsTheme.glassBg, 
+        start: { x: 0, y: 0 }, 
+        end: { x: 1, y: 1 }, 
+        style: [styles.container, styles.glassEffect] 
+      }
+    : { 
+        style: [styles.container, { backgroundColor: "rgba(0, 151, 178, 0.1)", borderColor: "rgba(0,151,178,0.2)", borderWidth: 1 }] 
+      };
 
   return (
-    <View
-      style={[styles.gradientWrapper, { shadowColor: colors.accent }]}
-    >
-      <View
-        style={[styles.container, { backgroundColor: cardBackground, borderColor: dividerColor, borderWidth: 1 }]}
-      >
-        {/* (Notifications section removed per request) */}
-
-        {/* Device permissions */}
-        <TouchableOpacity style={[styles.row, { borderColor: dividerColor }]} onPress={() => setShowDevicePermissions(!showDevicePermissions)} activeOpacity={0.85}>
-          <Ionicons name="shield-checkmark-outline" size={22} color={titleColor} />
+    <View style={styles.gradientWrapper}>
+      <Wrapper {...(wrapperProps as any)}>
+        
+        {/* --- AUTORISATIONS --- */}
+        <TouchableOpacity style={styles.row} onPress={() => setShowDevicePermissions(!showDevicePermissions)} activeOpacity={0.7}>
+          <View style={[styles.iconBox, { backgroundColor: isLight ? "#E0F7EF" : "rgba(255,255,255,0.1)" }]}>
+            <Ionicons name="shield-checkmark-outline" size={20} color={accentColor} />
+          </View>
           <Text style={[styles.text, { color: titleColor }]}>Autorisations de l'appareil</Text>
-          <Ionicons
-            name={showDevicePermissions ? "chevron-down" : "chevron-forward"}
-            size={18}
-            color={mutedColor}
-          />
+          <Ionicons name={showDevicePermissions ? "chevron-down" : "chevron-forward"} size={18} color={mutedColor} />
         </TouchableOpacity>
 
         {showDevicePermissions && (
-          <View style={[styles.subMenu, { backgroundColor: isLight ? colors.cardAlt : colors.cardAlt }]}>
+          <View style={styles.subMenu}>
             <SettingSwitch
               label="Notifications (système)"
               value={pushEnabled}
               onValueChange={async (next) => {
-                await setPushEnabled(next);
+                await setPushEnabled(next); 
               }}
               disabled={notificationsLoading}
             />
@@ -324,364 +338,275 @@ export const SettingsSection = () => {
                 try {
                   if (next) {
                     const { status } = await Camera.requestCameraPermissionsAsync();
-                    if (status === 'granted') {
-                      setCameraEnabled(true);
-                    } else {
-                      setCameraEnabled(false);
-                      Alert.alert(
-                        'Permission caméra',
-                        "Autorise l'accès à la caméra dans les réglages de ton appareil pour utiliser cette fonctionnalité.",
-                        [
-                          { text: 'Ouvrir réglages', onPress: () => Linking.openSettings() },
-                          { text: 'Fermer', style: 'cancel' },
-                        ]
-                      );
-                    }
+                    if (status === 'granted') setCameraEnabled(true);
+                    else Alert.alert('Permission requise', "Activez la caméra dans les réglages.", [{ text: 'Réglages', onPress: () => Linking.openSettings() }, { text: 'OK' }]);
                   } else {
-                    // Cannot programmatically revoke; guide user to settings
                     setCameraEnabled(false);
-                    Alert.alert(
-                      'Désactiver la caméra',
-                      "Pour révoquer l'accès à la caméra, ouvre les réglages de ton appareil.",
-                      [
-                        { text: 'Ouvrir réglages', onPress: () => Linking.openSettings() },
-                        { text: 'Fermer', style: 'cancel' },
-                      ]
-                    );
+                    Alert.alert('Info', "Désactivez la caméra dans les réglages.", [{ text: 'Réglages', onPress: () => Linking.openSettings() }, { text: 'OK' }]);
                   }
-                } catch (err) {
-                  console.warn('Camera permission error', err);
-                } finally {
-                  setCameraLoading(false);
-                }
+                } catch (err) { console.warn(err); } finally { setCameraLoading(false); }
               }}
               disabled={cameraLoading}
             />
           </View>
         )}
-        {/* Theme */}
-        <View style={[styles.row, { borderColor: dividerColor }]}>
-          <Ionicons name="moon-outline" size={22} color={titleColor} />
+
+        {/* --- THEME --- */}
+        <View style={styles.row}>
+          <View style={[styles.iconBox, { backgroundColor: isLight ? "#E0F7EF" : "rgba(255,255,255,0.1)" }]}>
+            <Ionicons name="moon-outline" size={20} color={accentColor} />
+          </View>
           <Text style={[styles.text, { color: titleColor }]}>Thème sombre</Text>
           <Switch
             value={mode === "dark"}
             onValueChange={toggle}
-            thumbColor={mode === "dark" ? "#f5f5f5" : "#f3f4f6"}
-            trackColor={{ false: isLight ? "rgba(255,255,255,0.25)" : "#3f3f46", true: colors.accent }}
+            thumbColor={mode === "dark" ? "#f5f5f5" : "#fff"}
+            trackColor={{ false: "#E2E8F0", true: accentColor }}
           />
         </View>
 
-
-        {/* Settings */}
-        <TouchableOpacity style={[styles.row, { borderColor: dividerColor }]} onPress={() => setShowSettings(!showSettings)} activeOpacity={0.85}>
-          <Ionicons name="settings-outline" size={22} color={titleColor} />
+        {/* --- PARAMETRES --- */}
+        <TouchableOpacity style={styles.row} onPress={() => setShowSettings(!showSettings)} activeOpacity={0.7}>
+          <View style={[styles.iconBox, { backgroundColor: isLight ? "#E0F7EF" : "rgba(255,255,255,0.1)" }]}>
+            <Ionicons name="settings-outline" size={20} color={accentColor} />
+          </View>
           <Text style={[styles.text, { color: titleColor }]}>Paramètres</Text>
-          <Ionicons
-            name={showSettings ? "chevron-down" : "chevron-forward"}
-            size={18}
-            color={mutedColor}
-          />
+          <Ionicons name={showSettings ? "chevron-down" : "chevron-forward"} size={18} color={mutedColor} />
         </TouchableOpacity>
 
         {showSettings && (
-          <View
-            style={[
-              styles.subMenu,
-              { backgroundColor: isLight ? colors.cardAlt : colors.cardAlt },
-            ]}
-          >
+          <View style={styles.subMenu}>
+            {/* 1. COMPTE */}
             <TouchableOpacity style={styles.subRow} activeOpacity={0.8} onPress={() => setShowAccountDetails(!showAccountDetails)}>
               <View style={styles.subRowLeft}>
-                <Ionicons name="person-circle-outline" size={20} color={mutedColor} style={{ marginRight: 10 }} />
                 <Text style={[styles.subText, { color: titleColor }]}>Compte</Text>
               </View>
               <Ionicons name={showAccountDetails ? "chevron-down" : "chevron-forward"} size={16} color={mutedColor} />
             </TouchableOpacity>
 
             {showAccountDetails && (
-              <View style={{ paddingLeft: 8, paddingVertical: 8 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8 }}>
-                  <Text style={[{ fontSize: 15, fontFamily: FontFamilies.heading, marginBottom: 6, color: titleColor }]}>Informations personnelles</Text>
-                  {!accountEditing ? (
-                    <TouchableOpacity onPress={() => setAccountEditing(true)} style={{ padding: 6 }}>
-                      <Text style={{ color: colors.accent, fontFamily: FontFamilies.bodyStrong }}>Modifier</Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <TouchableOpacity onPress={() => setAccountEditing(false)} style={{ padding: 6 }}>
-                      <Text style={{ color: colors.mutedText, fontFamily: FontFamilies.body }}>Annuler</Text>
-                    </TouchableOpacity>
-                  )}
+              <View style={styles.detailsContainer}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <Text style={{ fontSize: 14, fontFamily: FontFamilies.heading, color: titleColor }}>Infos personnelles</Text>
+                  <TouchableOpacity onPress={() => setAccountEditing(!accountEditing)}>
+                    <Text style={{ color: accentColor, fontWeight: '700', fontSize: 13 }}>{accountEditing ? "Annuler" : "Modifier"}</Text>
+                  </TouchableOpacity>
                 </View>
 
-                <View style={{ paddingHorizontal: 8, marginTop: 6 }}>
-                  {!accountEditing ? (
-                    <View>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 }}>
-                        <Text style={{ color: mutedColor }}>Nom</Text>
-                        <Text style={{ color: titleColor }}>{user?.lastName ?? ""}</Text>
-                      </View>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 }}>
-                        <Text style={{ color: mutedColor }}>Prénom</Text>
-                        <Text style={{ color: titleColor }}>{user?.firstName ?? ""}</Text>
-                      </View>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 }}>
-                        <Text style={{ color: mutedColor }}>Date de naissance</Text>
-                        <Text style={{ color: titleColor }}>{user?.birthDate ?? ""}</Text>
-                      </View>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 }}>
-                        <Text style={{ color: mutedColor }}>Code postal</Text>
-                        <Text style={{ color: titleColor }}>{user?.postalCode ?? ""}</Text>
-                      </View>
+                {!accountEditing ? (
+                  // VUE LECTURE
+                  <View style={{ gap: 8 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <Text style={{ color: mutedColor, fontSize: 13 }}>Nom</Text>
+                        <Text style={{ color: titleColor, fontWeight: '600', fontSize: 13 }}>{user?.lastName} {user?.firstName}</Text>
                     </View>
-                  ) : (
-                    <View>
-                      <Text style={[styles.fieldLabel, { color: titleColor }]}>Nom</Text>
-                      <TextInput
-                        value={editingLastName}
-                        onChangeText={(t) => { setEditingLastName(t); setFieldErrors((s) => ({ ...s, lastName: false })); }}
-                        style={[styles.inputInline, fieldErrors.lastName && { borderColor: "#FF4D4F" }]}
-                        placeholder="Nom"
-                        placeholderTextColor={isLight ? colors.cardMuted : colors.mutedText}
-                      />
-
-                      <Text style={[styles.fieldLabel, { color: titleColor, marginTop: 8 }]}>Prénom</Text>
-                      <TextInput
-                        value={editingFirstName}
-                        onChangeText={(t) => { setEditingFirstName(t); setFieldErrors((s) => ({ ...s, firstName: false })); }}
-                        style={[styles.inputInline, fieldErrors.firstName && { borderColor: "#FF4D4F" }]}
-                        placeholder="Prénom"
-                        placeholderTextColor={isLight ? colors.cardMuted : colors.mutedText}
-                      />
-
-                      <Text style={[styles.fieldLabel, { color: titleColor, marginTop: 8 }]}>Date de naissance (JJ/MM/AAAA)</Text>
-                      <TextInput
-                        value={editingBirth}
-                        onChangeText={(t) => { const f = formatBirthInput(t); setEditingBirth(f); setFieldErrors((s) => ({ ...s, birthDate: false })); }}
-                        style={[styles.inputInline, fieldErrors.birthDate && { borderColor: "#FF4D4F" }]}
-                        placeholder="JJ/MM/AAAA"
-                        placeholderTextColor={isLight ? colors.cardMuted : colors.mutedText}
-                        keyboardType="numeric"
-                      />
-
-                      <Text style={[styles.fieldLabel, { color: titleColor, marginTop: 8 }]}>Code postal</Text>
-                      <TextInput
-                        value={editingPostal}
-                        onChangeText={(t) => { setEditingPostal(t); setFieldErrors((s) => ({ ...s, postal: false })); }}
-                        style={[styles.inputInline, fieldErrors.postal && { borderColor: "#FF4D4F" }]}
-                        placeholder="Code postal"
-                        placeholderTextColor={isLight ? colors.cardMuted : colors.mutedText}
-                        keyboardType="numeric"
-                      />
-
-                      <View style={{ marginTop: 12, flexDirection: 'row', gap: 10 }}>
-                        <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.accent }]} onPress={saveAccountChanges} disabled={savingAccount}>
-                          {savingAccount ? <ActivityIndicator color="#fff" /> : <Text style={[styles.saveBtnText]}>Enregistrer</Text>}
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.cancelBtn]} onPress={() => {
-                          // revert
-                          setEditingFirstName(user?.firstName ?? "");
-                          setEditingLastName(user?.lastName ?? "");
-                          setEditingPostal(user?.postalCode ?? "");
-                          setEditingBirth(user?.birthDate ?? "");
-                          setFieldErrors({});
-                          setAccountEditing(false);
-                        }}>
-                          <Text style={[styles.cancelBtnText]}>Annuler</Text>
-                        </TouchableOpacity>
-                      </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <Text style={{ color: mutedColor, fontSize: 13 }}>Né(e) le</Text>
+                        <Text style={{ color: titleColor, fontWeight: '600', fontSize: 13 }}>{user?.birthDate}</Text>
                     </View>
-                  )}
-                </View>
-
-                <TouchableOpacity style={styles.subRow} activeOpacity={0.8} onPress={() => router.push("/change-password")}>
-                  <View style={styles.subRowLeft}>
-                    <Text style={[styles.subText, { color: titleColor }]}>Modifier mot de passe</Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <Text style={{ color: mutedColor, fontSize: 13 }}>Code postal</Text>
+                        <Text style={{ color: titleColor, fontWeight: '600', fontSize: 13 }}>{user?.postalCode}</Text>
+                    </View>
                   </View>
-                  <Ionicons name="chevron-forward" size={16} color={mutedColor} />
-                </TouchableOpacity>
-                {accountDeleteVisible && (
-                  <View style={styles.modalOverlay}>
-                    <View style={[styles.modalCard, { backgroundColor: colors.surface }]}> 
-                      <Text style={[styles.modalTitle, { color: colors.text }]}>Supprimer mon compte</Text>
-                      <Text style={{ color: colors.mutedText, marginTop: 6 }}>
-                        Êtes-vous sûr de vouloir supprimer votre compte ? Cette action est irréversible.
-                      </Text>
-                      <View style={styles.modalButtons}>
-                        <TouchableOpacity
-                          style={[styles.modalBtn, { backgroundColor: colors.accent }]}
-                          onPress={() => setAccountDeleteVisible(false)}
-                        >
-                          <Text style={{ color: '#0F3327', fontFamily: FontFamilies.heading }}>Rester</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.modalBtn, { backgroundColor: '#D93636' }]}
-                          onPress={performDeleteAccount}
-                        >
-                          <Text style={{ color: '#fff', fontFamily: FontFamilies.heading }}>Supprimer</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
+                ) : (
+                  // VUE EDITION
+                  <View style={{ gap: 10 }}>
+                    <TextInput 
+                        value={editingLastName} onChangeText={setEditingLastName} placeholder="Nom" 
+                        style={[styles.inputInline, { color: titleColor, backgroundColor: isLight ? "#FFF" : "rgba(0,0,0,0.2)" }]} placeholderTextColor={mutedColor} 
+                    />
+                    <TextInput 
+                        value={editingFirstName} onChangeText={setEditingFirstName} placeholder="Prénom" 
+                        style={[styles.inputInline, { color: titleColor, backgroundColor: isLight ? "#FFF" : "rgba(0,0,0,0.2)" }]} placeholderTextColor={mutedColor} 
+                    />
+                    <TextInput 
+                        value={editingBirth} onChangeText={(t) => setEditingBirth(formatBirthInput(t))} placeholder="JJ/MM/AAAA" keyboardType="numeric" maxLength={10}
+                        style={[styles.inputInline, { color: titleColor, backgroundColor: isLight ? "#FFF" : "rgba(0,0,0,0.2)" }]} placeholderTextColor={mutedColor} 
+                    />
+                    <TextInput 
+                        value={editingPostal} onChangeText={setEditingPostal} placeholder="Code postal" keyboardType="numeric" maxLength={4}
+                        style={[styles.inputInline, { color: titleColor, backgroundColor: isLight ? "#FFF" : "rgba(0,0,0,0.2)" }]} placeholderTextColor={mutedColor} 
+                    />
+                    
+                    <TouchableOpacity onPress={saveAccountChanges} style={[styles.saveBtn, { backgroundColor: accentColor }]}>
+                        {savingAccount ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={styles.saveBtnText}>Enregistrer</Text>}
+                    </TouchableOpacity>
                   </View>
                 )}
 
-                <TouchableOpacity style={styles.subRow} activeOpacity={0.8} onPress={() => setAccountDeleteVisible(true)}>
-                  <View style={styles.subRowLeft}>
-                    <Text style={[styles.subText, { color: "#F26767" }]}>Supprimer mon compte</Text>
-                  </View>
+                <View style={{ height: 1, backgroundColor: isLight ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.1)", marginVertical: 12 }} />
+
+                <TouchableOpacity onPress={() => router.push("/change-password")} style={{ paddingVertical: 6 }}>
+                    <Text style={{ color: titleColor, fontSize: 13 }}>Modifier mot de passe</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setAccountDeleteVisible(true)} style={{ paddingVertical: 6 }}>
+                    <Text style={{ color: settingsTheme.danger, fontSize: 13 }}>Supprimer mon compte</Text>
                 </TouchableOpacity>
               </View>
             )}
 
-            {/* --- DÉBUT SECTION ABONNEMENT --- */}
-            <TouchableOpacity 
-              style={styles.subRow} 
-              activeOpacity={0.8} 
-              onPress={() => setShowSubscriptionDetails(!showSubscriptionDetails)}
-            >
+            {/* 2. ABONNEMENT */}
+            <TouchableOpacity style={styles.subRow} activeOpacity={0.8} onPress={() => setShowSubscriptionDetails(!showSubscriptionDetails)}>
               <View style={styles.subRowLeft}>
-                <Ionicons name="card-outline" size={20} color={mutedColor} style={{ marginRight: 10 }} />
                 <Text style={[styles.subText, { color: titleColor }]}>Abonnement</Text>
               </View>
               <Ionicons name={showSubscriptionDetails ? "chevron-down" : "chevron-forward"} size={16} color={mutedColor} />
             </TouchableOpacity>
 
             {showSubscriptionDetails && (
-              <View style={{ paddingLeft: 16, paddingRight: 8, paddingVertical: 12, borderLeftWidth: 2, borderLeftColor: colors.accent, marginLeft: 10, marginBottom: 10 }}>
+              <View style={styles.detailsContainer}>
                 {loadingSubscription ? (
-                  <ActivityIndicator color={colors.accent} size="small" />
+                  <ActivityIndicator color={accentColor} size="small" />
                 ) : subscription ? (
                   <View>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                        <Text style={{ color: mutedColor, fontFamily: FontFamilies.body }}>Statut</Text>
-                        <Text style={{ color: colors.accent, fontFamily: FontFamilies.bodyStrong, textTransform: 'capitalize' }}>
+                        <Text style={{ color: mutedColor, fontSize: 13 }}>Statut</Text>
+                        <Text style={{ color: accentColor, fontWeight: '700', fontSize: 13, textTransform: 'capitalize' }}>
                             {subscription.status === 'trialing' ? 'Essai Gratuit' : 'Actif'}
                         </Text>
                     </View>
-                    
                     {subscription.cancel_at_period_end ? (
-                        <Text style={{ color: '#F26767', fontSize: 13, marginBottom: 10, fontFamily: FontFamilies.body, fontStyle: 'italic' }}>
-                            Arrêt prévu le {formatDate(subscription.current_period_end)}
-                        </Text>
+                        <Text style={{ color: settingsTheme.danger, fontSize: 12, fontStyle: 'italic' }}>Arrêt prévu le {formatDate(subscription.current_period_end)}</Text>
                     ) : (
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
-                            <Text style={{ color: mutedColor, fontFamily: FontFamilies.body }}>Renouvellement</Text>
-                            <Text style={{ color: titleColor, fontFamily: FontFamilies.body }}>
-                                {formatDate(subscription.current_period_end)}
-                            </Text>
-                        </View>
-                    )}
-
-                    {!subscription.cancel_at_period_end && (
-                        <TouchableOpacity 
-                            style={{ backgroundColor: 'rgba(242, 103, 103, 0.1)', padding: 10, borderRadius: 8, alignItems: 'center', marginTop: 4, borderWidth: 1, borderColor: 'rgba(242, 103, 103, 0.3)' }}
-                            onPress={handleManageSubscription}
-                        >
-                            <Text style={{ color: '#F26767', fontFamily: FontFamilies.bodyStrong, fontSize: 14 }}>
-                                Annuler l'abonnement
-                            </Text>
+                        <TouchableOpacity onPress={handleManageSubscription} style={{ marginTop: 8 }}>
+                            <Text style={{ color: settingsTheme.danger, fontSize: 13, textDecorationLine: 'underline' }}>Gérer / Annuler</Text>
                         </TouchableOpacity>
                     )}
                   </View>
                 ) : (
-                  <View>
-                    <Text style={{ color: mutedColor, fontFamily: FontFamilies.body, fontStyle: 'italic' }}>Aucun abonnement actif.</Text>
-                  </View>
+                  <Text style={{ color: mutedColor, fontSize: 13, fontStyle: 'italic' }}>Aucun abonnement actif.</Text>
                 )}
               </View>
             )}
-            {/* --- FIN SECTION ABONNEMENT --- */}
 
-            <TouchableOpacity style={styles.subRow} activeOpacity={0.8} onPress={() => router.push("/conditions-generales")}>
-              <View style={styles.subRowLeft}>
-                <Ionicons name="document-text-outline" size={20} color={mutedColor} style={{ marginRight: 10 }} />
-                <Text style={[styles.subText, { color: titleColor }]}>Conditions Générales</Text>
-              </View>
+            {/* 3. LIENS LEGAUX */}
+            <TouchableOpacity style={styles.subRow} onPress={() => router.push("/conditions-generales")}>
+              <Text style={[styles.subText, { color: titleColor }]}>Conditions Générales</Text>
               <Ionicons name="chevron-forward" size={16} color={mutedColor} />
             </TouchableOpacity>
-
-            <TouchableOpacity style={styles.subRow} activeOpacity={0.8} onPress={() => router.push("/mentions-legales")}>
-              <View style={styles.subRowLeft}>
-                <Ionicons name="information-circle-outline" size={20} color={mutedColor} style={{ marginRight: 10 }} />
-                <Text style={[styles.subText, { color: titleColor }]}>Mentions Légales</Text>
-              </View>
+            <TouchableOpacity style={styles.subRow} onPress={() => router.push("/mentions-legales")}>
+              <Text style={[styles.subText, { color: titleColor }]}>Mentions Légales</Text>
               <Ionicons name="chevron-forward" size={16} color={mutedColor} />
             </TouchableOpacity>
-
-            <TouchableOpacity style={styles.subRow} activeOpacity={0.8} onPress={() => router.push("/politique-de-confidentialite")}>
-              <View style={styles.subRowLeft}>
-                <Ionicons name="shield-checkmark-outline" size={20} color={mutedColor} style={{ marginRight: 10 }} />
-                <Text style={[styles.subText, { color: titleColor }]}>Politique de confidentialité</Text>
-              </View>
+            <TouchableOpacity style={styles.subRow} onPress={() => router.push("/politique-de-confidentialite")}>
+              <Text style={[styles.subText, { color: titleColor }]}>Politique de confidentialité</Text>
               <Ionicons name="chevron-forward" size={16} color={mutedColor} />
             </TouchableOpacity>
           </View>
         )}
 
-        {/* Logout */}
-        <TouchableOpacity
-          style={[styles.row, styles.logoutRow]}
-          onPress={handleLogout}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="exit-outline" size={22} color="#F26767" />
-          <Text style={[styles.text, { color: "#F26767" }]}>Se déconnecter</Text>
+        {/* --- LOGOUT --- */}
+        <TouchableOpacity style={[styles.row, { borderBottomWidth: 0 }]} onPress={handleLogout} activeOpacity={0.7}>
+          <View style={[styles.iconBox, { backgroundColor: isLight ? "#FEF2F2" : "rgba(239,68,68,0.1)" }]}>
+            <Ionicons name="log-out-outline" size={20} color={settingsTheme.danger} />
+          </View>
+          <Text style={[styles.text, { color: settingsTheme.danger }]}>Se déconnecter</Text>
         </TouchableOpacity>
-      </View>
+      </Wrapper>
+
+      {/* --- MODAL SUPPRESSION COMPTE --- */}
+      {accountDeleteVisible && (
+        <View style={styles.modalOverlay}>
+            <View style={[styles.modalCard, { backgroundColor: isLight ? "#FFF" : colors.surface }]}> 
+                <Text style={[styles.modalTitle, { color: titleColor }]}>Supprimer mon compte</Text>
+                <Text style={{ color: mutedColor, marginTop: 6, marginBottom: 20 }}>
+                Êtes-vous sûr de vouloir supprimer votre compte ? Cette action est irréversible.
+                </Text>
+                <View style={styles.modalButtons}>
+                <TouchableOpacity
+                    style={[styles.modalBtn, { backgroundColor: isLight ? "#F3F4F6" : "#333" }]}
+                    onPress={() => setAccountDeleteVisible(false)}
+                >
+                    <Text style={{ color: titleColor, fontWeight: '700' }}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={[styles.modalBtn, { backgroundColor: settingsTheme.danger }]}
+                    onPress={performDeleteAccount}
+                >
+                    <Text style={{ color: '#fff', fontWeight: '700' }}>Supprimer</Text>
+                </TouchableOpacity>
+                </View>
+            </View>
+        </View>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   gradientWrapper: {
-    marginTop: 12,
-    borderRadius: 22,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.18,
-    shadowRadius: 14,
-    elevation: 8,
+    borderRadius: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 4,
+    marginBottom: 20
   },
   container: {
-    borderRadius: 22,
+    borderRadius: 24,
     overflow: "hidden",
+    paddingVertical: 4
+  },
+  glassEffect: {
     borderWidth: 1,
-    paddingBottom: 6,
+    borderColor: settingsTheme.borderColor,
   },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 16,
-    paddingHorizontal: 18,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    backgroundColor: "transparent",
-  },
-  text: { marginLeft: 10, flex: 1, fontFamily: FontFamilies.headingMedium, fontSize: 16 },
-  subMenu: {
+    paddingVertical: 14,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(0,0,0,0.05)",
+  },
+  iconBox: {
+      width: 36, height: 36, borderRadius: 12,
+      alignItems: 'center', justifyContent: 'center',
+      marginRight: 12
+  },
+  text: { flex: 1, fontWeight: "600", fontSize: 15, fontFamily: FontFamilies.headingMedium },
+  
+  // Sous-menus
+  subMenu: {
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+    backgroundColor: "rgba(0,0,0,0.02)"
   },
   subRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(0,0,0,0.03)"
   },
-  subRowLeft: {
-    flexDirection: "row",
-    alignItems: "center",
+  subRowLeft: { flexDirection: "row", alignItems: "center" },
+  subText: { fontSize: 14, fontFamily: FontFamilies.body, marginLeft: 4, fontWeight: '500' },
+  
+  // Containers détails (Abo / Compte)
+  detailsContainer: {
+      padding: 14,
+      backgroundColor: "rgba(0,0,0,0.03)",
+      borderRadius: 16,
+      marginTop: 4,
+      marginBottom: 8
   },
-  langOption: { paddingVertical: 6 },
-  langText: { fontSize: 14, fontFamily: FontFamilies.bodyRegular },
-  subText: { fontSize: 14, fontFamily: FontFamilies.body },
-  logoutRow: { borderBottomWidth: 0 },
-  fieldLabel: { fontSize: 13, fontWeight: '700', marginBottom: 6 },
-  inputInline: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 6, fontFamily: FontFamilies.body },
-  saveBtn: { paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12 },
-  saveBtnText: { color: '#fff', fontWeight: '700' },
-  cancelBtn: { paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1, borderColor: '#ccc', marginLeft: 8 },
-  cancelBtnText: { fontWeight: '700' },
-  modalOverlay: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' },
-  modalCard: { width: '88%', borderRadius: 14, padding: 16 },
-  modalTitle: { fontSize: 18, fontFamily: FontFamilies.heading, marginBottom: 8 },
-  modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16, gap: 10 },
-  modalBtn: { paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10 },
+  inputInline: {
+      borderWidth: 1, borderColor: "rgba(0,0,0,0.1)",
+      borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8,
+      fontSize: 13, fontFamily: FontFamilies.body
+  },
+  saveBtn: {
+      paddingVertical: 10, borderRadius: 12, alignItems: 'center', marginTop: 4
+  },
+  saveBtnText: { color: '#FFF', fontWeight: '700', fontSize: 13 },
+
+  // Modal
+  modalOverlay: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', zIndex: 999 },
+  modalCard: { width: '85%', borderRadius: 20, padding: 20 },
+  modalTitle: { fontSize: 18, fontFamily: FontFamilies.heading, fontWeight: '700' },
+  modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
+  modalBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 12 },
 });

@@ -1,4 +1,5 @@
 import { AdminNav } from "@/components/ui/(admin)/AdminNav";
+import { FontFamilies } from "@/constants/fonts";
 import { db } from "@/firebaseConfig";
 import { useThemeMode } from "@/hooks/theme-context";
 import { useUser } from "@/hooks/user-context";
@@ -18,6 +19,17 @@ import {
   View
 } from "react-native";
 
+// 🎨 THEME ADMIN FORM
+const formTheme = {
+    bgGradient: ["#F9FAFB", "#F3F4F6"] as const,
+    glassCardBg: ["#FFFFFF", "rgba(255, 255, 255, 0.8)"] as const,
+    borderColor: "rgba(0, 0, 0, 0.05)",
+    textMain: "#111827",
+    textMuted: "#6B7280",
+    accent: "#008F6B",
+    inputBg: "#F9FAFB",
+};
+
 export default function NewDefiScreen() {
   const { user } = useUser();
   const { colors, theme } = useThemeMode();
@@ -27,7 +39,8 @@ export default function NewDefiScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const isEditing = Boolean(id);
 
-  if (!user.isAdmin) return <Redirect href="/acceuil" />;
+  // ✅ CORRECTION ICI : On vérifie d'abord si 'user' existe
+  if (!user || !user.isAdmin) return <Redirect href="/acceuil" />;
 
   // FORM STATE
   const [titre, setTitre] = useState("");
@@ -82,7 +95,7 @@ export default function NewDefiScreen() {
         preuve,
         difficulte,
         updatedAt: serverTimestamp(),
-        createdBy: user.uid,
+        createdBy: user.uid, // TypeScript sait maintenant que user n'est pas null
       };
 
       if (isEditing && id) {
@@ -99,30 +112,35 @@ export default function NewDefiScreen() {
     }
   };
 
-  // STYLES DYNAMIQUES
-  const glassInputStyle = {
-    backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.6)",
-    borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.4)",
-    color: colors.text
-  };
+  // Couleurs dynamiques
+  const titleColor = isDark ? "#FFF" : formTheme.textMain;
+  const mutedColor = isDark ? "#9CA3AF" : formTheme.textMuted;
+  const cardBorder = isDark ? "rgba(255,255,255,0.1)" : formTheme.borderColor;
+  const bgColors = isDark ? [colors.background, "#1F2937"] : formTheme.bgGradient;
+  const inputBackground = isDark ? "rgba(255,255,255,0.05)" : formTheme.inputBg;
 
   return (
     <View style={{ flex: 1 }}>
       <Stack.Screen options={{ headerShown: false }} />
       
-      {/* 🟢 BACKGROUND LIQUIDE */}
+      {/* FOND */}
       <LinearGradient
-        colors={isDark ? [colors.background, "#0f2027", "#203a43"] : ["#d1fae5", "#cffafe", "#ffffff"]}
+        colors={bgColors as any}
         style={StyleSheet.absoluteFill}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       />
 
+      {/* Header */}
       <View style={styles.headerContainer}>
-        {/* J'ai supprimé le TouchableOpacity ici */}
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          {isEditing ? "Modifier" : "Nouveau Défi"}
+        {/* Bouton retour personnalisé pour cohérence */}
+        <TouchableOpacity onPress={() => router.back()} style={[styles.backBtn, { backgroundColor: isDark ? "rgba(255,255,255,0.1)" : "#FFF" }]}>
+            <Ionicons name="arrow-back" size={20} color={titleColor} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: titleColor }]}>
+          {isEditing ? "Modifier Défi" : "Nouveau Défi"}
         </Text>
+        <View style={{ width: 40 }} /> 
       </View>
 
       <KeyboardAvoidingView 
@@ -131,37 +149,35 @@ export default function NewDefiScreen() {
       >
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ padding: 20, paddingBottom: 120 }}
+          contentContainerStyle={{ padding: 24, paddingBottom: 120 }}
           showsVerticalScrollIndicator={false}
         >
           {/* CARD PRINCIPALE */}
-          <View style={[styles.glassCard, { 
-            borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.5)" 
-          }]}>
+          <View style={[styles.card, { backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "#FFF", borderColor: cardBorder }]}>
             
             {/* TITRE */}
-            <Text style={[styles.label, { color: colors.mutedText }]}>TITRE DU DÉFI</Text>
+            <Text style={[styles.label, { color: mutedColor }]}>TITRE DU DÉFI</Text>
             <TextInput
-              style={[styles.input, glassInputStyle]}
+              style={[styles.input, { backgroundColor: inputBackground, borderColor: cardBorder, color: titleColor }]}
               value={titre}
               onChangeText={setTitre}
               placeholder="Ex : Recycler des bouteilles"
-              placeholderTextColor={colors.mutedText}
+              placeholderTextColor={mutedColor}
             />
 
             {/* DESCRIPTION */}
-            <Text style={[styles.label, { color: colors.mutedText }]}>DESCRIPTION</Text>
+            <Text style={[styles.label, { color: mutedColor }]}>DESCRIPTION</Text>
             <TextInput
-              style={[styles.input, styles.multiline, glassInputStyle]}
+              style={[styles.input, styles.multiline, { backgroundColor: inputBackground, borderColor: cardBorder, color: titleColor }]}
               value={description}
               onChangeText={setDescription}
               placeholder="Explique ce qu'il faut faire..."
-              placeholderTextColor={colors.mutedText}
+              placeholderTextColor={mutedColor}
               multiline
             />
 
             {/* CATÉGORIE (TABS) */}
-            <Text style={[styles.label, { color: colors.mutedText }]}>TYPE DE DÉFI</Text>
+            <Text style={[styles.label, { color: mutedColor }]}>TYPE DE DÉFI</Text>
             <View style={styles.row}>
               {(["personnel", "club"] as const).map((c) => (
                 <TouchableOpacity
@@ -169,12 +185,16 @@ export default function NewDefiScreen() {
                   onPress={() => handleCategoryChange(c)}
                   style={[
                     styles.selector,
-                    categorie === c ? { backgroundColor: colors.accent, borderColor: colors.accent } : glassInputStyle
+                    { 
+                        backgroundColor: categorie === c ? formTheme.accent : inputBackground,
+                        borderColor: categorie === c ? formTheme.accent : cardBorder
+                    }
                   ]}
                 >
                   <Text style={{ 
-                    color: categorie === c ? "#fff" : colors.mutedText,
-                    fontWeight: categorie === c ? "700" : "400"
+                    color: categorie === c ? "#fff" : mutedColor,
+                    fontWeight: categorie === c ? "700" : "400",
+                    fontSize: 13
                   }}>
                     {c.charAt(0).toUpperCase() + c.slice(1)}
                   </Text>
@@ -183,15 +203,15 @@ export default function NewDefiScreen() {
             </View>
 
             {/* INFO DURÉE AUTO */}
-            <View style={[styles.infoBox, { backgroundColor: isDark ? "rgba(0,0,0,0.2)" : "rgba(0,0,0,0.03)" }]}>
-               <Ionicons name="time-outline" size={16} color={colors.mutedText} />
-               <Text style={{ color: colors.mutedText, fontSize: 12 }}>
-                 Durée automatique : {duree === 1 ? "1 jour (Quotidien)" : "7 jours (Hebdomadaire)"}
+            <View style={[styles.infoBox, { backgroundColor: isDark ? "rgba(0,0,0,0.2)" : "#F0FDF4" }]}>
+               <Ionicons name="time-outline" size={16} color={formTheme.accent} />
+               <Text style={{ color: formTheme.accent, fontSize: 12, fontWeight: '500' }}>
+                 Durée : {duree === 1 ? "1 jour (Quotidien)" : "7 jours (Hebdomadaire)"}
                </Text>
             </View>
 
             {/* DIFFICULTÉ */}
-            <Text style={[styles.label, { color: colors.mutedText, marginTop: 16 }]}>DIFFICULTÉ</Text>
+            <Text style={[styles.label, { color: mutedColor, marginTop: 16 }]}>DIFFICULTÉ</Text>
             <View style={styles.row}>
               {(["facile", "moyen", "difficile"] as const).map((d) => (
                 <TouchableOpacity
@@ -199,69 +219,74 @@ export default function NewDefiScreen() {
                   onPress={() => handleDifficultyChange(d)}
                   style={[
                     styles.selector,
-                    difficulte === d ? { backgroundColor: colors.accent, borderColor: colors.accent } : glassInputStyle
+                    { 
+                        backgroundColor: difficulte === d ? formTheme.accent : inputBackground,
+                        borderColor: difficulte === d ? formTheme.accent : cardBorder
+                    }
                   ]}
                 >
                   <Text style={{ 
-                    color: difficulte === d ? "#fff" : colors.mutedText,
+                    color: difficulte === d ? "#fff" : mutedColor,
                     fontWeight: difficulte === d ? "700" : "400",
-                    fontSize: 12
+                    fontSize: 12,
+                    textTransform: 'capitalize'
                   }}>
-                    {d.toUpperCase()}
+                    {d}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            {/* POINTS & PREUVE */}
+            {/* POINTS & STATUT */}
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
                 <View style={{ flex: 1 }}>
-                    <Text style={[styles.label, { color: colors.mutedText }]}>POINTS</Text>
+                    <Text style={[styles.label, { color: mutedColor }]}>POINTS</Text>
                     <TextInput
-                        style={[styles.input, glassInputStyle, { textAlign: 'center', fontWeight: 'bold' }]}
+                        style={[styles.input, { backgroundColor: inputBackground, borderColor: cardBorder, color: titleColor, textAlign: 'center', fontWeight: 'bold' }]}
                         value={points}
                         editable={false}
                     />
                 </View>
-                <View style={{ flex: 2 }}>
-                    <Text style={[styles.label, { color: colors.mutedText }]}>STATUT</Text>
-                     <View style={styles.row}>
-                        <TouchableOpacity 
-                            onPress={() => setStatut(statut === 'rotation' ? 'inactive' : 'rotation')}
-                            style={[
-                                styles.input, 
-                                glassInputStyle, 
-                                { justifyContent: 'center', alignItems: 'center', backgroundColor: statut === 'rotation' ? colors.accent : glassInputStyle.backgroundColor }
-                            ]}
-                        >
-                            <Text style={{ color: statut === 'rotation' ? '#fff' : colors.mutedText, fontWeight: '600' }}>
-                                {statut === "rotation" ? "En Ligne" : "Inactif"}
-                            </Text>
-                        </TouchableOpacity>
-                     </View>
+                <View style={{ flex: 1 }}>
+                    <Text style={[styles.label, { color: mutedColor }]}>STATUT</Text>
+                    <TouchableOpacity 
+                        onPress={() => setStatut(statut === 'rotation' ? 'inactive' : 'rotation')}
+                        style={[
+                            styles.input, 
+                            { 
+                                justifyContent: 'center', alignItems: 'center', 
+                                backgroundColor: statut === 'rotation' ? "#DCFCE7" : "#F3F4F6",
+                                borderColor: statut === 'rotation' ? "#86EFAC" : cardBorder
+                            }
+                        ]}
+                    >
+                        <Text style={{ color: statut === 'rotation' ? '#15803D' : '#6B7280', fontWeight: '700', fontSize: 12, textTransform: 'uppercase' }}>
+                            {statut === "rotation" ? "ACTIF" : "OFF"}
+                        </Text>
+                    </TouchableOpacity>
                 </View>
             </View>
 
             {/* PREUVE */}
-            <Text style={[styles.label, { color: colors.mutedText }]}>PREUVE REQUISE</Text>
+            <Text style={[styles.label, { color: mutedColor }]}>PREUVE REQUISE (Optionnel)</Text>
             <TextInput
-              style={[styles.input, glassInputStyle]}
+              style={[styles.input, { backgroundColor: inputBackground, borderColor: cardBorder, color: titleColor }]}
               value={preuve}
               onChangeText={setPreuve}
               placeholder="Ex : Photo avant/après"
-              placeholderTextColor={colors.mutedText}
+              placeholderTextColor={mutedColor}
             />
 
           </View>
 
           {/* SUBMIT BUTTON */}
           <TouchableOpacity
-            style={[styles.submitButton, { backgroundColor: colors.accent }]}
+            style={[styles.submitButton, { backgroundColor: formTheme.accent }]}
             onPress={handleSubmit}
             activeOpacity={0.8}
           >
             <Text style={styles.submitText}>
-              {isEditing ? "ENREGISTRER LES MODIFICATIONS" : "CRÉER LE DÉFI"}
+              {isEditing ? "ENREGISTRER" : "CRÉER LE DÉFI"}
             </Text>
           </TouchableOpacity>
 
@@ -276,37 +301,48 @@ export default function NewDefiScreen() {
 const styles = StyleSheet.create({
   headerContainer: {
     paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 10,
+    paddingHorizontal: 24,
+    paddingBottom: 16,
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
   },
-  // j'ai retiré le style backButton qui ne servait plus
   headerTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "800",
-    letterSpacing: 0.5,
-    marginLeft: 60, // Marge ajoutée pour éviter que le texte ne soit sous la flèche flottante
+    fontFamily: FontFamilies.heading,
   },
-  glassCard: {
+  backBtn: {
+      padding: 8,
+      borderRadius: 12,
+      shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 4, elevation: 1
+  },
+  card: {
     padding: 24,
-    borderRadius: 30,
+    borderRadius: 24,
     borderWidth: 1,
-    backgroundColor: "rgba(255,255,255,0.2)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
   },
   label: {
     marginTop: 16,
     marginBottom: 8,
     fontSize: 11,
     fontWeight: "700",
-    letterSpacing: 1,
+    letterSpacing: 0.5,
     textTransform: "uppercase",
+    fontFamily: FontFamilies.body
   },
   input: {
     borderWidth: 1,
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     fontSize: 15,
+    fontFamily: FontFamilies.body
   },
   multiline: {
     minHeight: 100,
@@ -318,35 +354,36 @@ const styles = StyleSheet.create({
   },
   selector: {
     flex: 1,
-    paddingVertical: 14,
+    paddingVertical: 12,
     borderWidth: 1,
-    borderRadius: 16,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
   infoBox: {
-    marginTop: 10,
+    marginTop: 16,
     flexDirection: 'row', 
     alignItems: 'center', 
-    gap: 6,
-    padding: 10,
+    gap: 8,
+    padding: 12,
     borderRadius: 12,
   },
   submitButton: {
     marginTop: 30,
     padding: 18,
-    borderRadius: 20,
+    borderRadius: 16,
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 4,
   },
   submitText: {
     color: "#fff",
     fontWeight: "800",
     fontSize: 14,
     letterSpacing: 1,
+    fontFamily: FontFamilies.heading
   },
 });

@@ -12,13 +12,20 @@ import { usePoints } from "@/hooks/points-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { useUser } from "@/hooks/user-context";
 import { useClassement } from "@/src/classement/hooks/useClassement";
-import { LinearGradient } from "expo-linear-gradient";
+import { LinearGradient } from "expo-linear-gradient"; // ✅ AJOUT
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import { addDoc, collection, onSnapshot } from "firebase/firestore";
 import { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+// 🎨 THEME PROFIL
+const profileTheme = {
+    bgGradient: ["#DDF7E8", "#F4FDF9"] as const,
+    accent: "#008F6B", // Vert Marque
+    textMain: "#0A3F33",
+};
 
 export default function ProfilScreen() {
   const { colors, mode } = useThemeMode();
@@ -91,15 +98,9 @@ export default function ProfilScreen() {
     }
   };
 
-  const darkBg = "#021114";
-  const darkCardGradient = ["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"] as const;
-
-  const neonGradient = isLight
-    ? ([colors.cardAlt, colors.card] as const)
-    : darkCardGradient;
-  const primaryButtonText = isLight ? colors.cardText : colors.text;
   const sectionSpacing = { marginBottom: 17 } as const;
 
+  // Vérifications existantes
   const hasHeader = typeof Header !== "undefined";
   const hasStatCard = typeof StatCard !== "undefined";
   const hasChallengeHistory = typeof ChallengeHistoryList !== "undefined";
@@ -107,139 +108,162 @@ export default function ProfilScreen() {
   const hasShareQR = typeof ShareQRModal !== "undefined";
   const hasPremiumCard = typeof PremiumCard !== "undefined";
 
+  // Wrapper Fond
+  const BackgroundComponent = isLight ? LinearGradient : View;
+  const bgProps = isLight 
+    ? { colors: profileTheme.bgGradient, style: StyleSheet.absoluteFill } 
+    : { style: [StyleSheet.absoluteFill, { backgroundColor: "#021114" }] };
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: isLight ? colors.background : darkBg }}>
-      <ScrollView
-        style={[styles.container]}
-        contentContainerStyle={{ paddingBottom: 160 }}
-      >
-        <View style={styles.titleRow}>
-          <Text style={[styles.titleText, { color: colors.text }]}>Profil</Text>
-          <View style={{ position: 'absolute', right: 16, top: 8 }}>
-            <NotificationBell />
+    <View style={{ flex: 1 }}>
+      <BackgroundComponent {...(bgProps as any)} />
+      
+      <SafeAreaView style={{ flex: 1 }}>
+        <ScrollView
+          style={[styles.container]}
+          contentContainerStyle={{ paddingBottom: 160 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* TITLE & NOTIF */}
+          <View style={styles.titleRow}>
+            <Text style={[styles.titleText, { color: isLight ? profileTheme.textMain : colors.text }]}>Profil</Text>
+            <View style={{ position: 'absolute', right: 0, top: 4 }}>
+              <NotificationBell />
+            </View>
           </View>
-        </View>
 
-        {hasHeader ? <Header /> : <Text style={{ color: isLight ? colors.text : "#fff" }}>Profil indisponible</Text>}
+          {/* HEADER (Avatar + Nom) */}
+          {hasHeader ? <Header /> : <Text style={{ color: isLight ? colors.text : "#fff" }}>Profil indisponible</Text>}
 
-        <View style={[sectionSpacing, styles.firstBlockMargin]}>
-          <View style={styles.actionRow}>
-            <LinearGradient
-              colors={neonGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={{ flex: 1, borderRadius: 18 }}
-            >
+          {/* ACTIONS RAPIDES (Modifier / Partager) */}
+          <View style={[sectionSpacing, styles.firstBlockMargin]}>
+            <View style={styles.actionRow}>
+              {/* Bouton Modifier */}
               <TouchableOpacity
-                style={styles.primaryBtn}
+                style={{ flex: 1 }}
                 onPress={() => router.push("/edit-profile")}
                 activeOpacity={0.85}
               >
-                <Text style={[styles.primaryBtnText, { color: primaryButtonText }]}>Modifier mon profil</Text>
+                <LinearGradient
+                    colors={isLight ? ["#008F6B", "#10B981"] : [colors.cardAlt, colors.card]}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={styles.primaryBtn}
+                >
+                    <Text style={styles.primaryBtnText}>Modifier mon profil</Text>
+                </LinearGradient>
               </TouchableOpacity>
-            </LinearGradient>
 
-            <LinearGradient
-              colors={neonGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={{ flex: 1, borderRadius: 18 }}
-            >
+              {/* Bouton Partager */}
               <TouchableOpacity
-                style={styles.primaryBtn}
+                style={{ flex: 1 }}
                 onPress={() => setShowQR(true)}
                 activeOpacity={0.85}
               >
-                <Text style={[styles.primaryBtnText, { color: primaryButtonText }]}>Partager mon profil</Text>
+                <LinearGradient
+                    colors={isLight ? ["#008F6B", "#10B981"] : [colors.cardAlt, colors.card]}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={styles.primaryBtn}
+                >
+                    <Text style={styles.primaryBtnText}>Partager mon profil</Text>
+                </LinearGradient>
               </TouchableOpacity>
-            </LinearGradient>
+            </View>
           </View>
-        </View>
 
-        <View style={sectionSpacing}>
-          <View style={styles.row}>
-            {/* Carte Classement Individuel */}
-            <TouchableOpacity
-              style={{ flex: 1 }}
-              activeOpacity={0.8}
-              onPress={() => {
-                router.push({
-                  pathname: "/(tabs)/defi",
-                  params: { 
-                    view: "classement", 
-                    rankingTab: "perso", 
-                    t: Date.now() // Timestamp pour forcer le refresh
-                  }
-                });
-              }}
-            >
-              <StatCard icon="trophy-outline" label="Classement individuel" value={individualRankLabel} />
-            </TouchableOpacity>
+          {/* STAT CARDS (Navigation vers classements) */}
+          <View style={sectionSpacing}>
+            <View style={styles.row}>
+              <TouchableOpacity
+                style={{ flex: 1, marginRight: 10 }}
+                activeOpacity={0.8}
+                onPress={() => {
+                  router.push({
+                    pathname: "/(tabs)/defi",
+                    params: { 
+                      view: "classement", 
+                      rankingTab: "perso", 
+                      t: Date.now()
+                    }
+                  });
+                }}
+              >
+                <StatCard icon="trophy-outline" label="Classement individuel" value={individualRankLabel} />
+              </TouchableOpacity>
 
-            {/* Carte Classement Amis */}
-            <TouchableOpacity
-              style={{ flex: 1 }}
-              activeOpacity={0.8}
-              onPress={() => {
-                router.push({
-                  pathname: "/(tabs)/social",
-                  params: { 
-                    tab: "amis", 
-                    reset: "true", // Force le reset de la vue (ferme les chats)
-                    t: Date.now() 
-                  }
-                });
-              }}
-            >
-              <StatCard icon="person-outline" label="Classement entre amis" value={friendRankLabel} />
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={{ flex: 1 }}
+                activeOpacity={0.8}
+                onPress={() => {
+                  router.push({
+                    pathname: "/(tabs)/social",
+                    params: { 
+                      tab: "amis", 
+                      reset: "true",
+                      t: Date.now() 
+                    }
+                  });
+                }}
+              >
+                <StatCard icon="person-outline" label="Classement entre amis" value={friendRankLabel} />
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
 
-        <View style={sectionSpacing}>
-          {hasPremiumCard ? <PremiumCard onSubscribe={startSubscription} /> : <Text style={{ color: isLight ? colors.text : "#fff" }}>Premium indisponible</Text>}
-        </View>
+          {/* PREMIUM */}
+          <View style={sectionSpacing}>
+            {hasPremiumCard ? <PremiumCard onSubscribe={startSubscription} /> : <Text style={{ color: isLight ? colors.text : "#fff" }}>Premium indisponible</Text>}
+          </View>
 
-        <View style={sectionSpacing}>
-          {hasChallengeHistory ? <ChallengeHistoryList /> : <Text style={{ color: isLight ? colors.text : "#fff" }}>Historique indisponible</Text>}
-        </View>
+          {/* HISTORIQUE */}
+          <View style={sectionSpacing}>
+            {hasChallengeHistory ? <ChallengeHistoryList /> : <Text style={{ color: isLight ? colors.text : "#fff" }}>Historique indisponible</Text>}
+          </View>
 
-        <View style={[sectionSpacing, styles.tighterSpacing]}>
-          {hasSettingsSection ? <SettingsSection /> : <Text style={{ color: isLight ? colors.text : "#fff" }}>Paramètres indisponibles</Text>}
-        </View>
+          {/* SETTINGS */}
+          <View style={[sectionSpacing, styles.tighterSpacing]}>
+            {hasSettingsSection ? <SettingsSection /> : <Text style={{ color: isLight ? colors.text : "#fff" }}>Paramètres indisponibles</Text>}
+          </View>
 
-        {user?.isAdmin && (
-          <TouchableOpacity
-            onPress={() => router.push("../(admin)")}
-            style={{
-              backgroundColor: colors.accent,
-              paddingVertical: 12,
-              paddingHorizontal: 16,
-              borderRadius: 14,
-              marginTop: 20,
-            }}
-          >
-            <Text style={{ color: "#fff", textAlign: "center", fontFamily: FontFamilies.heading }}>
-              Accéder à l’espace administrateur
-            </Text>
-          </TouchableOpacity>
-        )}
+          {/* ADMIN ACCESS */}
+          {user?.isAdmin && (
+            <TouchableOpacity
+              onPress={() => router.push("../(admin)")}
+              activeOpacity={0.9}
+            >
+               <LinearGradient
+                  colors={["#FF8C66", "#FF9D7E"]}
+                  style={{
+                    paddingVertical: 14,
+                    paddingHorizontal: 16,
+                    borderRadius: 16,
+                    marginTop: 10,
+                    alignItems: 'center'
+                  }}
+               >
+                  <Text style={{ color: "#fff", fontFamily: FontFamilies.heading, fontSize: 16 }}>
+                    Accéder à l’espace administrateur
+                  </Text>
+               </LinearGradient>
+            </TouchableOpacity>
+          )}
 
-        {hasShareQR ? (
-          <ShareQRModal
-            visible={showQR}
-            onClose={() => setShowQR(false)}
-            title="Partager mon profil"
-            subtitle="Scanne pour voir mon profil"
-            qrValue={`app://user/${encodeURIComponent(fullName)}`}
-            shareText={`Voici mon profil sur l'app : app://user/${encodeURIComponent(fullName)}`}
-            accentColor={colors.accent}
-          />
-        ) : showQR ? (
-          <Text style={{ color: isLight ? colors.text : "#fff", textAlign: "center", marginTop: 12 }}>QR indisponible</Text>
-        ) : null}
-      </ScrollView>
-    </SafeAreaView>
+          {/* QR CODE MODAL */}
+          {hasShareQR ? (
+            <ShareQRModal
+              visible={showQR}
+              onClose={() => setShowQR(false)}
+              title="Partager mon profil"
+              subtitle="Scanne pour voir mon profil"
+              qrValue={`app://user/${encodeURIComponent(fullName)}`}
+              shareText={`Voici mon profil sur l'app : app://user/${encodeURIComponent(fullName)}`}
+              accentColor={colors.accent}
+            />
+          ) : showQR ? (
+            <Text style={{ color: isLight ? colors.text : "#fff", textAlign: "center", marginTop: 12 }}>QR indisponible</Text>
+          ) : null}
+        </ScrollView>
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -248,9 +272,25 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", justifyContent: "space-between" },
   firstBlockMargin: { marginTop: 10 },
   tighterSpacing: { marginTop: -4 },
-  titleRow: { alignItems: "center", justifyContent: "center", marginTop: 18, marginBottom: 16, position: 'relative' },
-  titleText: { fontSize: 30, fontFamily: FontFamilies.display },
-  primaryBtn: { flex: 1, paddingVertical: 12, paddingHorizontal: 16, borderRadius: 18, alignItems: "center" },
-  primaryBtnText: { fontFamily: FontFamilies.heading, textAlign: "center" },
-  actionRow: { flexDirection: "row", columnGap: 10 },
+  titleRow: { 
+      alignItems: "center", 
+      justifyContent: "center", 
+      marginTop: 10, 
+      marginBottom: 10, 
+      position: 'relative',
+      height: 44
+  },
+  titleText: { fontSize: 28, fontFamily: FontFamilies.display, fontWeight: '800' },
+  primaryBtn: { 
+      paddingVertical: 14, 
+      paddingHorizontal: 16, 
+      borderRadius: 18, 
+      alignItems: "center",
+      shadowColor: "#008F6B", 
+      shadowOpacity: 0.2, 
+      shadowOffset: {width: 0, height: 4}, 
+      elevation: 4
+  },
+  primaryBtnText: { fontFamily: FontFamilies.heading, textAlign: "center", color: "#FFF", fontSize: 14 },
+  actionRow: { flexDirection: "row", gap: 12 },
 });

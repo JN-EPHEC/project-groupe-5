@@ -1,16 +1,16 @@
 // Keep this context independent of routing
+import { checkPremiumStatus } from "@/services/premiumService";
 import { User as FirebaseUser, onAuthStateChanged } from "firebase/auth";
 import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 import React, {
-    createContext,
-    useCallback,
-    useContext,
-    useEffect,
-    useMemo,
-    useState,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
 } from "react";
 import { auth, db } from "../firebaseConfig";
-import { checkPremiumStatus } from "@/services/premiumService";
 
 // The core user profile from the 'users' collection
 export type UserProfile = {
@@ -30,13 +30,12 @@ export type UserProfile = {
   isPremium?: boolean;
 };
 
-// The context now includes the separate premium status
 type UserContextType = {
-  user: UserProfile | null; // Can be null when logged out
+  user: UserProfile | null;
   isPremium: boolean;
-  loading: boolean; // A single flag for overall loading state
+  loading: boolean; // Flag "BLOQUANT" pour l'initialisation seulement
   userClub: { id: string; name: string; isPrivate?: boolean } | null;
-  refreshUser: () => Promise<void>; // To re-trigger premium check
+  refreshUser: () => Promise<void>;
 };
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -47,33 +46,39 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [userClub, setUserClub] = useState<{ id: string; name: string; isPrivate?: boolean } | null>(null);
   const [isPremium, setIsPremium] = useState(false);
   
-  // Separate loading states for clarity
-  const [profileLoading, setProfileLoading] = useState(true);
-  const [premiumLoading, setPremiumLoading] = useState(true);
+  // 🛡️ CORRECTION : On sépare le chargement initial du chargement d'arrière-plan
+  const [authLoading, setAuthLoading] = useState(true); // Chargement de Firebase Auth
+  const [profileLoading, setProfileLoading] = useState(true); // Chargement du profil Firestore
 
   // 1️⃣ Listen to Firebase Auth state
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       setFirebaseUser(user);
       if (!user) {
-        // If logged out, reset everything
+        // Logged out: clean everything and stop loading
         setUserProfile(null);
         setIsPremium(false);
         setProfileLoading(false);
-        setPremiumLoading(false);
+        setAuthLoading(false); // Auth is ready (result: no user)
+      } else {
+        // User found: auth is ready, but we start loading profile
+        setAuthLoading(false);
+        setProfileLoading(true); 
       }
     });
     return unsub;
   }, []);
 
-  // 2️⃣ Listen to Firestore user profile (only when logged in)
+  // 2️⃣ Listen to Firestore user profile
   useEffect(() => {
     if (!firebaseUser) {
         setProfileLoading(false);
         return;
     };
 
-    setProfileLoading(true);
+    // Note: On ne met PAS setProfileLoading(true) ici, car onSnapshot gère ses mises à jour
+    // sans avoir besoin de bloquer l'UI à chaque petit changement.
+    
     const ref = doc(db, "users", firebaseUser.uid);
     const unsub = onSnapshot(
       ref,
@@ -96,8 +101,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             photoURL: data.photoURL ?? null,
           });
         } else {
-            setUserProfile(null);
+          setUserProfile(null);
         }
+        // Une fois qu'on a la première réponse de Firestore, on arrête le chargement bloquant
         setProfileLoading(false);
       },
       (err) => {
@@ -121,31 +127,27 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             const data: any = d.data();
             const club = { id: d.id, name: data.name ?? "Club", isPrivate: Boolean(data.isPrivate) };
             setUserClub(club);
-            setUserProfile((prev) => prev ? { ...prev, clubId: club.id } : null);
         } else {
             setUserClub(null);
-            setUserProfile((prev) => prev ? { ...prev, clubId: null } : null);
         }
     });
     return unsub;
   }, [firebaseUser]);
   
-  // 4️⃣ Check for premium status once user profile is loaded
+  // 4️⃣ Check for premium status (BACKGROUND CHECK)
+  // 🛡️ CORRECTION : Cette fonction ne touche plus au state "loading" global
   const refreshPremiumStatus = useCallback(async () => {
     if (!userProfile) {
         setIsPremium(false);
-        setPremiumLoading(false);
         return;
     }
-    setPremiumLoading(true);
+    // On ne met PAS de loading ici pour ne pas faire clignoter l'app
     try {
         const status = await checkPremiumStatus(userProfile);
         setIsPremium(status);
     } catch (e) {
         console.error(e);
         setIsPremium(false);
-    } finally {
-        setPremiumLoading(false);
     }
   }, [userProfile]);
 
@@ -153,17 +155,17 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     refreshPremiumStatus();
   }, [refreshPremiumStatus]);
 
-  // The single loading flag exposed to the app
-  const isLoading = profileLoading || premiumLoading;
+  // 🛡️ CORRECTION : Le chargement global n'est vrai QUE pendant l'initialisation.
+  // Une fois l'utilisateur chargé, les mises à jour (edit profil, premium) se font en "live" sans spinner bloquant.
+  const isLoading = authLoading || (!!firebaseUser && profileLoading);
 
-  // Memoized context value
   const value = useMemo(
     () => ({
       user: userProfile,
       isPremium,
       loading: isLoading,
       userClub,
-      refreshUser: refreshPremiumStatus, // refreshUser now re-checks premium status
+      refreshUser: refreshPremiumStatus,
     }),
     [userProfile, isPremium, isLoading, userClub, refreshPremiumStatus]
   );
@@ -171,10 +173,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 }
 
-// Hook to access the user data
 export function useUser() {
   const ctx = useContext(UserContext);
   if (!ctx) throw new Error("useUser must be used within a UserProvider");
   return ctx;
 }
-

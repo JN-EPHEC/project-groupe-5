@@ -1,9 +1,11 @@
+import { FontFamilies } from "@/constants/fonts"; // Import recommandé si dispo
 import { auth, db } from "@/firebaseConfig";
 import { useThemeMode } from "@/hooks/theme-context";
-import { useUser } from "@/hooks/user-context"; // updateUser retiré ici
+import { useUser } from "@/hooks/user-context";
 import { uploadProfilePhoto } from "@/services/profile";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import { LinearGradient } from "expo-linear-gradient"; // ✅ AJOUT
 import { Stack, useRouter } from "expo-router";
 import { doc, setDoc } from "firebase/firestore";
 import React, { useMemo, useState } from "react";
@@ -21,25 +23,25 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-// Palette de couleurs
+// Palette de couleurs (inchangée)
 const PRESET_COLORS = [
-  "#19D07D", // Vert Principal
-  "#3B82F6", // Bleu
-  "#6366F1", // Indigo
-  "#EC4899", // Rose
-  "#EF4444", // Rouge
-  "#F59E0B", // Ambre
-  "#1A1A1A", // Noir
-  "#FFFFFF", // Blanc
-  "#8B5CF6", // Violet
-  "#10B981", // Émeraude
-  "#06B6D4", // Cyan
-  "#F97316", // Orange
+  "#19D07D", "#3B82F6", "#6366F1", "#EC4899", "#EF4444", "#F59E0B",
+  "#1A1A1A", "#FFFFFF", "#8B5CF6", "#10B981", "#06B6D4", "#F97316",
 ];
 
+// 🎨 THEME EDIT
+const editTheme = {
+    bgGradient: ["#DDF7E8", "#F4FDF9"] as const,
+    glassInput: "rgba(255, 255, 255, 0.6)",
+    borderColor: "rgba(0, 143, 107, 0.15)",
+    textMain: "#0A3F33", 
+    textMuted: "#4A665F",
+    accent: "#008F6B",
+};
+
 export default function EditProfileScreen() {
-  // 🚨 CORRECTION : On ne récupère PLUS updateUser ici car il n'existe pas dans le contexte
   const { user, loading } = useUser();
   const { colors, mode } = useThemeMode();
   const router = useRouter();
@@ -52,7 +54,6 @@ export default function EditProfileScreen() {
   const [bio, setBio] = useState(user?.bio ?? "");
   const [photoURL, setPhotoURL] = useState<string | null>(user?.photoURL ?? null);
   
-  // Couleur : Récupère la couleur existante ou vert par défaut
   const [avatarColor, setAvatarColor] = useState<string>(
     (user as any)?.avatarColor ?? "#19D07D"
   );
@@ -78,7 +79,6 @@ export default function EditProfileScreen() {
 
   const handleHexChange = (text: string) => {
     let newColor = text;
-    // Ajoute le # si l'utilisateur l'oublie et que c'est un hex valide
     if (!text.startsWith("#") && /^[0-9A-F]{6}$/i.test(text)) {
       newColor = "#" + text;
     }
@@ -136,13 +136,11 @@ export default function EditProfileScreen() {
       const userDocRef = doc(db, "users", auth.currentUser.uid);
       let nextPhotoURL = photoURL;
 
-      // Upload si nouvelle image locale
       if (photoURL && !isRemoteUri(photoURL)) {
         nextPhotoURL = await uploadProfilePhoto(photoURL);
         setPhotoURL(nextPhotoURL);
       }
 
-      // S'assure que la couleur est valide
       const finalColor = avatarColor.startsWith("#") ? avatarColor : `#${avatarColor}`;
 
       const payload = {
@@ -154,10 +152,7 @@ export default function EditProfileScreen() {
         avatarColor: finalColor,
       };
 
-      // Sauvegarde dans Firebase
       await setDoc(userDocRef, payload, { merge: true });
-
-      // 🚨 CORRECTION : On a retiré l'appel à updateUser(payload) qui causait le crash
 
       Alert.alert("Succès", "Profil mis à jour");
       router.back();
@@ -177,7 +172,6 @@ export default function EditProfileScreen() {
     );
   }
 
-  // --- APERÇU COULEUR & CONTRASTE ---
   const previewColor = avatarColor.startsWith("#") ? avatarColor : `#${avatarColor}`;
   const isValidHex = /^#([0-9A-F]{3}){1,2}$/i.test(previewColor);
   const displayColor = isValidHex ? previewColor : "#19D07D";
@@ -186,228 +180,249 @@ export default function EditProfileScreen() {
   const initialsColor = isWhiteBg ? "#1A1A1A" : "#FFFFFF";
   const borderColor = isWhiteBg ? "#E5E5E5" : "transparent";
 
-  // Style Glassmorphism dynamique
-  const glassStyle = {
-    backgroundColor: isLight ? "rgba(255, 255, 255, 0.7)" : "rgba(30, 30, 30, 0.6)",
-    borderColor: isLight ? "rgba(255, 255, 255, 0.9)" : "rgba(255, 255, 255, 0.1)",
-  };
+  // Couleurs dynamiques
+  const titleColor = isLight ? editTheme.textMain : colors.text;
+  const mutedColor = isLight ? editTheme.textMuted : colors.mutedText;
+  const inputBg = isLight ? editTheme.glassInput : colors.surfaceAlt;
+  const inputBorder = isLight ? editTheme.borderColor : "transparent";
+
+  // Wrapper Fond
+  const BackgroundComponent = isLight ? LinearGradient : View;
+  const bgProps = isLight 
+    ? { colors: editTheme.bgGradient, style: StyleSheet.absoluteFill } 
+    : { style: [StyleSheet.absoluteFill, { backgroundColor: "#021114" }] };
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <ScrollView
-        style={[styles.container, { backgroundColor: colors.background }]}
-        contentContainerStyle={{ paddingBottom: 40 }}
-      >
-        <Stack.Screen options={{ headerShown: false }} />
+    <View style={{ flex: 1 }}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <BackgroundComponent {...(bgProps as any)} />
 
-        {/* HEADER */}
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.title, { color: colors.text }]}>
-            Modifier mon profil
-          </Text>
-          <View style={{ width: 24 }} />
-        </View>
-
-        {/* AVATAR & PHOTO */}
-        <View style={{ alignItems: "center", marginVertical: 24 }}>
-          <Pressable onPress={takePhoto} style={styles.avatarWrapper}>
-            {photoURL ? (
-              <View>
-                <Image source={{ uri: photoURL }} style={styles.avatarImage} />
-                <TouchableOpacity
-                  style={styles.removeBtn}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    removePhoto();
-                  }}
-                >
-                  <View style={styles.removeBtnBg}>
-                    <Ionicons name="close-circle" size={28} color="#EF4444" />
-                  </View>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View
-                style={[
-                  styles.avatarPlaceholder,
-                  { backgroundColor: displayColor, borderColor, borderWidth: 1 },
-                ]}
-              >
-                <Text style={[styles.initials, { color: initialsColor }]}>
-                  {getInitials()}
-                </Text>
-                <View
-                  style={[styles.editIconOverlay, { borderColor: displayColor }]}
-                >
-                  <Ionicons name="camera" size={16} color="#fff" />
-                </View>
-              </View>
-            )}
-          </Pressable>
-
-          <TouchableOpacity onPress={pickImage} style={{ marginTop: 12 }}>
-            <Text style={{ color: colors.accent, fontWeight: "600" }}>
-              {photoURL ? "Changer la photo" : "Ajouter une photo"}
-            </Text>
-          </TouchableOpacity>
-
-          {/* SÉLECTEUR DE COULEUR (Effet Glacé 🧊) */}
-          {!photoURL && (
-            <View style={[styles.colorPickerContainer, glassStyle]}>
-              <Text style={{ color: colors.mutedText, fontSize: 12, marginBottom: 8, fontWeight: '600', letterSpacing: 0.5 }}>
-                COULEUR DE FOND
+      <SafeAreaView style={{ flex: 1 }}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
+          <ScrollView
+            contentContainerStyle={{ paddingBottom: 40, paddingHorizontal: 20 }}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* HEADER */}
+            <View style={styles.headerRow}>
+              <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+                <Ionicons name="arrow-back" size={24} color={titleColor} />
+              </TouchableOpacity>
+              <Text style={[styles.title, { color: titleColor }]}>
+                Modifier mon profil
               </Text>
+              <View style={{ width: 40 }} />
+            </View>
 
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 4 }}>
-                {PRESET_COLORS.map((color) => (
-                  <TouchableOpacity
-                    key={color}
-                    onPress={() => handleSelectColor(color)}
+            {/* AVATAR & PHOTO */}
+            <View style={{ alignItems: "center", marginVertical: 24 }}>
+              <Pressable onPress={takePhoto} style={styles.avatarWrapper}>
+                {photoURL ? (
+                  <View>
+                    <Image source={{ uri: photoURL }} style={styles.avatarImage} />
+                    <TouchableOpacity
+                      style={styles.removeBtn}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        removePhoto();
+                      }}
+                    >
+                      <View style={styles.removeBtnBg}>
+                        <Ionicons name="close-circle" size={28} color="#EF4444" />
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View
                     style={[
-                      styles.colorCircle,
-                      { backgroundColor: color },
-                      avatarColor.toLowerCase() === color.toLowerCase() &&
-                        styles.colorCircleSelected,
+                      styles.avatarPlaceholder,
+                      { backgroundColor: displayColor, borderColor, borderWidth: 1 },
                     ]}
-                  />
-                ))}
-              </ScrollView>
+                  >
+                    <Text style={[styles.initials, { color: initialsColor }]}>
+                      {getInitials()}
+                    </Text>
+                    <View
+                      style={[styles.editIconOverlay, { borderColor: displayColor }]}
+                    >
+                      <Ionicons name="camera" size={16} color="#fff" />
+                    </View>
+                  </View>
+                )}
+              </Pressable>
 
-              <View style={styles.hexInputRow}>
-                <Text style={{ color: colors.mutedText, marginRight: 8, fontWeight: 'bold' }}>#</Text>
+              <TouchableOpacity onPress={pickImage} style={{ marginTop: 12 }}>
+                <Text style={{ color: editTheme.accent, fontWeight: "600" }}>
+                  {photoURL ? "Changer la photo" : "Ajouter une photo"}
+                </Text>
+              </TouchableOpacity>
+
+              {/* SÉLECTEUR DE COULEUR */}
+              {!photoURL && (
+                <LinearGradient
+                    colors={isLight ? ["rgba(255,255,255,0.7)", "rgba(255,255,255,0.4)"] : ["rgba(255,255,255,0.05)", "rgba(255,255,255,0.02)"]}
+                    style={styles.colorPickerContainer}
+                >
+                  <Text style={{ color: mutedColor, fontSize: 12, marginBottom: 8, fontWeight: '700', letterSpacing: 0.5 }}>
+                    COULEUR DE FOND
+                  </Text>
+
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 4 }}>
+                    {PRESET_COLORS.map((color) => (
+                      <TouchableOpacity
+                        key={color}
+                        onPress={() => handleSelectColor(color)}
+                        style={[
+                          styles.colorCircle,
+                          { backgroundColor: color },
+                          avatarColor.toLowerCase() === color.toLowerCase() &&
+                            styles.colorCircleSelected,
+                        ]}
+                      />
+                    ))}
+                  </ScrollView>
+
+                  <View style={styles.hexInputRow}>
+                    <Text style={{ color: mutedColor, marginRight: 8, fontWeight: 'bold' }}>#</Text>
+                    <TextInput
+                      style={[
+                        styles.hexInput,
+                        { color: titleColor, borderColor: inputBorder, backgroundColor: inputBg },
+                      ]}
+                      value={avatarColor.replace("#", "")}
+                      onChangeText={handleHexChange}
+                      placeholder="FFFFFF"
+                      placeholderTextColor={mutedColor}
+                      maxLength={6}
+                      autoCapitalize="characters"
+                    />
+                    <View
+                      style={[
+                        styles.colorPreviewSmall,
+                        { backgroundColor: displayColor },
+                      ]}
+                    />
+                  </View>
+                </LinearGradient>
+              )}
+            </View>
+
+            {/* FORMULAIRE */}
+            {[
+              ["Prénom", firstName, setFirstName],
+              ["Nom", lastName, setLastName],
+              ["Nom d'utilisateur", username, setUsername],
+            ].map(([label, value, setter]: any, i) => (
+              <View key={i} style={styles.formGroup}>
+                <Text style={[styles.label, { color: mutedColor }]}>
+                  {label}
+                </Text>
                 <TextInput
                   style={[
-                    styles.hexInput,
-                    { color: colors.text, borderColor: colors.surfaceAlt, backgroundColor: isLight ? "#fff" : "rgba(255,255,255,0.05)" },
+                    styles.input,
+                    {
+                      borderColor: inputBorder,
+                      backgroundColor: inputBg,
+                      color: titleColor,
+                    },
                   ]}
-                  value={avatarColor.replace("#", "")}
-                  onChangeText={handleHexChange}
-                  placeholder="FFFFFF"
-                  placeholderTextColor={colors.mutedText}
-                  maxLength={6}
-                  autoCapitalize="characters"
-                />
-                <View
-                  style={[
-                    styles.colorPreviewSmall,
-                    { backgroundColor: displayColor },
-                  ]}
+                  value={value}
+                  onChangeText={setter}
+                  placeholder={label}
+                  placeholderTextColor={mutedColor}
                 />
               </View>
+            ))}
+
+            <View style={styles.formGroup}>
+              <Text style={[styles.label, { color: mutedColor }]}>Bio</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    height: 100,
+                    textAlignVertical: "top",
+                    borderColor: inputBorder,
+                    backgroundColor: inputBg,
+                    color: titleColor,
+                  },
+                ]}
+                multiline
+                value={bio}
+                onChangeText={setBio}
+                placeholder="Quelques mots sur vous..."
+                placeholderTextColor={mutedColor}
+              />
             </View>
-          )}
-        </View>
 
-        {/* FORMULAIRE */}
-        {[
-          ["Prénom", firstName, setFirstName],
-          ["Nom", lastName, setLastName],
-          ["Nom d'utilisateur", username, setUsername],
-        ].map(([label, value, setter]: any, i) => (
-          <View key={i} style={styles.formGroup}>
-            <Text style={[styles.label, { color: colors.mutedText }]}>
-              {label}
-            </Text>
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  borderColor: colors.surfaceAlt,
-                  backgroundColor: colors.surface,
-                  color: colors.text,
-                },
-              ]}
-              value={value}
-              onChangeText={setter}
-              placeholder={label}
-              placeholderTextColor={colors.mutedText}
-            />
-          </View>
-        ))}
+            {/* BOUTONS */}
+            <TouchableOpacity
+              onPress={save}
+              disabled={!canSave}
+              activeOpacity={0.9}
+              style={{ shadowColor: editTheme.accent, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: {width: 0, height: 4}, elevation: 4 }}
+            >
+                <LinearGradient
+                    colors={canSave ? ["#008F6B", "#10B981"] : ["#A0AEC0", "#CBD5E0"]}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                    style={styles.saveBtn}
+                >
+                    <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 16 }}>
+                        {saving ? "Enregistrement..." : "Enregistrer"}
+                    </Text>
+                </LinearGradient>
+            </TouchableOpacity>
 
-        <View style={styles.formGroup}>
-          <Text style={[styles.label, { color: colors.mutedText }]}>Bio</Text>
-          <TextInput
-            style={[
-              styles.input,
-              {
-                height: 100,
-                textAlignVertical: "top",
-                borderColor: colors.surfaceAlt,
-                backgroundColor: colors.surface,
-                color: colors.text,
-              },
-            ]}
-            multiline
-            value={bio}
-            onChangeText={setBio}
-            placeholder="Quelques mots sur vous..."
-            placeholderTextColor={colors.mutedText}
-          />
-        </View>
-
-        {/* BOUTONS */}
-        <Pressable
-          onPress={save}
-          disabled={!canSave}
-          style={[
-            styles.saveBtn,
-            { backgroundColor: colors.accent, opacity: canSave ? 1 : 0.6 },
-          ]}
-        >
-          <Text style={{ color: "#0F3327", fontWeight: "700", fontSize: 16 }}>
-            {saving ? "Enregistrement..." : "Enregistrer"}
-          </Text>
-        </Pressable>
-
-        <Pressable
-          onPress={() => router.back()}
-          style={[styles.saveBtn, { backgroundColor: colors.surface, marginTop: 12 }]}
-        >
-          <Text style={{ color: colors.text, fontWeight: "600" }}>
-            Annuler
-          </Text>
-        </Pressable>
-      </ScrollView>
-    </KeyboardAvoidingView>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={[styles.cancelBtn, { borderColor: inputBorder, backgroundColor: isLight ? "rgba(255,255,255,0.5)" : "transparent" }]}
+            >
+              <Text style={{ color: titleColor, fontWeight: "600" }}>
+                Annuler
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 10,
+    marginTop: 10
   },
-  title: { fontSize: 20, fontWeight: "700" },
+  backBtn: { padding: 8, borderRadius: 12 },
+  title: { fontSize: 20, fontWeight: "700", fontFamily: FontFamilies.heading },
 
-  avatarWrapper: { position: "relative" },
-  avatarImage: { width: 110, height: 110, borderRadius: 55 },
+  avatarWrapper: { position: "relative", shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 },
+  avatarImage: { width: 110, height: 110, borderRadius: 55, borderWidth: 4, borderColor: "#FFF" },
   avatarPlaceholder: {
     width: 110,
     height: 110,
     borderRadius: 55,
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 10, elevation: 5
   },
   initials: { fontSize: 36, fontWeight: "bold" },
   editIconOverlay: {
     position: "absolute",
     bottom: 0,
     right: 0,
-    backgroundColor: "#0F3327",
+    backgroundColor: "#008F6B",
     padding: 8,
     borderRadius: 20,
     borderWidth: 3,
+    borderColor: "#FFF"
   },
   removeBtn: { position: "absolute", top: 0, right: 0 },
   removeBtnBg: { backgroundColor: "#fff", borderRadius: 15 },
@@ -419,13 +434,8 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 20,
     borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.5)",
     overflow: "hidden",
-    // Ombre douce pour l'effet de profondeur
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 3,
   },
   colorCircle: {
     width: 36,
@@ -444,7 +454,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginTop: 16,
-    backgroundColor: "rgba(0,0,0,0.03)",
     padding: 4,
     borderRadius: 12,
   },
@@ -453,9 +462,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
     fontFamily: Platform.OS === 'ios' ? "Courier" : "monospace",
     fontSize: 14,
+    fontWeight: "600"
   },
   colorPreviewSmall: {
     width: 40,
@@ -468,7 +478,8 @@ const styles = StyleSheet.create({
 
   formGroup: { marginBottom: 16 },
   label: { marginBottom: 8, fontSize: 13, fontWeight: "600" },
-  input: { borderWidth: 1, borderRadius: 14, padding: 14, fontSize: 16 },
+  input: { borderWidth: 1, borderRadius: 16, padding: 16, fontSize: 16 },
 
   saveBtn: { paddingVertical: 16, borderRadius: 16, alignItems: "center" },
+  cancelBtn: { paddingVertical: 16, borderRadius: 16, alignItems: "center", marginTop: 12, borderWidth: 1 },
 });

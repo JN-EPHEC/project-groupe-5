@@ -38,6 +38,17 @@ import { useClassement } from "@/src/classement/hooks/useClassement";
 import { AVPlaybackStatus, ResizeMode, Video } from "expo-av";
 import { Modal } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
+
+// 🎨 THEME DEFI SCREEN
+const THEME = {
+    bgGradient: ["#DDF7E8", "#F4FDF9"] as const,
+    glassCardBg: ["rgba(240, 253, 244, 0.95)", "rgba(255, 255, 255, 0.85)"] as const,
+    glassBorder: "rgba(255, 255, 255, 0.6)",
+    textMain: "#0A3F33", 
+    textMuted: "#4A665F",
+    accent: "#008F6B", // Vert Marque
+};
 
 type DefiDoc = {
   id: string;
@@ -372,15 +383,28 @@ export default function DefiScreen() {
     }
   };
 
+  const BackgroundComponent = isLight ? LinearGradient : View;
+  const bgProps = isLight 
+    ? { colors: THEME.bgGradient, style: StyleSheet.absoluteFill } 
+    : { style: [StyleSheet.absoluteFill, { backgroundColor: "#021114" }] };
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: isLight ? colors.background : darkBg }]}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={[styles.title, { color: colors.text }]}>{viewMode === 'defis' ? 'Défis' : 'Classement'}</Text>
-        <TouchableOpacity
-          onPress={() => setViewMode(viewMode === 'defis' ? 'classement' : 'defis')}
-          style={{ padding: 8, borderRadius: 12, backgroundColor: isLight ? colors.surface : "rgba(0, 151, 178, 0.1)" }}
-        >
-          <Ionicons name={viewMode === 'defis' ? 'trophy-outline' : 'flag-outline'} size={22} color={colors.text} />
+    <View style={{ flex: 1 }}>
+      <BackgroundComponent {...(bgProps as any)} />
+      
+      <SafeAreaView style={styles.container}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, marginTop: 10 }}>
+        <Text style={[styles.title, { color: isLight ? THEME.textMain : colors.text, fontFamily: "StylizedTitle" }]}>
+            {viewMode === 'defis' ? 'Défis' : 'Classement'}
+        </Text>
+        
+        <TouchableOpacity onPress={() => setViewMode(viewMode === 'defis' ? 'classement' : 'defis')}>
+            <LinearGradient
+                colors={isLight ? ["#E0F7EF", "#D1FAE5"] : ["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.1)"]}
+                style={{ padding: 10, borderRadius: 14, borderWidth: 1, borderColor: isLight ? "#A7F3D0" : "transparent" }}
+            >
+                <Ionicons name={viewMode === 'defis' ? 'trophy-outline' : 'flag-outline'} size={24} color={isLight ? "#008F6B" : colors.text} />
+            </LinearGradient>
         </TouchableOpacity>
       </View>
 
@@ -394,23 +418,31 @@ export default function DefiScreen() {
         {(activeTab === "perso" && viewMode === 'defis') && (
           <>
             {gatingActive && (
-              <View style={{ backgroundColor: colors.card, padding: 20, borderRadius: 24, marginBottom: 18 }}>
-                <Text style={{ color: colors.text, fontSize: 16, fontWeight: "700" }}>
-                  Validation requise
+              <LinearGradient
+                colors={isLight ? ["rgba(255,255,255,0.9)", "rgba(255,255,255,0.6)"] : ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"]}
+                style={{ padding: 20, borderRadius: 24, marginBottom: 18, borderWidth: 1, borderColor: isLight ? "rgba(255,255,255,0.6)" : "transparent" }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 8 }}>
+                    <Ionicons name="shield-checkmark-outline" size={24} color={isLight ? "#008F6B" : colors.text} />
+                    <Text style={{ color: isLight ? "#0A3F33" : colors.text, fontSize: 18, fontWeight: "700" }}>Validation requise</Text>
+                </View>
+                <Text style={{ color: isLight ? "#4A665F" : colors.mutedText, lineHeight: 22 }}>
+                  Validez 3 défis de la communauté pour débloquer la validation du vôtre.
                 </Text>
-                <Text style={{ color: colors.mutedText, marginTop: 8 }}>
-                  Il vous faut maintenant valider 3 défis d&apos;autres membres avant que
-                  votre propre défi soit examiné.
-                </Text>
-                <View style={{ flexDirection: "row", alignItems: "center", marginTop: 14, gap: 12 }}>
-                  <View style={{ flex: 1, height: 10, backgroundColor: colors.surfaceAlt, borderRadius: 6, overflow: "hidden" }}>
-                    <View style={{ width: `${(reviewCompleted / reviewRequiredCount) * 100}%`, backgroundColor: colors.accent, height: "100%" }} />
+                
+                <View style={{ flexDirection: "row", alignItems: "center", marginTop: 16, gap: 12 }}>
+                  <View style={{ flex: 1, height: 8, backgroundColor: isLight ? "#E2E8F0" : colors.surfaceAlt, borderRadius: 4, overflow: "hidden" }}>
+                    <LinearGradient
+                        colors={["#008F6B", "#10B981"]}
+                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                        style={{ width: `${(reviewCompleted / reviewRequiredCount) * 100}%`, height: "100%" }} 
+                    />
                   </View>
-                  <Text style={{ color: colors.text, fontWeight: "700" }}>
+                  <Text style={{ color: isLight ? "#008F6B" : colors.text, fontWeight: "800" }}>
                     {reviewCompleted}/{reviewRequiredCount}
                   </Text>
                 </View>
-              </View>
+              </LinearGradient>
             )}
 
             {gatingActive &&
@@ -487,34 +519,68 @@ export default function DefiScreen() {
               current.status === "pendingValidation" &&
               reviewCompleted >= reviewRequiredCount &&
               !current.feedbackSubmitted && (
-                <View style={{ backgroundColor: colors.card, padding: 20, borderRadius: 24, marginTop: 10 }}>
-                  <Text style={{ color: colors.text, fontSize: 16, fontWeight: "700" }}>Laisser un avis</Text>
-                  <Text style={{ color: colors.mutedText, marginTop: 6 }}>
+                <LinearGradient
+                  colors={isLight ? THEME.glassCardBg : ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"]}
+                  style={{ padding: 20, borderRadius: 24, marginTop: 10, borderWidth: 1, borderColor: isLight ? THEME.glassBorder : "transparent" }}
+                >
+                  <Text style={{ color: isLight ? "#0A3F33" : colors.text, fontSize: 18, fontWeight: "700", marginBottom: 4 }}>Laisser un avis</Text>
+                  <Text style={{ color: isLight ? "#4A665F" : colors.mutedText, marginBottom: 12, lineHeight: 20 }}>
                     Notez ce défi et laissez un commentaire pour aider la validation.
                   </Text>
-                  <View style={{ flexDirection: "row", marginTop: 12 }}>
+                  
+                  {/* Etoiles */}
+                  <View style={{ flexDirection: "row", marginBottom: 16, justifyContent: 'center', backgroundColor: isLight ? "rgba(255,255,255,0.5)" : "transparent", padding: 8, borderRadius: 16 }}>
                     {[1, 2, 3, 4, 5].map((n) => (
-                      <TouchableOpacity key={n} onPress={() => setFeedbackRating(n)} style={{ marginRight: 8 }}>
-                        <Text style={{ fontSize: 24 }}>{feedbackRating >= n ? "⭐" : "☆"}</Text>
+                      <TouchableOpacity key={n} onPress={() => setFeedbackRating(n)} style={{ marginHorizontal: 6 }}>
+                        <Ionicons 
+                            name={feedbackRating >= n ? "star" : "star-outline"} 
+                            size={32} 
+                            color={feedbackRating >= n ? "#F6D365" : (isLight ? "#A0AEC0" : colors.mutedText)} 
+                        />
                       </TouchableOpacity>
                     ))}
                   </View>
+
+                  {/* Input Stylisé */}
                   <TextInput
                     value={feedbackComment}
                     onChangeText={setFeedbackComment}
-                    placeholder="Votre commentaire"
+                    placeholder="Votre commentaire..."
+                    placeholderTextColor={isLight ? "#8AA39C" : colors.mutedText}
                     multiline
-                    numberOfLines={4}
-                    style={{ marginTop: 12, borderWidth: 1, borderColor: "#2A3431", backgroundColor: colors.surfaceAlt, color: colors.text, borderRadius: 12, padding: 12, textAlignVertical: "top" }}
+                    numberOfLines={3}
+                    style={{ 
+                        borderWidth: 1, 
+                        borderColor: isLight ? "rgba(0,143,107,0.2)" : "#2A3431", 
+                        backgroundColor: isLight ? "rgba(255,255,255,0.8)" : colors.surfaceAlt, 
+                        color: isLight ? "#0A3F33" : colors.text, 
+                        borderRadius: 16, 
+                        padding: 14, 
+                        textAlignVertical: "top",
+                        fontSize: 15
+                    }}
                   />
+
                   <TouchableOpacity
                     onPress={handleSendFeedbackToAdmin}
                     disabled={feedbackRating === 0}
-                    style={{ marginTop: 14, borderRadius: 14, paddingVertical: 12, alignItems: "center", backgroundColor: feedbackRating === 0 ? "#2A3431" : colors.accent }}
+                    style={{ 
+                        marginTop: 16, 
+                        borderRadius: 16, 
+                        paddingVertical: 14, 
+                        alignItems: "center", 
+                        backgroundColor: feedbackRating === 0 ? (isLight ? "#E2E8F0" : "#2A3431") : (isLight ? "#008F6B" : colors.accent),
+                        shadowColor: feedbackRating !== 0 ? "#008F6B" : "transparent",
+                        shadowOpacity: 0.3,
+                        shadowOffset: {width: 0, height: 4},
+                        elevation: feedbackRating !== 0 ? 4 : 0
+                    }}
                   >
-                    <Text style={{ color: feedbackRating === 0 ? "#8AA39C" : "#0F3327", fontWeight: "700" }}>Envoyer l&apos;avis</Text>
+                    <Text style={{ color: feedbackRating === 0 ? (isLight ? "#A0AEC0" : "#8AA39C") : "#FFFFFF", fontWeight: "700", fontSize: 16 }}>
+                        Envoyer l'avis
+                    </Text>
                   </TouchableOpacity>
-                </View>
+                </LinearGradient>
               )}
 
             {hideAfterFeedback && (
@@ -530,14 +596,18 @@ export default function DefiScreen() {
         {viewMode === 'classement' && (
           <>
             {activeTab === 'perso' && (
-              <View style={{ backgroundColor: colors.surface, padding: 20, borderRadius: 24, marginBottom: 18 }}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                  <Text style={{ color: colors.text, fontSize: 18, fontWeight: "800" }}>Top 50 — Perso</Text>
+              <LinearGradient
+                colors={isLight ? THEME.glassCardBg : ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"]}
+                style={{ padding: 20, borderRadius: 24, marginBottom: 18, borderWidth: 1, borderColor: isLight ? THEME.glassBorder : "transparent" }}
+              >
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                  <Text style={{ color: isLight ? "#0A3F33" : colors.text, fontSize: 20, fontWeight: "800" }}>Top 50 — Perso</Text>
+                  
                   <TouchableOpacity
                     onPress={handleOpenRewards}
-                    style={{ backgroundColor: "rgba(82, 209, 146, 0.14)", borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: "rgba(82, 209, 146, 0.22)" }}
+                    style={{ backgroundColor: isLight ? "#E0F7EF" : "rgba(82, 209, 146, 0.14)", borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: isLight ? "#A7F3D0" : "rgba(82, 209, 146, 0.22)" }}
                   >
-                    <Text style={{ color: colors.text, fontWeight: "800" }}>Récompenses</Text>
+                    <Text style={{ color: isLight ? "#008F6B" : colors.text, fontWeight: "800", fontSize: 13 }}>🎁 Récompenses</Text>
                   </TouchableOpacity>
                 </View>
                 {classementLoading ? (
@@ -550,11 +620,14 @@ export default function DefiScreen() {
                     <ClassementList users={classementUsers} totalSlots={50} />
                   </View>
                 )}
-              </View>
+              </LinearGradient>
             )}
 
             {activeTab === 'club' && (
-              <View style={{ backgroundColor: colors.surface, padding: 20, borderRadius: 24, marginBottom: 18 }}>
+              <LinearGradient
+                colors={isLight ? THEME.glassCardBg : ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"]}
+                style={{ padding: 20, borderRadius: 24, marginBottom: 18, borderWidth: 1, borderColor: isLight ? THEME.glassBorder : "transparent" }}
+              >
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Text style={{ color: colors.text, fontSize: 18, fontWeight: '800' }}>Top 50 — Clubs</Text>
                   <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -608,7 +681,7 @@ export default function DefiScreen() {
                     </View>
                   );
                 })()}
-              </View>
+              </LinearGradient>
             )}
           </>
         )}
@@ -693,15 +766,16 @@ export default function DefiScreen() {
       </Modal>
 
     </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 20 },
-  title: { fontSize: 28, fontWeight: "700" },
+  title: { fontSize: 28, fontWeight: "800" }, // Plus gras pour le titre principal
   scroll: { marginTop: 12 },
   emptyText: { textAlign: "center", marginTop: 40, fontSize: 16 },
-  // Ajoutez ceci :
+  // ... styles de pub inchangés
   adContainer: { flex: 1, backgroundColor: "black", justifyContent: "center", alignItems: "center" },
   adVideo: { width: "100%", height: "100%" },
   adOverlay: { position: "absolute", right: 20, alignItems: "flex-end", gap: 10 },

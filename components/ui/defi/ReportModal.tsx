@@ -1,14 +1,16 @@
 import { useThemeMode } from "@/hooks/theme-context";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient"; // ✅ AJOUT
 import React, { useState } from "react";
 import {
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
 
 type Props = {
@@ -25,43 +27,74 @@ const REPORT_REASONS = [
   "Autre"
 ];
 
+// 🎨 THEME REPORT MODAL
+const reportTheme = {
+    glassBg: ["rgba(255, 255, 255, 0.95)", "rgba(240, 253, 244, 0.95)"] as const,
+    borderColor: "rgba(255, 255, 255, 0.6)",
+    textMain: "#0A3F33", 
+    textMuted: "#4A665F",
+    accent: "#008F6B", // Vert Marque
+    danger: "#EF4444",
+};
+
 export function ReportModal({ visible, onClose, onSubmit }: Props) {
-  const { colors, theme } = useThemeMode(); // Ajout de 'theme' si dispo, sinon on utilise colors
+  const { colors, mode } = useThemeMode();
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
   const [details, setDetails] = useState("");
 
   const handleSubmit = () => {
-    if (!selectedReason) return; // Force à choisir une catégorie
+    if (!selectedReason) return;
 
-    // On combine la catégorie et le message détaillé
     const finalReason = details.trim().length > 0 
       ? `[${selectedReason}] ${details}` 
       : `[${selectedReason}]`;
 
     onSubmit(finalReason);
     
-    // Reset
     setDetails("");
     setSelectedReason(null);
     onClose();
   };
 
-  const isDark = theme === "dark";
+  const isLight = mode === "light";
+  
+  // Couleurs dynamiques
+  const titleColor = isLight ? reportTheme.textMain : colors.text;
+  const textColor = isLight ? reportTheme.textMuted : colors.mutedText;
+
+  // Wrapper conditionnel (LinearGradient si Light, View si Dark)
+  const Wrapper = isLight ? LinearGradient : View;
+  const wrapperProps = isLight 
+    ? { 
+        colors: reportTheme.glassBg, 
+        start: { x: 0, y: 0 }, 
+        end: { x: 1, y: 1 }, 
+        style: [styles.card, styles.glassEffect] 
+      }
+    : { 
+        style: [styles.card, { backgroundColor: colors.surface || "#1A2F28", borderColor: 'rgba(0,151,178,0.3)', borderWidth: 1 }] 
+      };
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <KeyboardAvoidingView 
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.overlay}
       >
-        <View style={[styles.card, { backgroundColor: colors.surface || "#FFFFFF" }]}>
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
+        
+        <Wrapper {...(wrapperProps as any)}>
+          <View style={styles.header}>
+              <View style={[styles.iconContainer, { backgroundColor: isLight ? "#FEF2F2" : "#2A171A" }]}>
+                <Ionicons name="warning-outline" size={24} color={reportTheme.danger} />
+              </View>
+              <Text style={[styles.title, { color: titleColor }]}>
+                Signaler ce contenu
+              </Text>
+          </View>
           
-          <Text style={[styles.title, { color: colors.text || "#000" }]}>
-            Signaler ce défi
-          </Text>
-          
-          <Text style={{ color: colors.mutedText || "#666", marginBottom: 15 }}>
-            Sélectionnez un motif :
+          <Text style={{ color: textColor, marginBottom: 16, textAlign: 'center' }}>
+            Aidez-nous à comprendre le problème. Ce signalement est anonyme.
           </Text>
 
           {/* 1. Zone des Catégories (Chips) */}
@@ -75,14 +108,15 @@ export function ReportModal({ visible, onClose, onSubmit }: Props) {
                   style={[
                     styles.chip,
                     { 
-                      borderColor: colors.mutedText || "#ccc",
-                      backgroundColor: isSelected ? "#EF4444" : "transparent"
+                      borderColor: isSelected ? reportTheme.danger : (isLight ? "rgba(0,143,107,0.2)" : colors.mutedText),
+                      backgroundColor: isSelected ? reportTheme.danger : (isLight ? "rgba(255,255,255,0.5)" : "transparent")
                     }
                   ]}
                 >
                   <Text style={{ 
-                    color: isSelected ? "white" : (colors.text || "#000"),
-                    fontWeight: isSelected ? "700" : "400"
+                    color: isSelected ? "white" : (isLight ? reportTheme.textMain : colors.text),
+                    fontWeight: isSelected ? "700" : "500",
+                    fontSize: 13
                   }}>
                     {reason}
                   </Text>
@@ -96,13 +130,13 @@ export function ReportModal({ visible, onClose, onSubmit }: Props) {
             style={[
               styles.input, 
               { 
-                color: colors.text || "#000", 
-                borderColor: colors.mutedText || "#ccc",
-                backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "#F9FAFB" // Fond gris clair pour être visible
+                color: isLight ? reportTheme.textMain : colors.text, 
+                borderColor: isLight ? "rgba(0,143,107,0.2)" : colors.mutedText,
+                backgroundColor: isLight ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.05)" 
               }
             ]}
             placeholder="Détails supplémentaires (optionnel)..."
-            placeholderTextColor={colors.mutedText || "#999"}
+            placeholderTextColor={isLight ? "#8AA39C" : colors.mutedText}
             multiline
             value={details}
             onChangeText={setDetails}
@@ -110,23 +144,27 @@ export function ReportModal({ visible, onClose, onSubmit }: Props) {
 
           {/* Boutons d'action */}
           <View style={styles.buttons}>
-            <TouchableOpacity onPress={onClose} style={styles.btn}>
-              <Text style={{ color: colors.mutedText || "#666" }}>Annuler</Text>
+            <TouchableOpacity onPress={onClose} style={[styles.btn, { backgroundColor: isLight ? "#F3F4F6" : "transparent" }]}>
+              <Text style={{ color: isLight ? "#4B5563" : colors.mutedText, fontWeight: "600" }}>Annuler</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
               onPress={handleSubmit} 
-              disabled={!selectedReason} // Désactivé si pas de motif
+              disabled={!selectedReason}
               style={[
                 styles.btn, 
-                { backgroundColor: selectedReason ? "#EF4444" : "#ccc" }
+                { 
+                    backgroundColor: selectedReason ? reportTheme.danger : (isLight ? "#E5E7EB" : "#333"),
+                    shadowColor: selectedReason ? reportTheme.danger : "transparent",
+                    shadowOpacity: 0.3, shadowOffset: {width: 0, height: 4}, shadowRadius: 6, elevation: selectedReason ? 4 : 0
+                }
               ]}
             >
-              <Text style={{ color: "white", fontWeight: "700" }}>Signaler</Text>
+              <Text style={{ color: selectedReason ? "white" : (isLight ? "#9CA3AF" : "#666"), fontWeight: "700" }}>Signaler</Text>
             </TouchableOpacity>
           </View>
 
-        </View>
+        </Wrapper>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -135,52 +173,72 @@ export function ReportModal({ visible, onClose, onSubmit }: Props) {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)", // Un peu plus sombre pour le focus
+    backgroundColor: "rgba(0,0,0,0.6)",
     justifyContent: "center",
     padding: 20,
+    alignItems: 'center'
   },
   card: {
     padding: 24,
-    borderRadius: 20,
+    borderRadius: 24,
+    width: '100%',
+    maxWidth: 340,
+  },
+  glassEffect: {
+    borderWidth: 1,
+    borderColor: reportTheme.borderColor,
     shadowColor: "#000",
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 5,
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  header: {
+      alignItems: 'center',
+      marginBottom: 10
+  },
+  iconContainer: {
+      width: 48, height: 48, borderRadius: 24,
+      alignItems: 'center', justifyContent: 'center',
+      marginBottom: 12
   },
   title: {
     fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 8,
+    fontWeight: "800",
+    textAlign: 'center',
+    fontFamily: "StylizedTitle" // Adapte si tu n'as pas cette font
   },
   chipsContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
     marginBottom: 20,
+    justifyContent: 'center'
   },
   chip: {
     paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     borderRadius: 20,
     borderWidth: 1,
   },
   input: {
     borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
+    borderRadius: 16,
+    padding: 14,
     minHeight: 100,
     textAlignVertical: "top",
     marginBottom: 20,
+    fontSize: 15
   },
   buttons: {
     flexDirection: "row",
-    justifyContent: "flex-end",
-    gap: 15,
-    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
   },
   btn: {
+    flex: 1,
     paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
 });
