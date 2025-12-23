@@ -159,6 +159,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   // 4️⃣ Check for premium status (BACKGROUND CHECK)
   // 🛡️ CORRECTION : Cette fonction ne touche plus au state "loading" global
   const refreshPremiumStatus = useCallback(async () => {
+    if (isDevPremiumUser) return; // ✅ DEV bypass, nothing else touched
+
     if (!userProfile) {
         setIsPremium(false);
         return;
@@ -183,16 +185,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const effectiveIsPremium = isDevPremiumUser ? true : isPremium;
 
-const value = useMemo(
-  () => ({
-    user: userProfile,
-    isPremium: effectiveIsPremium,
-    loading: isLoading,
-    userClub,
-    refreshUser: refreshPremiumStatus,
-  }),
-  [userProfile, effectiveIsPremium, isLoading, userClub, refreshPremiumStatus]
-);
+  const value = useMemo(
+    () => ({
+      user: userProfile,
+      isPremium: effectiveIsPremium,
+      loading: isLoading,
+      userClub,
+      refreshUser: refreshPremiumStatus,
+    }),
+    [userProfile, effectiveIsPremium, isLoading, userClub, refreshPremiumStatus]
+  );
 
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
