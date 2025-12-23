@@ -1,3 +1,4 @@
+// hooks/user-context.tsx
 // Keep this context independent of routing
 import { DEV_FORCE_PREMIUM, DEV_TEST_EMAIL, DEV_TEST_UID } from "@/devAuth.env";
 import { checkPremiumStatus } from "@/services/premiumService";
