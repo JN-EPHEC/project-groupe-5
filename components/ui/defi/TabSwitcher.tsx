@@ -1,3 +1,4 @@
+// components/ui/defi/TabSwitcher.tsx
 import { useThemeMode } from "@/hooks/theme-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";

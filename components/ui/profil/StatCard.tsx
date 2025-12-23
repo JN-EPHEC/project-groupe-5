@@ -51,7 +51,7 @@ export const StatCard: React.FC<StatCardProps> = ({ icon, value, label, accent }
       <View style={[styles.iconBadge, { backgroundColor: iconBg }]}>
         <Ionicons name={icon as any} size={22} color={iconColor} />
       </View>
-      {value && <Text style={[styles.number, { color: textColor }]}>{value}</Text>}
+      {value !== undefined && value !== null && <Text style={[styles.number, { color: textColor }]}>{value}</Text>}
       <Text style={[styles.label, { color: subTextColor }]}>{label}</Text>
     </Wrapper>
   );

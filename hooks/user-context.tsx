@@ -1,4 +1,5 @@
 // Keep this context independent of routing
+import { DEV_FORCE_PREMIUM, DEV_TEST_EMAIL, DEV_TEST_UID } from "@/devAuth.env";
 import { checkPremiumStatus } from "@/services/premiumService";
 import { User as FirebaseUser, onAuthStateChanged } from "firebase/auth";
 import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
@@ -11,6 +12,7 @@ import React, {
   useState,
 } from "react";
 import { auth, db } from "../firebaseConfig";
+
 
 // The core user profile from the 'users' collection
 export type UserProfile = {
@@ -45,6 +47,25 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [userClub, setUserClub] = useState<{ id: string; name: string; isPrivate?: boolean } | null>(null);
   const [isPremium, setIsPremium] = useState(false);
+  const isDevPremiumUser =
+    __DEV__ &&
+    DEV_FORCE_PREMIUM &&
+    firebaseUser?.email === DEV_TEST_EMAIL;
+
+    //debugger
+    useEffect(() => {
+  console.log("🧪 DEV PREMIUM CHECK", {
+    __DEV__,
+    DEV_FORCE_PREMIUM,
+    firebaseEmail: firebaseUser?.email,
+    firebaseUID: firebaseUser?.uid,
+    DEV_TEST_EMAIL,
+    DEV_TEST_UID,
+    isDevPremiumUser,
+    isPremiumState: isPremium,
+  });
+}, [firebaseUser, isDevPremiumUser, isPremium]);
+
   
   // 🛡️ CORRECTION : On sépare le chargement initial du chargement d'arrière-plan
   const [authLoading, setAuthLoading] = useState(true); // Chargement de Firebase Auth
@@ -159,16 +180,19 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   // Une fois l'utilisateur chargé, les mises à jour (edit profil, premium) se font en "live" sans spinner bloquant.
   const isLoading = authLoading || (!!firebaseUser && profileLoading);
 
-  const value = useMemo(
-    () => ({
-      user: userProfile,
-      isPremium,
-      loading: isLoading,
-      userClub,
-      refreshUser: refreshPremiumStatus,
-    }),
-    [userProfile, isPremium, isLoading, userClub, refreshPremiumStatus]
-  );
+  const effectiveIsPremium = isDevPremiumUser ? true : isPremium;
+
+const value = useMemo(
+  () => ({
+    user: userProfile,
+    isPremium: effectiveIsPremium,
+    loading: isLoading,
+    userClub,
+    refreshUser: refreshPremiumStatus,
+  }),
+  [userProfile, effectiveIsPremium, isLoading, userClub, refreshPremiumStatus]
+);
+
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 }

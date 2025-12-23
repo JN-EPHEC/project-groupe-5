@@ -11,6 +11,26 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+//debugger();
+if (typeof window !== "undefined") {
+  const originalError = console.error;
+
+  console.error = (...args: any[]) => {
+    const message = String(args[0] ?? "");
+
+    if (message.includes("Unexpected text node")) {
+      throw new Error(
+        "FORCED CRASH: Unexpected text node detected.\n" +
+        "This means a string or number is rendered inside a <View>."
+      );
+    }
+
+    originalError(...args);
+  };
+}
+
+
+
 // 🎨 THEME NAVBAR
 const navTheme = {
   light: {
