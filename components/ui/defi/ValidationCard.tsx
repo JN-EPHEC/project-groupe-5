@@ -50,6 +50,10 @@ export function ValidationCard({ item, onValidate, onReject, onReport }: Props) 
       icon: "leaf-outline" 
   };
 
+  //validation de commentaire => éviter l'affichage de commentaires vides
+  const hasValidComment =
+    typeof item.comment === "string" && item.comment.trim().length > 0;
+
   // Wrapper conditionnel (LinearGradient si Light, View si Dark)
   const Wrapper = isLight ? LinearGradient : View;
   const wrapperProps = isLight 
@@ -92,11 +96,11 @@ export function ValidationCard({ item, onValidate, onReject, onReport }: Props) 
       )}
 
       {/* COMMENTAIRE */}
-      {item.comment && (
-        <View style={[styles.commentBox, { backgroundColor: isLight ? "rgba(255,255,255,0.6)" : colors.surfaceAlt }]}>
-            <Text style={{ color: cardText, fontStyle: "italic", fontSize: 13, textAlign: 'center' }}>
-                "{item.comment}"
-            </Text>
+      {hasValidComment && (
+        <View style={styles.commentBox}>
+          <Text style={{ color: cardText, fontStyle: "italic", fontSize: 13, textAlign: "center" }}>
+            "{item.comment}"
+          </Text>
         </View>
       )}
 
