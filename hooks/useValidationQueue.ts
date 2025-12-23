@@ -71,6 +71,7 @@ const ID = instanceIdRef.current;
 
   const [queue, setQueue] = useState<ValidationProof[]>([]);
   const hasDecidedRef = useRef(false); // 🔒 FINAL decision flag
+  const prevReqRef = useRef<number | null>(null);
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;
@@ -167,7 +168,13 @@ vqLog(ID!, "SUBSCRIBE Firestore", {
 
       // ---------- NORMAL VALIDATION ----------
       setQueue(filtered);
-      setReviewRequiredCount(Math.min(filtered.length, 3));
+      // Only update shared reviewRequiredCount when it actually changes to avoid
+      // causing a re-subscription/render loop between hook and context
+      const req = Math.min(filtered.length, 3);
+      if (prevReqRef.current !== req) {
+        setReviewRequiredCount(req);
+        prevReqRef.current = req;
+      }
     });
 
     return () => {

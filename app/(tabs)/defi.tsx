@@ -1,3 +1,4 @@
+// app/(tabs)/defi.tsx
 import { ReportModal } from "@/components/ui/defi/ReportModal";
 import { useClub } from "@/hooks/club-context";
 import { useFriends } from "@/hooks/friends-context";
@@ -36,9 +37,9 @@ import { useClassement } from "@/src/classement/hooks/useClassement";
 
 
 import { AVPlaybackStatus, ResizeMode, Video } from "expo-av";
+import { LinearGradient } from "expo-linear-gradient";
 import { Modal } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { LinearGradient } from "expo-linear-gradient";
 
 // 🎨 THEME DEFI SCREEN
 const THEME = {
@@ -300,6 +301,9 @@ export default function DefiScreen() {
     reviewCompleted >= reviewRequiredCount &&
     current?.feedbackSubmitted;
 
+  // Progress percentage for validation progress bar — guard against division by 0
+  const validationProgressPct = reviewRequiredCount > 0 ? Math.round((reviewCompleted / reviewRequiredCount) * 100) : 0;
+
   const challengesToDisplay = useMemo(() => {
     if (current && !gatingActive) return [current];
     return rotatingChallenges;
@@ -435,7 +439,7 @@ export default function DefiScreen() {
                     <LinearGradient
                         colors={["#008F6B", "#10B981"]}
                         start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                        style={{ width: `${(reviewCompleted / reviewRequiredCount) * 100}%`, height: "100%" }} 
+                        style={{ width: `${validationProgressPct}%`, height: "100%" }}
                     />
                   </View>
                   <Text style={{ color: isLight ? "#008F6B" : colors.text, fontWeight: "800" }}>
@@ -445,8 +449,8 @@ export default function DefiScreen() {
               </LinearGradient>
             )}
 
-            {gatingActive &&
-              (validationQueue.length === 0 ? (
+            {gatingActive && (
+              validationQueue.length === 0 ? (
                 <Text style={[styles.emptyText, { color: colors.mutedText }]}>
                   Aucun défi à valider.
                 </Text>
@@ -477,16 +481,19 @@ export default function DefiScreen() {
                       removeFromQueue(p.id);
                       incrementReview();
                     }}
-                    onReport={() => handleOpenReport(
-                      p.id,
-                      "Preuve à vérifier",
-                      p.defiId,
-                      p.photoUrl,
-                      p.commentaire
-                    )}
+                    onReport={() =>
+                      handleOpenReport(
+                        p.id,
+                        "Preuve à vérifier",
+                        p.defiId,
+                        p.photoUrl,
+                        p.commentaire
+                      )
+                    }
                   />
                 ))
-              ))}
+              )
+            )}
 
             {!gatingActive &&
               challengesToDisplay.map((challenge: any) => {
