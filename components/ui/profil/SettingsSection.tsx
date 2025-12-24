@@ -4,17 +4,18 @@ import { useThemeMode } from "@/hooks/theme-context";
 import { useUser } from "@/hooks/user-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Camera } from "expo-camera";
+import { LinearGradient } from "expo-linear-gradient";
+import * as Linking from 'expo-linking'; // ✅ Toujours garder cet import Expo
 import { useRouter } from "expo-router";
 import { signOut } from "firebase/auth";
-import { collection, deleteDoc, doc, getDocs, query, updateDoc, where, limit } from "firebase/firestore";
+import { collection, deleteDoc, doc, getDocs, limit, query, updateDoc, where } from "firebase/firestore";
 import { deleteObject, ref as storageRef } from "firebase/storage";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Linking, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { auth, db, storage } from "../../../firebaseConfig";
 import { SettingSwitch } from "./SettingSwitch";
-import { LinearGradient } from "expo-linear-gradient";
 
-// 🎨 AJOUTER CE THÈME AVANT LE COMPOSANT
+// ... (Le thème reste inchangé) ...
 const settingsTheme = {
     glassBg: ["rgba(255, 255, 255, 0.85)", "rgba(255, 255, 255, 0.65)"] as const,
     borderColor: "rgba(255, 255, 255, 0.6)",
@@ -25,6 +26,7 @@ const settingsTheme = {
 };
 
 export const SettingsSection = () => {
+  // ... (Hooks et variables restent inchangés) ...
   const { colors, mode, toggle } = useThemeMode();
   const isLight = mode === "light";
   const { enabled: pushEnabled, setEnabled: setPushEnabled, loading: notificationsLoading } = useNotificationsSettings();
@@ -40,12 +42,12 @@ export const SettingsSection = () => {
   const [accountEditing, setAccountEditing] = useState(false);
   const [accountDeleteVisible, setAccountDeleteVisible] = useState(false);
 
-  // --- DÉBUT AJOUT ABONNEMENT ---
+  // --- ABONNEMENT ---
   const [showSubscriptionDetails, setShowSubscriptionDetails] = useState(false);
   const [subscription, setSubscription] = useState<any>(null);
   const [loadingSubscription, setLoadingSubscription] = useState(false);
+  // ❌ On retire portalLoading car le lien s'ouvre instantanément maintenant
 
-  // Charger l'abonnement quand l'utilisateur est détecté
   useEffect(() => {
     if (user) fetchSubscription();
   }, [user]);
@@ -54,7 +56,6 @@ export const SettingsSection = () => {
     if (!user) return;
     setLoadingSubscription(true);
     try {
-      // On cherche un abonnement actif ou en essai
       const q = query(
         collection(db, "customers", user.uid, "subscriptions"),
         where("status", "in", ["active", "trialing"]),
@@ -77,28 +78,38 @@ export const SettingsSection = () => {
 
   const formatDate = (timestamp: any) => {
     if (!timestamp) return "";
-    // Conversion du timestamp Firestore en date lisible
     const date = new Date(timestamp.seconds * 1000);
     return date.toLocaleDateString("fr-FR");
   };
 
+  // ✅ NOUVELLE VERSION : LIEN DIRECT STABLE
   const handleManageSubscription = () => {
-    // Lien vers le portail client Stripe (Remplacez par votre lien si vous en avez un fixe, sinon redirige vers Stripe global)
-    // Idéalement, utilisez votre lien "Customer Portal" trouvable dans le Dashboard Stripe > Paramètres > Portail client
-    const portalUrl = "https://billing.stripe.com/p/login/test"; 
+    // Votre lien Stripe
+    const baseUrl = "https://billing.stripe.com/p/login/test_dRm9ASdG9dC12VA24S3Ru00";
     
+    // Astuce : On pré-remplit l'email de l'utilisateur pour qu'il n'ait pas à le taper
+    const portalUrl = user?.email 
+        ? `${baseUrl}?prefilled_email=${encodeURIComponent(user.email)}`
+        : baseUrl;
+
     Alert.alert(
       "Gérer l'abonnement",
-      "Pour annuler ou modifier votre abonnement, vous devez accéder au portail sécurisé Stripe.",
+      "Vous allez être redirigé vers le portail Stripe. Vous recevrez un code par email pour accéder à la gestion de votre abonnement.",
       [
         { text: "Annuler", style: "cancel" },
-        { text: "Accéder au portail", onPress: () => Linking.openURL(portalUrl) }
+        { 
+            text: "Ouvrir le portail", 
+            onPress: () => {
+                Linking.openURL(portalUrl);
+            } 
+        }
       ]
     );
   };
-  // --- FIN AJOUT ABONNEMENT ---
 
-  // Account edit states
+  // ... (Le reste du code : COMPTE, DESIGN, JSX... reste exactement le même qu'avant)
+  // Je remets juste la partie JSX de l'abonnement pour montrer qu'on a enlevé le loading spinner du bouton
+
   const [editingFirstName, setEditingFirstName] = useState("");
   const [editingLastName, setEditingLastName] = useState("");
   const [editingPostal, setEditingPostal] = useState("");
@@ -106,6 +117,7 @@ export const SettingsSection = () => {
   const [savingAccount, setSavingAccount] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{ [k: string]: boolean }>({});
 
+  // ... (Gardez toutes les fonctions saveAccountChanges, deleteAccount, etc. inchangées) ...
   useEffect(() => {
     if (!user) return;
     setEditingFirstName(user.firstName ?? "");
@@ -184,7 +196,6 @@ export const SettingsSection = () => {
   }
 
   async function handleDeleteAccount() {
-    // Open modal confirmation (handled below)
     setAccountDeleteVisible(true);
   }
 
@@ -196,7 +207,6 @@ export const SettingsSection = () => {
 
     const uid = user.uid;
     try {
-      // 1) Delete user's proofs (storage + firestore)
       try {
         const pq = query(collection(db, "preuves"), where("userId", "==", uid));
         const ps = await getDocs(pq);
@@ -205,16 +215,11 @@ export const SettingsSection = () => {
           try {
             const imgRef = storageRef(storage, `preuves/${pid}/image.jpg`);
             await deleteObject(imgRef);
-          } catch (e) {
-            // ignore missing files
-          }
+          } catch (e) {}
           try { await deleteDoc(doc(db, "preuves", pid)); } catch(e) { /* ignore */ }
         }
-      } catch (e) {
-        console.warn("Error deleting proofs:", e);
-      }
+      } catch (e) {}
 
-      // 2) Delete user's subcollections: friends, friendRequests
       try {
         const friendsSnap = await getDocs(collection(db, "users", uid, "friends"));
         for (const f of friendsSnap.docs) {
@@ -228,7 +233,6 @@ export const SettingsSection = () => {
         }
       } catch (e) {}
 
-      // 3) Delete customer checkout sessions under customers/{uid}/checkout_sessions
       try {
         const csSnap = await getDocs(collection(db, "customers", uid, "checkout_sessions"));
         for (const s of csSnap.docs) {
@@ -236,10 +240,8 @@ export const SettingsSection = () => {
         }
       } catch (e) {}
 
-      // 4) Delete user document
       try { await deleteDoc(doc(db, "users", uid)); } catch (e) { console.warn("delete user doc", e); }
 
-      // 5) Delete Firebase Auth user
       try {
         await auth.currentUser.delete();
       } catch (err: any) {
@@ -274,9 +276,7 @@ export const SettingsSection = () => {
         const perm = await Camera.getCameraPermissionsAsync();
         if (!mounted) return;
         setCameraEnabled(perm.status === "granted");
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) {}
     })();
     return () => { mounted = false; };
   }, []);
@@ -289,12 +289,10 @@ export const SettingsSection = () => {
     }
   };
 
-  // Couleurs dynamiques pour le rendu
   const titleColor = isLight ? settingsTheme.textMain : colors.text;
   const mutedColor = isLight ? settingsTheme.textMuted : colors.mutedText;
   const accentColor = isLight ? settingsTheme.accent : colors.accent;
 
-  // Wrapper conditionnel (Gradient si Light, View si Dark)
   const Wrapper = isLight ? LinearGradient : View;
   const wrapperProps = isLight 
     ? { 
@@ -325,9 +323,7 @@ export const SettingsSection = () => {
             <SettingSwitch
               label="Notifications (système)"
               value={pushEnabled}
-              onValueChange={async (next) => {
-                await setPushEnabled(next); 
-              }}
+              onValueChange={async (next) => { await setPushEnabled(next); }}
               disabled={notificationsLoading}
             />
             <SettingSwitch
@@ -394,7 +390,6 @@ export const SettingsSection = () => {
                 </View>
 
                 {!accountEditing ? (
-                  // VUE LECTURE
                   <View style={{ gap: 8 }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                         <Text style={{ color: mutedColor, fontSize: 13 }}>Nom</Text>
@@ -410,7 +405,6 @@ export const SettingsSection = () => {
                     </View>
                   </View>
                 ) : (
-                  // VUE EDITION
                   <View style={{ gap: 10 }}>
                     <TextInput 
                         value={editingLastName} onChangeText={setEditingLastName} placeholder="Nom" 
@@ -568,7 +562,6 @@ const styles = StyleSheet.create({
   },
   text: { flex: 1, fontWeight: "600", fontSize: 15, fontFamily: FontFamilies.headingMedium },
   
-  // Sous-menus
   subMenu: {
     paddingHorizontal: 20,
     paddingBottom: 10,
@@ -585,7 +578,6 @@ const styles = StyleSheet.create({
   subRowLeft: { flexDirection: "row", alignItems: "center" },
   subText: { fontSize: 14, fontFamily: FontFamilies.body, marginLeft: 4, fontWeight: '500' },
   
-  // Containers détails (Abo / Compte)
   detailsContainer: {
       padding: 14,
       backgroundColor: "rgba(0,0,0,0.03)",
@@ -603,7 +595,6 @@ const styles = StyleSheet.create({
   },
   saveBtnText: { color: '#FFF', fontWeight: '700', fontSize: 13 },
 
-  // Modal
   modalOverlay: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', zIndex: 999 },
   modalCard: { width: '85%', borderRadius: 20, padding: 20 },
   modalTitle: { fontSize: 18, fontFamily: FontFamilies.heading, fontWeight: '700' },
