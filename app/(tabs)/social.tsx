@@ -22,6 +22,7 @@ import { useSubscriptions } from "@/hooks/subscriptions-context";
 import { useUser } from "@/hooks/user-context";
 import { acceptJoinRequest, rejectJoinRequest, removeMember, requestJoinClub } from "@/services/clubs";
 import { acceptFriendRequest, rejectFriendRequest, removeFriend, searchUsers, sendFriendRequest } from "@/services/friends";
+import { notifyFriendRequest, sendClubRequestToAdminsList } from "@/services/notifications";
 import { useCurrentCycle } from "@/src/classement/hooks/useCurrentCycle";
 import { useLeagueUsers } from "@/src/classement/hooks/useLeagueUsers";
 import { Ionicons } from "@expo/vector-icons";
@@ -725,6 +726,8 @@ setIsLeaving(false);
     setSentRequestIds((prev) => (prev.includes(userId) ? prev : [...prev, userId]));
     try {
       await sendFriendRequest(userId);
+      const username = user?.username || user?.firstName || 'Un utilisateur';
+      await notifyFriendRequest(userId, username);
       Alert.alert("Demande envoyée !");
     } catch (e: any) {
       setSentRequestIds((prev) => prev.filter((id) => id !== userId));
@@ -970,6 +973,11 @@ setIsLeaving(false);
                         try {
                           await requestJoinClub(club.id);
                           setRequestedClubIds((s) => Array.from(new Set([...s, club.id])));
+                          const adminIds = [...(club.officers || []), club.ownerId];
+                          const username = user?.username || user?.firstName || 'Un utilisateur';
+                          if(adminIds.length > 0) {
+                            await sendClubRequestToAdminsList(adminIds, club.name, username);
+                          }
                           Alert.alert('Envoyé', "Demande envoyée au chef.");
                         } catch (e) {
                           Alert.alert("Erreur", "Impossible d'envoyer la demande.");

@@ -1,4 +1,5 @@
-import NotificationBell from "@/components/ui/common/NotificationBell";
+// ✅ CORRECTION ICI : Ajout des accolades
+import { NotificationBell } from "@/components/ui/common/NotificationBell";
 import { ChallengeHistoryList } from "@/components/ui/profil/ChallengeHistoryList";
 import { Header } from "@/components/ui/profil/Header";
 import { SettingsSection } from "@/components/ui/profil/SettingsSection";
@@ -12,7 +13,7 @@ import { usePoints } from "@/hooks/points-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { useUser } from "@/hooks/user-context";
 import { useClassement } from "@/src/classement/hooks/useClassement";
-import { LinearGradient } from "expo-linear-gradient"; // ✅ AJOUT
+import { LinearGradient } from "expo-linear-gradient";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import { addDoc, collection, onSnapshot } from "firebase/firestore";

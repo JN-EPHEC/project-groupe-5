@@ -1,7 +1,8 @@
 import { ChallengeOfTheDay } from "@/components/ui/acceuil/ChallengeOfTheDay";
 import { ProgressionCard } from "@/components/ui/acceuil/ProgressionCard";
 import StreakCalendar from "@/components/ui/acceuil/StreakCalendar";
-import NotificationBell from "@/components/ui/common/NotificationBell";
+// ✅ CORRECTION ICI : Ajout des accolades { } car c'est un "export const"
+import { NotificationBell } from "@/components/ui/common/NotificationBell";
 import { Header } from "@/components/ui/profil/Header";
 import PremiumCard from "@/components/ui/recompenses/PremiumCard";
 import { FontFamilies } from "@/constants/fonts";
@@ -40,7 +41,7 @@ export default function AcceuilScreen() {
   const { current } = useChallenges();
   const { users: classementUsers, loading: classementLoading } = useClassement();
 
-  // ✅ LOGIQUE RESTAURÉE : ABONNEMENT
+  // --- LOGIQUE ABONNEMENT ---
   const startSubscription = async () => {
     const user = auth.currentUser;
     if (!user) {
@@ -72,7 +73,7 @@ export default function AcceuilScreen() {
   const defisTotal = 5;  // TODO: Connecter aux vraies données
   const myPoints = typeof points === "number" ? points : user?.points ?? 0;
 
-  // ✅ LOGIQUE RESTAURÉE : CLASSEMENT INDIVIDUEL
+  // --- CLASSEMENT INDIVIDUEL ---
   const { position, totalUsers } = useMemo(() => {
     if (classementLoading || !classementUsers || !user) return { position: null, totalUsers: 50 };
     const currentUser = classementUsers.find((u) => u.isCurrentUser);
@@ -81,7 +82,7 @@ export default function AcceuilScreen() {
   
   const positionLabel = position ? (position === 1 ? "1er" : `${position}e`) : "—";
 
-  // ✅ LOGIQUE RESTAURÉE : CLASSEMENT CLUB (MOCK)
+  // --- CLASSEMENT CLUB (MOCK) ---
   const { clubPosition, totalClubs } = useMemo(() => {
     if (!joinedClub) return { clubPosition: null, totalClubs: 50 };
 
@@ -114,7 +115,7 @@ export default function AcceuilScreen() {
 
   const clubLabel = clubPosition ? (clubPosition === 1 ? "1er" : `${clubPosition}e`) : "—";
 
-  // RENDU
+  // --- RENDU ---
   const isLight = mode === "light";
   const hasProgressionCard = typeof ProgressionCard !== "undefined";
   const hasChallengeOfTheDay = typeof ChallengeOfTheDay !== "undefined";

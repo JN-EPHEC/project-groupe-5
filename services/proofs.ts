@@ -12,6 +12,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { notifyChallengeResult } from "./notifications";
 
 export type ProofStatus = "pending" | "validated" | "rejected";
 
@@ -203,6 +204,14 @@ export async function finalizeProof(proofId: string) {
   const rejected = data.votesAgainst >= 3;
 
   if (!validated && !rejected) return;
+
+  try {
+    const defiDoc = await getDoc(doc(db, "defis", data.defiId));
+    const challengeTitle = defiDoc.exists() ? defiDoc.data().titre : "un défi";
+    await notifyChallengeResult(uid, challengeTitle, validated);
+  } catch (e) {
+    console.warn("Failed to send challenge result notification", e);
+  }
 
   // Update activeDefi
   const activeRef = doc(db, "users", uid, "activeDefi", "perso");

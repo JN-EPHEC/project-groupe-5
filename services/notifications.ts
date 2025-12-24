@@ -1,199 +1,120 @@
-// services/notifications.ts
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Notifications from "expo-notifications";
-import { Platform } from "react-native";
+import { db } from "@/firebaseConfig";
+import { addDoc, collection } from "firebase/firestore";
 
-const DEFI_DONE_DATE_KEY = "defi_done_date";
-const NOTIFICATION_PREF_KEY = "notifications_enabled";
-let handlerConfigured = false;
+// ============================================================================
+// SERVICE D'ENVOI DE NOTIFICATIONS (Distantes / Entre utilisateurs)
+// ============================================================================
 
-export function notificationsSupported() {
-  return Platform.OS === "android" || Platform.OS === "ios";
-}
-
-function ensureNotificationHandler() {
-  if (!notificationsSupported() || handlerConfigured) {
-    return;
-  }
-
-  Notifications.setNotificationHandler({
-    handleNotification: async () => {
-      const today = new Date().toISOString().split("T")[0];
-      try {
-        const savedDate = await AsyncStorage.getItem(DEFI_DONE_DATE_KEY);
-        if (savedDate === today) {
-          return {
-            shouldShowAlert: false,
-            shouldPlaySound: false,
-            shouldSetBadge: false,
-            shouldShowBanner: false,
-            shouldShowList: false,
-          };
-        }
-      } catch (error) {
-        console.warn("[notifications] Unable to read AsyncStorage", error);
-      }
-
-      return {
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: false,
-        shouldShowBanner: true,
-        shouldShowList: true,
-      };
-    },
-  });
-
-  if (Platform.OS === "android") {
-    Notifications.setNotificationChannelAsync("default", {
-      name: "default",
-      importance: Notifications.AndroidImportance.DEFAULT,
-    }).catch((error) => {
-      console.warn("[notifications] Failed to set Android channel", error);
-    });
-  }
-
-  handlerConfigured = true;
-}
-
-async function ensurePermissionsGranted() {
-  if (!notificationsSupported()) {
-    return false;
-  }
-
-  const existingStatus = await Notifications.getPermissionsAsync();
-  let finalStatus = existingStatus.status;
-
-  if (finalStatus !== "granted") {
-    const requestStatus = await Notifications.requestPermissionsAsync();
-    finalStatus = requestStatus.status;
-  }
-
-  return finalStatus === "granted";
-}
-
-async function scheduleInternalReminder() {
-  await Notifications.cancelAllScheduledNotificationsAsync();
-
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: "Défi non fait 😯",
-      body: "N'oublie pas de faire ton défi aujourd'hui !",
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
-      hour: 20,
-      minute: 0,
-      repeats: true,
-    },
-  });
-}
-
-export async function scheduleDailyReminder() {
-  if (!notificationsSupported()) {
-    return false;
-  }
-
-  ensureNotificationHandler();
-
-  const granted = await ensurePermissionsGranted();
-  if (!granted) {
-    await AsyncStorage.setItem(NOTIFICATION_PREF_KEY, "false");
-    return false;
-  }
-
+/**
+ * Fonction générique pour écrire une notif dans la DB de quelqu'un d'autre.
+ */
+export async function sendNotification(
+  targetUserId: string,
+  title: string,
+  body: string,
+  type: 'info' | 'alert' | 'success' = 'info',
+  data: any = {}
+) {
+  if (!targetUserId) return;
+  
   try {
-    await scheduleInternalReminder();
-    await AsyncStorage.setItem(NOTIFICATION_PREF_KEY, "true");
-    return true;
+    await addDoc(collection(db, "users", targetUserId, "notifications"), {
+      title,
+      body,
+      type,
+      read: false,
+      createdAt: new Date(),
+      data,
+    });
   } catch (error) {
-    console.warn("[notifications] Failed to schedule reminder", error);
-    return false;
+    console.error("Erreur envoi notification:", error);
   }
 }
 
-export async function initializeNotificationSystem() {
-  if (!notificationsSupported()) {
-    return false;
-  }
-
-  ensureNotificationHandler();
-  const prefRaw = await AsyncStorage.getItem(NOTIFICATION_PREF_KEY);
-  if (prefRaw === "true") {
-    return scheduleDailyReminder();
-  }
-
-  if (prefRaw === null) {
-    return false;
-  }
-
-  return false;
+/**
+ * 1. DEMANDE D'AMI
+ * Appelle ceci quand tu envoies une demande.
+ */
+export async function notifyFriendRequest(targetUserId: string, fromUserName: string) {
+  await sendNotification(
+    targetUserId,
+    "Nouvelle demande d'ami",
+    `${fromUserName} souhaite vous ajouter en ami.`,
+    'info',
+    { type: 'friend_request' }
+  );
 }
+
+/**
+ * 2. DEMANDE CLUB (Pour les admins)
+ * Appelle ceci quand quelqu'un postule.
+ */
+export async function notifyClubAdmins(clubId: string, clubName: string, candidateName: string) {
+  try {
+    // 1. On trouve le club pour récupérer les admins
+    // Note: Si tu as déjà la liste des admins, utilise sendClubRequestToAdminsList direct
+    // Ici on suppose qu'on doit les chercher
+    // C'est souvent mieux de passer la liste des admins en argument pour éviter des lectures DB
+  } catch (e) {
+    console.log(e);
+  }
+}
+
+export async function sendClubRequestToAdminsList(adminIds: string[], clubName: string, candidateName: string) {
+  if (!adminIds || adminIds.length === 0) return;
+
+  // On envoie la notif à CHAQUE admin
+  const promises = adminIds.map(adminId => 
+    sendNotification(
+      adminId,
+      "Demande d'adhésion Club",
+      `${candidateName} souhaite rejoindre le club "${clubName}".`,
+      'info',
+      { type: 'club_request' }
+    )
+  );
+  await Promise.all(promises);
+}
+
+/**
+ * 3. RÉSULTAT VALIDATION DÉFI
+ * Appelle ceci après le décompte des votes.
+ */
+export async function notifyChallengeResult(targetUserId: string, challengeTitle: string, isValidated: boolean) {
+  if (isValidated) {
+    await sendNotification(
+      targetUserId,
+      "Défi Validé ! 🎉",
+      `Bravo ! La communauté a validé votre défi "${challengeTitle}". Vous avez gagné vos points.`,
+      'success'
+    );
+  } else {
+    await sendNotification(
+      targetUserId,
+      "Défi Refusé ❌",
+      `Votre défi "${challengeTitle}" n'a pas été validé. La photo ne correspondait pas assez aux critères.`,
+      'alert'
+    );
+  }
+}
+
+// ============================================================================
+// FONCTIONS DE COMPATIBILITÉ (Pour ne pas casser ton ancien code)
+// ============================================================================
+// Si ton app appelle encore markDefiDone, on laisse une fonction vide pour éviter le crash.
+// La logique de rappel est maintenant gérée automatiquement à 7h par le Context.
 
 export async function markDefiDone(date: Date = new Date()) {
-  if (!notificationsSupported()) {
-    return;
-  }
-
-  const isoDate = date.toISOString().split("T")[0];
-  try {
-    await AsyncStorage.setItem(DEFI_DONE_DATE_KEY, isoDate);
-  } catch (error) {
-    console.warn("[notifications] Unable to flag défi as done", error);
-  }
+  // Plus nécessaire avec le rappel automatique de 7h, mais gardé pour éviter les erreurs d'import.
+  console.log("Defi marked as done (Logic moved to Firestore/Context)");
 }
 
 export async function clearDefiDoneFlag() {
-  if (!notificationsSupported()) {
-    return;
-  }
-
-  try {
-    await AsyncStorage.removeItem(DEFI_DONE_DATE_KEY);
-  } catch (error) {
-    console.warn("[notifications] Unable to clear défi flag", error);
-  }
+  // Idem
 }
 
-export async function getNotificationPreference(): Promise<boolean | null> {
-  const value = await AsyncStorage.getItem(NOTIFICATION_PREF_KEY);
-  if (value === null) {
-    return null;
-  }
-  return value === "true";
-}
-
-export async function setNotificationPreferenceEnabled(enabled: boolean): Promise<boolean> {
-  if (!notificationsSupported()) {
-    await AsyncStorage.setItem(NOTIFICATION_PREF_KEY, "false");
-    return false;
-  }
-
-  ensureNotificationHandler();
-
-  if (!enabled) {
-    try {
-      await Notifications.cancelAllScheduledNotificationsAsync();
-    } catch (error) {
-      console.warn("[notifications] Failed to cancel notifications", error);
-    }
-    await AsyncStorage.setItem(NOTIFICATION_PREF_KEY, "false");
-    return false;
-  }
-
-  const granted = await ensurePermissionsGranted();
-  if (!granted) {
-    await AsyncStorage.setItem(NOTIFICATION_PREF_KEY, "false");
-    return false;
-  }
-
-  try {
-    await scheduleInternalReminder();
-    await AsyncStorage.setItem(NOTIFICATION_PREF_KEY, "true");
-    return true;
-  } catch (error) {
-    console.warn("[notifications] Failed to enable notifications", error);
-    await AsyncStorage.setItem(NOTIFICATION_PREF_KEY, "false");
-    return false;
-  }
+export async function scheduleDailyReminder() {
+   // Géré par notifications-context.tsx maintenant
+   console.log("Reminder scheduling is handled by NotificationsProvider now.");
+   return true;
 }
