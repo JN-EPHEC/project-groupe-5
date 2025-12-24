@@ -1,3 +1,4 @@
+// components/ui/defi/ValidationCard.tsx
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient"; // ✅ AJOUT
