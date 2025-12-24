@@ -5,7 +5,7 @@ import { View } from "react-native";
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import "react-native-reanimated";
 
-// --- TES PROVIDERS ---
+// PROVIDERS
 import { ChallengesProvider } from "@/hooks/challenges-context";
 import { ClubProvider } from "@/hooks/club-context";
 import { CouponsProvider } from "@/hooks/coupons-context";
@@ -18,7 +18,7 @@ import { ThemeProviderCustom, useThemeMode } from "@/hooks/theme-context";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { UserProvider, useUser } from "@/hooks/user-context";
 
-// --- FONTS ---
+// FONTS
 import {
     Baloo2_400Regular,
     Baloo2_500Medium,
@@ -36,105 +36,94 @@ import { setBackgroundColorAsync } from 'expo-system-ui';
 import React, { useEffect, useRef } from "react";
 
 export const unstable_settings = {
-    initialRouteName: "(tabs)",
+  initialRouteName: "(tabs)",
 };
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
-// 👇 C'EST ICI QUE TOUT SE JOUE
 function RootNavigation() {
-    const { mode } = useThemeMode();
-    const { user, loading } = useUser();
-    const segments = useSegments(); // Indique sur quelle page on est
-    const router = useRouter();
-    const colorScheme = useColorScheme();
-    const theme = (mode ?? colorScheme) === "dark" ? DarkTheme : DefaultTheme;
+  const { mode } = useThemeMode();
+  const { user, loading } = useUser();
+  const segments = useSegments();
+  const router = useRouter();
+  const colorScheme = useColorScheme();
+  const theme = (mode ?? colorScheme) === "dark" ? DarkTheme : DefaultTheme;
 
-    // 🛡️ LE GARDIEN DE NAVIGATION 🛡️
-    useEffect(() => {
-        if (loading) return; // On attend la fin du chargement
+  useEffect(() => {
+    if (loading) return;
+    const inAuthGroup = segments[0] === '(auth)';
+    if (!user && !inAuthGroup) {
+      router.replace('/(auth)/login');
+    } else if (user && inAuthGroup) {
+      router.replace('/(tabs)/acceuil');
+    }
+  }, [user, loading, segments]);
 
-        // On vérifie si on est actuellement dans les pages de connexion/inscription
-        const inAuthGroup = segments[0] === '(auth)';
+  useEffect(() => {
+    setBackgroundColorAsync(theme.colors.background);
+  }, [theme]);
 
-        if (!user && !inAuthGroup) {
-            // Cas 1 : Pas connecté et on essaie d'accéder à l'app -> HOP, LOGIN
-            router.replace('/(auth)/login');
-        } else if (user && inAuthGroup) {
-            // Cas 2 : Connecté mais on est sur la page de login -> HOP, ACCUEIL
-            router.replace('/(tabs)/acceuil');
-        }
-        
-        // 🛡️ CAS 3 (CELUI QUI CORRIGE TON BUG) :
-        // Si (user existe) ET (on est DÉJÀ dans l'app, donc !inAuthGroup)...
-        // ALORS ON NE FAIT RIEN. 
-        // Le useEffect s'arrête ici, pas de router.replace(), donc tu restes sur EditProfile.
-
-    }, [user, loading, segments]);
-
-    useEffect(() => {
-        setBackgroundColorAsync(theme.colors.background);
-    }, [theme]);
-
-    return (
-        <GestureHandlerRootView style={{ flex: 1 }}>
-            <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-                <Stack screenOptions={{ headerShown: false }}>
-                    <Stack.Screen name="(auth)" />
-                    <Stack.Screen name="(tabs)" />
-                </Stack>
-                <StatusBar style={mode === "dark" ? "light" : "dark"} />
-            </View>
-        </GestureHandlerRootView>
-    );
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="(tabs)" />
+        </Stack>
+        <StatusBar style={mode === "dark" ? "light" : "dark"} />
+      </View>
+    </GestureHandlerRootView>
+  );
 }
 
 export default function RootLayout() {
-    const [fontsLoaded, fontError] = useFonts({
-        FredokaOne_400Regular,
-        Baloo2_400Regular,
-        Baloo2_500Medium,
-        Baloo2_600SemiBold,
-        Quicksand_400Regular,
-        Quicksand_500Medium,
-        Quicksand_600SemiBold,
-    });
+  const [fontsLoaded, fontError] = useFonts({
+    FredokaOne_400Regular,
+    Baloo2_400Regular,
+    Baloo2_500Medium,
+    Baloo2_600SemiBold,
+    Quicksand_400Regular,
+    Quicksand_500Medium,
+    Quicksand_600SemiBold,
+  });
 
-    const defaultsAppliedRef = useRef(false);
+  const defaultsAppliedRef = useRef(false);
 
-    useEffect(() => {
-        if (fontError) throw fontError;
-    }, [fontError]);
+  useEffect(() => {
+    if (fontError) throw fontError;
+  }, [fontError]);
 
-    useEffect(() => {
-        if (!fontsLoaded || defaultsAppliedRef.current) return;
-        defaultsAppliedRef.current = true;
-        SplashScreen.hideAsync().catch(() => {});
-    }, [fontsLoaded]);
+  useEffect(() => {
+    if (!fontsLoaded || defaultsAppliedRef.current) return;
+    defaultsAppliedRef.current = true;
+    SplashScreen.hideAsync().catch(() => {});
+  }, [fontsLoaded]);
 
-    if (!fontsLoaded) return null;
+  if (!fontsLoaded) return null;
 
-    return (
-        <ThemeProviderCustom>
-            <GlobalPopupProvider>
-                <NotificationsProvider>
-                    <UserProvider>
-                        <PointsProvider>
-                            <CouponsProvider>
-                                <ClubProvider>
-                                    <ChallengesProvider>
-                                        <FriendsProvider>
-                                            <SubscriptionsProvider>
-                                                <RootNavigation />
-                                            </SubscriptionsProvider>
-                                        </FriendsProvider>
-                                    </ChallengesProvider>
-                                </ClubProvider>
-                            </CouponsProvider>
-                        </PointsProvider>
-                    </UserProvider>
-                </NotificationsProvider>
-            </GlobalPopupProvider>
-        </ThemeProviderCustom>
-    );
+  return (
+    <ThemeProviderCustom>
+      {/* ⚠️ ORDRE CRUCIAL ⚠️ */}
+      <UserProvider> 
+        {/* UserProvider doit être le parent de NotificationsProvider */}
+        <NotificationsProvider>
+          <GlobalPopupProvider>
+            <PointsProvider>
+              <CouponsProvider>
+                <ClubProvider>
+                  <ChallengesProvider>
+                    <FriendsProvider>
+                      <SubscriptionsProvider>
+                        <RootNavigation />
+                      </SubscriptionsProvider>
+                    </FriendsProvider>
+                  </ChallengesProvider>
+                </ClubProvider>
+              </CouponsProvider>
+            </PointsProvider>
+          </GlobalPopupProvider>
+        </NotificationsProvider>
+      </UserProvider>
+    </ThemeProviderCustom>
+  );
 }

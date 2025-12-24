@@ -1,130 +1,37 @@
 import { FontFamilies } from "@/constants/fonts";
-import { auth, db } from "@/firebaseConfig"; // Assure-toi que db est bien importé
-import { useNotificationsSettings } from "@/hooks/notifications-context";
+import { useNotifications } from "@/hooks/notifications-context"; // ✅ On utilise le vrai hook
 import { useThemeMode } from "@/hooks/theme-context";
-import { useUser } from "@/hooks/user-context"; // Besoin de l'user pour l'ID
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { Stack, useRouter } from "expo-router";
-import { collection, getDocs, query, where } from "firebase/firestore";
-import React, { useEffect, useState } from "react";
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Stack, useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback } from "react";
+import { Animated, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { FlatList, GestureHandlerRootView, Swipeable } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 // 🎨 THEME NOTIFICATIONS
 const notifTheme = {
     bgGradient: ["#DDF7E8", "#F4FDF9"] as const,
-    glassCardBg: ["rgba(255, 255, 255, 0.85)", "rgba(255, 255, 255, 0.65)"] as const,
-    glassBorder: "rgba(255, 255, 255, 0.8)",
+    activeCardBg: "#FFFFFF",
+    readCardBg: "rgba(255, 255, 255, 0.6)",
     textMain: "#0A3F33", 
     textMuted: "#4A665F",
     accent: "#008F6B",
-};
-
-// Type pour nos notifications unifiées
-type NotificationItem = {
-    id: string;
-    type: 'friend_request' | 'club_request' | 'info';
-    title: string;
-    body: string;
-    date: Date;
-    data?: any; // Pour stocker des IDs utiles (clubId, userId, etc.)
+    corail: "#FF8C66" // Pour le non-lu et le delete
 };
 
 export default function NotificationsScreen() {
   const { colors, mode } = useThemeMode();
   const router = useRouter();
-  const { resetUnread } = useNotificationsSettings();
-  const { user } = useUser(); // On récupère l'utilisateur connecté
+  const { notifications, markAllAsRead, deleteNotification, loading } = useNotifications();
   const isLight = mode === "light";
 
-  const [items, setItems] = useState<NotificationItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  // Fonction pour charger les notifications
-  const fetchNotifications = async () => {
-    if (!user || !auth.currentUser) return;
-    
-    try {
-        const notifs: NotificationItem[] = [];
-
-        // 1. Récupérer les demandes d'amis (Friend Requests)
-        // Suppose que les demandes sont dans users/{uid}/friendRequests
-        const friendReqRef = collection(db, "users", auth.currentUser.uid, "friendRequests");
-        const friendSnaps = await getDocs(friendReqRef);
-
-        friendSnaps.forEach((doc) => {
-            const data = doc.data();
-            // On peut utiliser timestamp Firestore ou new Date()
-            const date = data.createdAt ? new Date(data.createdAt.seconds * 1000) : new Date();
-            
-            notifs.push({
-                id: `friend_${doc.id}`,
-                type: 'friend_request',
-                title: "Nouvelle demande d'ami",
-                body: `${data.username || 'Un utilisateur'} souhaite vous ajouter en ami.`,
-                date: date,
-                data: { userId: doc.id }
-            });
-        });
-
-        // 2. Récupérer les demandes d'adhésion Club (Si je suis admin)
-        // On cherche d'abord les clubs où je suis admin
-        const myClubsQuery = query(collection(db, "clubs"), where("admins", "array-contains", auth.currentUser.uid));
-        const myClubsSnaps = await getDocs(myClubsQuery);
-
-        // Pour chaque club, on va chercher ses requêtes
-        for (const clubDoc of myClubsSnaps.docs) {
-            const clubData = clubDoc.data();
-            const requestsRef = collection(db, "clubs", clubDoc.id, "requests");
-            const reqSnaps = await getDocs(requestsRef);
-
-            reqSnaps.forEach((reqDoc) => {
-                const rData = reqDoc.data();
-                const date = rData.createdAt ? new Date(rData.createdAt.seconds * 1000) : new Date();
-
-                notifs.push({
-                    id: `club_${clubDoc.id}_${reqDoc.id}`,
-                    type: 'club_request',
-                    title: "Demande d'adhésion Club",
-                    body: `${rData.username || 'Un utilisateur'} veut rejoindre "${clubData.name}".`,
-                    date: date,
-                    data: { clubId: clubDoc.id, userId: reqDoc.id }
-                });
-            });
-        }
-
-        // 3. Trier par date (plus récent en premier)
-        notifs.sort((a, b) => b.date.getTime() - a.date.getTime());
-
-        setItems(notifs);
-    } catch (e) {
-        console.error("Erreur chargement notifications:", e);
-    } finally {
-        setLoading(false);
-        setRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchNotifications();
-    
-    // Reset le badge "non lu" à l'ouverture
-    (async () => {
-      try { await resetUnread(); } catch {}
-    })();
-  }, [user]);
-
-  const onRefresh = () => {
-      setRefreshing(true);
-      fetchNotifications();
-  };
-
-  // Couleurs dynamiques
-  const titleColor = isLight ? notifTheme.textMain : colors.text;
-  const textColor = isLight ? notifTheme.textMuted : colors.mutedText;
-  const accentColor = isLight ? notifTheme.accent : colors.accent;
+  // ✅ REMETTRE LE COMPTEUR À ZERO QUAND ON ARRIVE SUR LA PAGE
+  useFocusEffect(
+    useCallback(() => {
+      markAllAsRead();
+    }, [])
+  );
 
   // Wrapper Fond
   const BackgroundComponent = isLight ? LinearGradient : View;
@@ -132,108 +39,113 @@ export default function NotificationsScreen() {
     ? { colors: notifTheme.bgGradient, style: StyleSheet.absoluteFill } 
     : { style: [StyleSheet.absoluteFill, { backgroundColor: "#021114" }] };
 
-  // Helper pour formater la date relative (ex: "Il y a 2h")
-  const formatTime = (date: Date) => {
-      const now = new Date();
-      const diffMs = now.getTime() - date.getTime();
-      const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
-      const diffDays = Math.floor(diffHrs / 24);
+  // --- ACTIONS SWIPE (SUPPRIMER) ---
+  const renderRightActions = (progress: any, dragX: any, id: string) => {
+    const scale = dragX.interpolate({
+      inputRange: [-80, 0],
+      outputRange: [1, 0],
+      extrapolate: 'clamp',
+    });
 
-      if (diffDays > 0) return `Il y a ${diffDays}j`;
-      if (diffHrs > 0) return `Il y a ${diffHrs}h`;
-      return "À l'instant";
+    return (
+      <TouchableOpacity onPress={() => deleteNotification(id)} activeOpacity={0.8}>
+        <View style={styles.deleteButton}>
+          <Animated.View style={{ transform: [{ scale }] }}>
+            <Ionicons name="trash-outline" size={24} color="#FFF" />
+          </Animated.View>
+        </View>
+      </TouchableOpacity>
+    );
   };
 
-  // Action au clic sur une notif
-  const handlePressNotif = (item: NotificationItem) => {
-      if (item.type === 'friend_request') {
-          // Rediriger vers l'onglet social -> Amis -> Requetes (si implémenté)
-          // Ou ouvrir une modale pour accepter/refuser
-          router.push("/(tabs)/social"); 
-      } else if (item.type === 'club_request') {
-          // Rediriger vers la page du club
-          // router.push(`/club/${item.data.clubId}/admin`);
-          alert("Allez dans la gestion de votre club pour accepter.");
-      }
+  // --- RENDU D'UNE NOTIF ---
+  const renderItem = ({ item }: { item: any }) => {
+    // Si c'est une demande d'ami/club, on peut ajouter une logique de clic spécifique
+    const handlePress = () => {
+        if (item.data?.type === 'friend_request') router.push("/(tabs)/social");
+        // Autres redirections possibles...
+    };
+
+    return (
+      <Swipeable renderRightActions={(p, d) => renderRightActions(p, d, item.id)}>
+        <TouchableOpacity 
+            activeOpacity={0.9} 
+            onPress={handlePress}
+            style={[
+              styles.card, 
+              { 
+                backgroundColor: item.read 
+                    ? (isLight ? notifTheme.readCardBg : "rgba(255,255,255,0.05)") 
+                    : (isLight ? notifTheme.activeCardBg : "rgba(255,255,255,0.1)"),
+                borderLeftColor: item.read ? "transparent" : notifTheme.corail,
+                borderLeftWidth: item.read ? 0 : 4,
+                opacity: item.read ? 0.8 : 1
+              }
+            ]}
+        >
+          <View style={styles.cardContent}>
+              {/* Icône */}
+              <View style={[styles.iconBox, { backgroundColor: isLight ? "#E0F7EF" : "rgba(255,255,255,0.1)" }]}>
+                  <Ionicons 
+                    name={item.type === 'alert' ? "warning" : "notifications"} 
+                    size={20} 
+                    color={isLight ? notifTheme.accent : "#FFF"} 
+                  />
+              </View>
+
+              {/* Texte */}
+              <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <Text style={[styles.title, { color: isLight ? notifTheme.textMain : "#FFF", fontWeight: item.read ? '600' : '800' }]}>
+                          {item.title}
+                      </Text>
+                      <Text style={styles.date}>
+                          {item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleDateString() : "À l'instant"}
+                      </Text>
+                  </View>
+                  <Text style={[styles.body, { color: isLight ? notifTheme.textMuted : "#AAA" }]} numberOfLines={2}>
+                      {item.body}
+                  </Text>
+              </View>
+          </View>
+        </TouchableOpacity>
+      </Swipeable>
+    );
   };
 
   return (
-    <View style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1 }}>
       <Stack.Screen options={{ headerShown: false }} />
       <BackgroundComponent {...(bgProps as any)} />
 
       <SafeAreaView style={styles.root}>
-        {/* HEADER SIMPLE */}
+        {/* HEADER */}
         <View style={styles.header}>
-            <TouchableOpacity
-              style={styles.backBtn}
-              onPress={() => router.back()}
-            >
-              <Ionicons name="arrow-back" size={24} color={titleColor} />
+            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+                <Ionicons name="arrow-back" size={24} color={isLight ? notifTheme.textMain : colors.text} />
             </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: titleColor }]}>Notifications</Text>
+            <Text style={[styles.headerTitle, { color: isLight ? notifTheme.textMain : colors.text }]}>Notifications</Text>
             <View style={{ width: 40 }} />
         </View>
 
-        <ScrollView 
-            contentContainerStyle={styles.scrollContent} 
-            showsVerticalScrollIndicator={false}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={accentColor} />}
-        >
-          {/* CARD CONTENU */}
-          <LinearGradient
-            colors={isLight ? notifTheme.glassCardBg : ["rgba(255,255,255,0.05)", "rgba(255,255,255,0.02)"]}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={[
-                styles.card, 
-                { borderColor: isLight ? notifTheme.glassBorder : "rgba(255,255,255,0.1)", borderWidth: 1 }
-            ]}
-          >
-            {loading && !refreshing ? (
-                <View style={styles.emptyRow}>
-                    <ActivityIndicator size="small" color={accentColor} />
-                </View>
-            ) : items.length === 0 ? (
-              <View style={styles.emptyRow}>
-                <Ionicons name="notifications-off-outline" size={48} color={isLight ? "#A0AEC0" : colors.mutedText} style={{ marginBottom: 12, opacity: 0.5 }} />
-                <Text style={[styles.emptyText, { color: textColor }]}>Aucune notification pour le moment.</Text>
-              </View>
-            ) : (
-              items.map((it, index) => (
-                <TouchableOpacity 
-                    key={it.id} 
-                    style={[
-                        styles.section, 
-                        index === items.length - 1 && { borderBottomWidth: 0, marginBottom: 0, paddingBottom: 0 }
-                    ]}
-                    onPress={() => handlePressNotif(it)}
-                >
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <View style={{ flexDirection: 'row', gap: 12, flex: 1 }}>
-                        {/* Icone selon le type */}
-                        <View style={[styles.iconBox, { backgroundColor: isLight ? "#E0F7EF" : "rgba(255,255,255,0.1)" }]}>
-                            <Ionicons 
-                                name={it.type === 'friend_request' ? "person-add" : "people"} 
-                                size={20} 
-                                color={accentColor} 
-                            />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                            <Text style={[styles.sectionTitle, { color: titleColor }]}>{it.title}</Text>
-                            <Text style={[styles.sectionBody, { color: textColor }]}>{it.body}</Text>
-                        </View>
-                      </View>
-                      <Text style={{ fontSize: 11, color: isLight ? "#A0AEC0" : colors.mutedText, marginLeft: 8 }}>
-                          {formatTime(it.date)}
-                      </Text>
-                  </View>
-                </TouchableOpacity>
-              ))
-            )}
-          </LinearGradient>
-        </ScrollView>
+        {/* LISTE */}
+        {notifications.length === 0 ? (
+            <View style={styles.empty}>
+                <Ionicons name="notifications-off-outline" size={64} color={isLight ? "#A0AEC0" : colors.mutedText} style={{ opacity: 0.5 }} />
+                <Text style={[styles.emptyText, { color: isLight ? notifTheme.textMuted : colors.mutedText }]}>Aucune notification</Text>
+            </View>
+        ) : (
+            <FlatList
+                data={notifications}
+                keyExtractor={(item) => item.id}
+                renderItem={renderItem}
+                contentContainerStyle={styles.listContent}
+                showsVerticalScrollIndicator={false}
+                ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+            />
+        )}
       </SafeAreaView>
-    </View>
+    </GestureHandlerRootView>
   );
 }
 
@@ -244,43 +156,38 @@ const styles = StyleSheet.create({
       paddingHorizontal: 20, paddingTop: 10, marginBottom: 10
   },
   backBtn: { padding: 8, borderRadius: 12 },
-  headerTitle: { fontSize: 20, fontFamily: FontFamilies.heading, fontWeight: '700' },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-    paddingTop: 10,
-  },
+  headerTitle: { fontSize: 22, fontFamily: FontFamilies.heading, fontWeight: '700' },
+  
+  listContent: { paddingHorizontal: 20, paddingBottom: 100, paddingTop: 10 },
+  
   card: {
-    borderRadius: 24,
-    padding: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 4,
-    minHeight: 200, 
+    borderRadius: 16,
+    padding: 16,
+    backgroundColor: '#FFF',
+    shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+    marginBottom: 0 // Géré par ItemSeparator
   },
-  section: {
-    marginBottom: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(0,0,0,0.05)"
-  },
+  cardContent: { flexDirection: 'row', gap: 14, alignItems: 'flex-start' },
+  
   iconBox: {
-      width: 40, height: 40, borderRadius: 14,
+      width: 40, height: 40, borderRadius: 14, 
       alignItems: 'center', justifyContent: 'center'
   },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    marginBottom: 4,
-    fontFamily: FontFamilies.heading
+  title: { fontSize: 15, flex: 1, fontFamily: FontFamilies.heading },
+  body: { fontSize: 13, lineHeight: 18, fontFamily: FontFamilies.body },
+  date: { fontSize: 10, color: '#9CA3AF', marginLeft: 8, marginTop: 2 },
+
+  // Delete Action
+  deleteButton: {
+    backgroundColor: '#EF4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    height: '100%',
+    borderRadius: 16,
+    marginLeft: 10 // Petit espace entre la carte et le bouton rouge
   },
-  sectionBody: {
-    fontSize: 13,
-    lineHeight: 18,
-    fontFamily: FontFamilies.body
-  },
-  emptyRow: { alignItems: "center", justifyContent: 'center', paddingVertical: 40 },
-  emptyText: { fontSize: 15, fontWeight: "500", fontFamily: FontFamilies.body },
+
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: -50 },
+  emptyText: { fontSize: 16, marginTop: 16, fontFamily: FontFamilies.body }
 });

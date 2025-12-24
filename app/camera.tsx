@@ -1,10 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { LinearGradient } from "expo-linear-gradient"; // ✅ AJOUT
+import * as ImagePicker from 'expo-image-picker'; // ✅ AJOUT: Galerie
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import {
+  Alert,
   Image,
+  Linking, // ✅ AJOUT: Réglages
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -14,10 +17,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // 🎨 THEME CAMERA
 const cameraTheme = {
-    bgGradient: ["#021114", "#0F3327"] as const, // Fond sombre teinté vert pour les permissions
-    accent: "#008F6B", // Vert Marque
+    bgGradient: ["#021114", "#0F3327"] as const, 
+    accent: "#008F6B", 
     text: "#FFFFFF",
-    glassCtrl: "rgba(0, 0, 0, 0.4)", // Fond semi-transparent pour les contrôles
+    glassCtrl: "rgba(0, 0, 0, 0.4)",
 };
 
 export default function CameraScreen() {
@@ -29,23 +32,67 @@ export default function CameraScreen() {
   const [navigating, setNavigating] = useState(false);
   const insets = useSafeAreaInsets();
 
-  useEffect(() => {
+  // Gestion intelligente de la demande de permission
+  const handleRequestPermission = async () => {
     if (!permission) return;
-    if (!permission.granted) {
-      requestPermission();
-    }
-  }, [permission]);
 
+    if (permission.status === 'denied' && !permission.canAskAgain) {
+      // Si refusé définitivement -> Ouvrir les réglages
+      Alert.alert(
+        "Caméra requise",
+        "L'accès à la caméra est bloqué. Veuillez l'activer dans les réglages de votre iPhone.",
+        [
+          { text: "Annuler", style: "cancel" },
+          { text: "Ouvrir les réglages", onPress: () => Linking.openSettings() }
+        ]
+      );
+    } else {
+      // Sinon, demander la permission normalement
+      await requestPermission();
+    }
+  };
+
+  // ✅ FONCTION: PRENDRE UNE PHOTO
   const takePicture = async () => {
     try {
-      const photo = await cameraRef.current?.takePictureAsync();
-      if (photo?.uri) setPhotoUri(photo.uri);
+      const photo = await cameraRef.current?.takePictureAsync({ quality: 0.8 }); // Optimisation qualité
+      if (photo?.uri) checkImageSizeAndSet(photo.uri);
     } catch (e) {
       console.warn(e);
     }
   };
 
-  // ---- ECRAN PERMISSION ----
+  // ✅ FONCTION: CHOISIR DEPUIS LA GALERIE
+  const pickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images, // Photos uniquement
+        allowsEditing: false, // On garde l'originale
+        quality: 0.8,
+        // legacy: true, // Parfois utile sur Android
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        checkImageSizeAndSet(result.assets[0].uri, result.assets[0].fileSize);
+      }
+    } catch (e) {
+      Alert.alert("Erreur", "Impossible d'ouvrir la galerie.");
+    }
+  };
+
+  // ✅ VALIDATION TAILLE (Max 10 Mo)
+  const checkImageSizeAndSet = async (uri: string, fileSize?: number) => {
+    // Si fileSize n'est pas fourni (cas caméra), on pourrait vérifier le fichier, 
+    // mais ici on fait confiance à la compression quality: 0.8 qui dépasse rarement 10Mo.
+    
+    if (fileSize && fileSize > 10 * 1024 * 1024) { // 10 Mo en octets
+        Alert.alert("Image trop lourde", "La photo doit faire moins de 10 Mo.");
+        return;
+    }
+    setPhotoUri(uri);
+  };
+
+  // ---- ECRAN PERMISSION (NON ACCORDÉE) ----
   if (!permission || !permission.granted) {
     return (
       <View style={{ flex: 1 }}>
@@ -56,7 +103,7 @@ export default function CameraScreen() {
                 <Text style={styles.permDesc}>
                 Pour valider vos défis écologiques, nous avons besoin d'accéder à votre appareil photo.
                 </Text>
-                <TouchableOpacity onPress={() => requestPermission()} activeOpacity={0.8}>
+                <TouchableOpacity onPress={handleRequestPermission} activeOpacity={0.8}>
                     <LinearGradient
                         colors={["#008F6B", "#10B981"]}
                         style={styles.permBtn}
@@ -64,22 +111,27 @@ export default function CameraScreen() {
                         <Text style={styles.permBtnText}>Autoriser l'accès</Text>
                     </LinearGradient>
                 </TouchableOpacity>
+                
+                {/* Bouton retour si on ne veut pas autoriser */}
+                <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 20 }}>
+                    <Text style={{ color: "#AAA", textDecorationLine: "underline" }}>Annuler</Text>
+                </TouchableOpacity>
             </View>
         </LinearGradient>
       </View>
     );
   }
 
-  // ---- PREVIEW (PHOTO PRISE) ----
+  // ---- PREVIEW (PHOTO PRISE OU CHOISIE) ----
   if (photoUri) {
     return (
       <View style={{ flex: 1, backgroundColor: "#000" }}>
-        <Image source={{ uri: photoUri }} style={{ flex: 1 }} resizeMode="cover" />
+        <Image source={{ uri: photoUri }} style={{ flex: 1 }} resizeMode="contain" />
 
         {/* Header (Retour) */}
         <View style={[styles.topBar, { top: insets.top }]}>
             <TouchableOpacity onPress={() => setPhotoUri(null)} style={styles.iconBtn}>
-                <Ionicons name="arrow-back" size={24} color="#FFF" />
+                <Ionicons name="close" size={24} color="#FFF" />
             </TouchableOpacity>
         </View>
 
@@ -96,7 +148,7 @@ export default function CameraScreen() {
                     onPress={() => setPhotoUri(null)}
                 >
                     <Ionicons name="refresh" size={20} color="#FFF" style={{ marginRight: 8 }} />
-                    <Text style={styles.secondaryText}>Reprendre</Text>
+                    <Text style={styles.secondaryText}>Changer</Text>
                 </TouchableOpacity>
 
                 {/* Confirmer */}
@@ -143,21 +195,32 @@ export default function CameraScreen() {
             <Ionicons name="close" size={28} color="#FFF" />
         </TouchableOpacity>
 
-        <TouchableOpacity
-            onPress={() => setFacing((f) => (f === "back" ? "front" : "back"))}
-            style={styles.iconBtn}
-        >
-            <Ionicons name="camera-reverse" size={26} color="#FFF" />
-        </TouchableOpacity>
+        {/* Flash ou autre option ici si besoin */}
       </View>
 
-      {/* Bottom Controls (Shutter) */}
+      {/* Bottom Controls */}
       <View style={[styles.controls, { paddingBottom: insets.bottom + 30 }]}>
-        <TouchableOpacity onPress={takePicture} activeOpacity={0.7}>
+        
+        {/* BOUTON GALERIE (GAUCHE) */}
+        <TouchableOpacity onPress={pickImage} style={styles.sideBtn}>
+            <Ionicons name="images" size={28} color="#FFF" />
+        </TouchableOpacity>
+
+        {/* BOUTON SHUTTER (CENTRE) */}
+        <TouchableOpacity onPress={takePicture} activeOpacity={0.7} style={styles.shutterContainer}>
             <View style={styles.shutterOuter}>
                 <View style={styles.shutterInner} />
             </View>
         </TouchableOpacity>
+
+        {/* BOUTON SWITCH CAMERA (DROITE) */}
+        <TouchableOpacity
+            onPress={() => setFacing((f) => (f === "back" ? "front" : "back"))}
+            style={styles.sideBtn}
+        >
+            <Ionicons name="camera-reverse" size={28} color="#FFF" />
+        </TouchableOpacity>
+
       </View>
     </View>
   );
@@ -188,17 +251,31 @@ const styles = StyleSheet.create({
   },
   iconBtn: {
       width: 44, height: 44, borderRadius: 22,
-      backgroundColor: "rgba(0,0,0,0.3)", // Glass dark
+      backgroundColor: "rgba(0,0,0,0.3)", 
       alignItems: 'center', justifyContent: 'center',
       borderWidth: 1, borderColor: "rgba(255,255,255,0.2)"
   },
   
   controls: {
     position: "absolute", bottom: 0, width: "100%",
-    justifyContent: "center", alignItems: "center",
+    flexDirection: 'row', 
+    justifyContent: "space-around", // Répartit les 3 boutons (Galerie, Shutter, Switch)
+    alignItems: "center",
+    paddingHorizontal: 30
   },
   
-  // Shutter Button Styling
+  // Side Buttons (Galerie & Switch)
+  sideBtn: {
+      width: 50, height: 50, borderRadius: 25,
+      backgroundColor: "rgba(0,0,0,0.3)",
+      alignItems: 'center', justifyContent: 'center',
+      borderWidth: 1, borderColor: "rgba(255,255,255,0.2)"
+  },
+
+  // Shutter Button
+  shutterContainer: {
+      // Un peu d'espace pour que le bouton central respire
+  },
   shutterOuter: {
     width: 84, height: 84, borderRadius: 42,
     borderWidth: 4, borderColor: "#FFF",

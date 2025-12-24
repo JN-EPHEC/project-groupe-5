@@ -1,7 +1,8 @@
+import { useNotifications } from "@/hooks/notifications-context"; // ✅ Import des notifs
 import { useThemeMode } from "@/hooks/theme-context";
 import { useUser } from "@/hooks/user-context";
 import { Ionicons } from "@expo/vector-icons";
-import { Tabs } from "expo-router"; // ⚠️ Plus de "Redirect" ici !
+import { Tabs } from "expo-router";
 import React, { useEffect } from "react";
 import { ActivityIndicator, Platform, View } from "react-native";
 import Animated, {
@@ -75,12 +76,15 @@ function CircleIcon({ name, color, focused, light }: any) {
 
 export default function TabLayout() {
   const { colors, mode } = useThemeMode();
-  const { loading } = useUser(); // On n'a besoin que du loading ici
+  const { loading } = useUser();
+  const { unreadCount } = useNotifications(); // ✅ Récupération du compteur
   const insets = useSafeAreaInsets();
   const isLight = mode === "light";
   const theme = isLight ? navTheme.light : navTheme.dark;
 
-  // Affichage du loader uniquement si on charge
+  // Calcul du badge "9+"
+  const badgeValue = unreadCount > 0 ? (unreadCount > 9 ? "9+" : unreadCount.toString()) : undefined;
+
   if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background }}>
@@ -88,8 +92,6 @@ export default function TabLayout() {
       </View>
     );
   }
-
-  // ❌ SUPPRESSION DE LA REDIRECTION ICI : C'est le RootLayout qui s'en charge maintenant.
 
   return (
     <Tabs
@@ -129,6 +131,7 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ href: null }} />
+      
       <Tabs.Screen
         name="acceuil"
         options={{
@@ -138,6 +141,7 @@ export default function TabLayout() {
           ),
         }}
       />
+      
       <Tabs.Screen
         name="defi"
         options={{
@@ -147,6 +151,31 @@ export default function TabLayout() {
           ),
         }}
       />
+      
+      {/* ✅ ONGLET NOTIFICATIONS AVEC BADGE */}
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          title: "Notifs",
+          tabBarBadge: badgeValue, // Le badge s'affiche ici
+          tabBarBadgeStyle: {
+            backgroundColor: "#FF8C66", // Corail
+            color: "#FFF",
+            fontSize: 10,
+            fontWeight: "bold",
+            minWidth: 18,
+            height: 18,
+            borderRadius: 9,
+            lineHeight: 18, // Pour centrer verticalement
+            borderWidth: 1,
+            borderColor: theme.bg // Petit contour pour détacher du fond
+          },
+          tabBarIcon: ({ color, focused }) => (
+            <CircleIcon name="notifications-outline" color={color} focused={focused} light={isLight} />
+          ),
+        }}
+      />
+
       <Tabs.Screen
         name="social"
         options={{
@@ -156,6 +185,7 @@ export default function TabLayout() {
           ),
         }}
       />
+      
       <Tabs.Screen
         name="recompenses"
         options={{
@@ -165,6 +195,7 @@ export default function TabLayout() {
           ),
         }}
       />
+      
       <Tabs.Screen
         name="profil"
         options={{

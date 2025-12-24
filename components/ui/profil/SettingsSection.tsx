@@ -326,21 +326,50 @@ export const SettingsSection = () => {
               onValueChange={async (next) => { await setPushEnabled(next); }}
               disabled={notificationsLoading}
             />
-            <SettingSwitch
+          <SettingSwitch
               label="Caméra"
               value={cameraEnabled}
               onValueChange={async (next) => {
                 setCameraLoading(true);
                 try {
                   if (next) {
-                    const { status } = await Camera.requestCameraPermissionsAsync();
-                    if (status === 'granted') setCameraEnabled(true);
-                    else Alert.alert('Permission requise', "Activez la caméra dans les réglages.", [{ text: 'Réglages', onPress: () => Linking.openSettings() }, { text: 'OK' }]);
+                    // On veut activer
+                    const { status } = await Camera.getCameraPermissionsAsync();
+                    
+                    if (status === 'granted') {
+                      setCameraEnabled(true);
+                    } else if (status === 'denied') {
+                      // Déjà refusé -> Réglages
+                      Alert.alert(
+                        "Caméra désactivée",
+                        "L'accès à la caméra est bloqué. Veuillez l'activer dans les réglages de votre iPhone.",
+                        [
+                          { text: "Annuler", style: "cancel" },
+                          { text: "Ouvrir les Réglages", onPress: () => Linking.openSettings() }
+                        ]
+                      );
+                      setCameraEnabled(false);
+                    } else {
+                      // Jamais demandé -> On demande
+                      const { status: newStatus } = await Camera.requestCameraPermissionsAsync();
+                      setCameraEnabled(newStatus === 'granted');
+                    }
                   } else {
-                    setCameraEnabled(false);
-                    Alert.alert('Info', "Désactivez la caméra dans les réglages.", [{ text: 'Réglages', onPress: () => Linking.openSettings() }, { text: 'OK' }]);
+                    // On veut désactiver -> Réglages
+                    Alert.alert(
+                      "Désactiver la caméra",
+                      "Pour retirer l'accès à la caméra, vous devez modifier ce paramètre dans les réglages de votre iPhone.",
+                      [
+                        { text: "Annuler", style: "cancel", onPress: () => setCameraEnabled(true) }, // On remet à ON visuellement
+                        { text: "Ouvrir les Réglages", onPress: () => Linking.openSettings() }
+                      ]
+                    );
                   }
-                } catch (err) { console.warn(err); } finally { setCameraLoading(false); }
+                } catch (err) { 
+                  console.warn(err); 
+                } finally { 
+                  setCameraLoading(false); 
+                }
               }}
               disabled={cameraLoading}
             />

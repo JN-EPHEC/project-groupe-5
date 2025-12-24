@@ -9,7 +9,8 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tonnom.projectba"
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +20,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.tonnom.projectba"
     },
     "web": {
       "output": "static",
@@ -39,7 +41,19 @@
           }
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "GreenUp a besoin d'accéder à votre caméra pour vous permettre de prendre en photo vos défis écologiques."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "GreenUp a besoin d'accéder à vos photos pour vous permettre de sélectionner une preuve de défi depuis votre galerie."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
