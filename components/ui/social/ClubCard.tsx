@@ -28,10 +28,12 @@ interface ClubCardProps {
   totalPoints?: number;
 }
 
-// 🎨 THEME CLUB CARD
 const clubTheme = {
     glassBg: ["rgba(240, 253, 244, 0.95)", "rgba(255, 255, 255, 0.85)"] as const,
+    // THEME SOMBRE (Menthe Givrée Dark)
+    darkGlassBg: ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"] as const,
     borderColor: "rgba(255, 255, 255, 0.6)",
+    darkBorderColor: "rgba(0, 151, 178, 0.3)",
     textMain: "#0A3F33", 
     textMuted: "#4A665F",
     accent: "#008F6B", 
@@ -41,28 +43,32 @@ export const ClubCard: React.FC<ClubCardProps> = ({ club, onJoin, onMembers, onR
   const { colors, mode } = useThemeMode();
   const isLight = mode === "light";
 
-  const cardText = isLight ? clubTheme.textMain : colors.text;
-  const cardMuted = isLight ? clubTheme.textMuted : colors.mutedText;
+  const cardText = isLight ? clubTheme.textMain : "#FFF";
+  const cardMuted = isLight ? clubTheme.textMuted : "#CCC";
 
-  const Wrapper = isLight ? LinearGradient : View;
-  const wrapperProps = isLight 
-    ? { 
-        colors: clubTheme.glassBg, 
-        start: { x: 0, y: 0 }, 
-        end: { x: 1, y: 1 }, 
-        style: [styles.card, styles.glassEffect] 
-      }
-    : { 
-        style: [styles.card, { backgroundColor: colors.surface, borderColor: 'rgba(0,151,178,0.3)', borderWidth: 1 }] 
-      };
+  // Toujours LinearGradient pour l'effet glacé
+  const Wrapper = LinearGradient;
+  const wrapperProps = { 
+      colors: isLight ? clubTheme.glassBg : clubTheme.darkGlassBg, 
+      start: { x: 0, y: 0 }, 
+      end: { x: 1, y: 1 }, 
+      style: [
+          styles.card, 
+          { 
+              borderWidth: 1, 
+              borderColor: isLight ? clubTheme.borderColor : clubTheme.darkBorderColor 
+          },
+          isLight && styles.lightShadow
+      ] 
+  };
 
   return (
-    <Wrapper {...(wrapperProps as any)}>
+    <Wrapper {...wrapperProps}>
       <View style={styles.headerRow}>
         {club.photoUri ? (
           <Image source={{ uri: club.photoUri }} style={styles.avatar} />
         ) : (
-          <View style={[styles.avatar, { backgroundColor: isLight ? "#E0F7EF" : colors.pill, alignItems: 'center', justifyContent: 'center' }]}>
+          <View style={[styles.avatar, { backgroundColor: isLight ? "#E0F7EF" : "rgba(255,255,255,0.1)", alignItems: 'center', justifyContent: 'center' }]}>
             <Text style={{ fontSize: 18 }}>{club.emoji || '🌿'}</Text>
           </View>
         )}
@@ -85,13 +91,13 @@ export const ClubCard: React.FC<ClubCardProps> = ({ club, onJoin, onMembers, onR
 
       <View style={styles.row}>
         {club.joined ? (
-          <TouchableOpacity onPress={onJoin} style={[styles.joinBtn, { backgroundColor: "#FFE4E4", borderColor: "#FFCDCD", borderWidth: 1 }]}>
+          <TouchableOpacity onPress={onJoin} style={[styles.joinBtn, { backgroundColor: isLight ? "#FFE4E4" : "rgba(217, 54, 54, 0.1)", borderColor: isLight ? "#FFCDCD" : "rgba(217, 54, 54, 0.3)", borderWidth: 1 }]}>
             <Text style={[styles.joinText, { color: "#D93636" }]}>Quitter</Text>
           </TouchableOpacity>
         ) : (
           club.requestPending ? (
-            <View style={[styles.joinBtn, { backgroundColor: isLight ? "#F0FDF4" : colors.surfaceAlt, borderColor: isLight ? "#BBF7D0" : "transparent", borderWidth: 1 }]}>
-              <Text style={{ color: isLight ? "#4A665F" : colors.mutedText, fontFamily: FontFamilies.headingMedium }}>Demande envoyée</Text>
+            <View style={[styles.joinBtn, { backgroundColor: isLight ? "#F0FDF4" : "rgba(255,255,255,0.05)", borderColor: isLight ? "#BBF7D0" : "rgba(255,255,255,0.1)", borderWidth: 1 }]}>
+              <Text style={{ color: cardMuted, fontFamily: FontFamilies.headingMedium }}>Demande envoyée</Text>
             </View>
           ) : (
             <GradientButton label="Rejoindre" onPress={onJoin} style={{ flex: 1, borderRadius: 12, height: 40 }} />
@@ -101,20 +107,29 @@ export const ClubCard: React.FC<ClubCardProps> = ({ club, onJoin, onMembers, onR
         <TouchableOpacity
           style={[
             styles.chatBtn,
-            { borderColor: isLight ? "#BBF7D0" : colors.accent, backgroundColor: isLight ? "#F0FDF4" : colors.pill },
+            { 
+                borderColor: isLight ? "#BBF7D0" : "rgba(255,255,255,0.2)", 
+                backgroundColor: isLight ? "#F0FDF4" : "rgba(255,255,255,0.05)" 
+            },
           ]}
           onPress={onMembers}
         >
-          <Ionicons name="people" size={18} color={isLight ? clubTheme.accent : colors.accent} />
+          <Ionicons name="people" size={18} color={isLight ? clubTheme.accent : "#4ADE80"} />
         </TouchableOpacity>
 
         {club.joined && onRanking && (
           <TouchableOpacity
-            style={[styles.chatBtn, { borderColor: isLight ? "#BBF7D0" : colors.accent, backgroundColor: isLight ? "#F0FDF4" : colors.pill }]}
+            style={[
+                styles.chatBtn, 
+                { 
+                    borderColor: isLight ? "#BBF7D0" : "rgba(255,255,255,0.2)", 
+                    backgroundColor: isLight ? "#F0FDF4" : "rgba(255,255,255,0.05)" 
+                }
+            ]}
             onPress={onRanking}
           >
-            <Ionicons name="leaf" size={18} color={isLight ? clubTheme.accent : colors.accent} />
-            <Text style={[styles.chatText, { color: isLight ? clubTheme.accent : colors.accent }]}>
+            <Ionicons name="leaf" size={18} color={isLight ? clubTheme.accent : "#4ADE80"} />
+            <Text style={[styles.chatText, { color: isLight ? clubTheme.accent : "#4ADE80" }]}>
               {typeof totalPoints === 'number' ? `${totalPoints}` : ''}
             </Text>
           </TouchableOpacity>
@@ -126,9 +141,7 @@ export const ClubCard: React.FC<ClubCardProps> = ({ club, onJoin, onMembers, onR
 
 const styles = StyleSheet.create({
   card: { borderRadius: 20, padding: 16, marginBottom: 12 },
-  glassEffect: {
-    borderWidth: 1,
-    borderColor: clubTheme.borderColor,
+  lightShadow: {
     shadowColor: "#005c4b",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.05,
@@ -153,6 +166,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderWidth: 1,
   },
-  // CORRECTION ICI : bodyStrong n'existe pas -> on utilise headingMedium ou body + fontWeight
   chatText: { marginLeft: 6, fontFamily: FontFamilies.headingMedium, fontSize: 13 },
 });

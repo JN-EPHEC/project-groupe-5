@@ -1,13 +1,15 @@
-import { rewardsData } from "@/components/ui/recompenses/data";
 import { FontFamilies } from "@/constants/fonts";
+import { db } from "@/firebaseConfig"; // ✅ On importe la DB
 import { useCoupons } from "@/hooks/coupons-context";
 import { usePoints } from "@/hooks/points-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useMemo, useState } from "react";
+import { doc, getDoc } from "firebase/firestore"; // ✅ Pour lire un document unique
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Dimensions,
   Image,
@@ -25,7 +27,9 @@ const { width } = Dimensions.get("window");
 const detailsTheme = {
   bgGradient: ["#DDF7E8", "#F4FDF9"] as const,
   glassSheet: ["rgba(255, 255, 255, 0.95)", "rgba(255, 255, 255, 0.85)"] as const,
-  accent: "#008F6B", // Vert Marque
+  darkGlassSheet: ["rgba(2, 17, 20, 0.95)", "rgba(2, 17, 20, 0.9)"] as const,
+  accent: "#008F6B", 
+  darkAccent: "#0097B2",
   textMain: "#0A3F33",
   textMuted: "#4A665F",
 };
@@ -39,12 +43,45 @@ export default function RewardDetailScreen() {
   const { points, spendPoints } = usePoints();
   const { addCoupon, hasCoupon } = useCoupons();
 
-  // Trouver la récompense
-  const reward = useMemo(
-    () => rewardsData.find((r) => r.id === id),
-    [id]
-  );
+  // ✅ NOUVEAU : État pour stocker la récompense chargée depuis Firebase
+  const [reward, setReward] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [activeImg, setActiveImg] = useState(0);
 
+  // ✅ CHARGEMENT DEPUIS FIREBASE
+  useEffect(() => {
+    if (!id) return;
+
+    const fetchReward = async () => {
+      try {
+        const docRef = doc(db, "rewards", id);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          setReward({ id: docSnap.id, ...docSnap.data() });
+        } else {
+          console.log("Aucun document trouvé !");
+        }
+      } catch (error) {
+        console.error("Erreur chargement récompense:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchReward();
+  }, [id]);
+
+  // Écran de chargement
+  if (loading) {
+    return (
+      <View style={[styles.center, { backgroundColor: isLight ? "#F4FDF9" : "#021114" }]}>
+        <ActivityIndicator size="large" color={isLight ? "#008F6B" : "#0097B2"} />
+      </View>
+    );
+  }
+
+  // Écran introuvable
   if (!reward) {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
@@ -58,7 +95,11 @@ export default function RewardDetailScreen() {
 
   const already = hasCoupon(reward.id);
   const canAfford = points >= reward.pointsCost && !already;
-  const [activeImg, setActiveImg] = useState(0);
+  
+  // Gestion des images (fallback si pas d'image)
+  const images = reward.images && reward.images.length > 0 
+    ? reward.images 
+    : ["https://placehold.co/600x400/png?text=Pas+d'image"];
 
   const handleRedeem = () => {
     if (already) {
@@ -71,16 +112,17 @@ export default function RewardDetailScreen() {
       `Dépenser ${reward.pointsCost} Greenies pour ce bon de ${reward.voucherAmountEuro}€ ?`,
       [
         { text: "Annuler", style: "cancel" },
-        {
-          text: "Confirmer",
-          onPress: () => {
-            const success = spendPoints(reward.pointsCost, `Échange : ${reward.name}`);
-            if (success) {
-              addCoupon(reward.id);
-              Alert.alert("Félicitations !", "Ton coupon est disponible dans l'onglet 'Mes coupons'.");
-              router.back();
-            } else {
-              Alert.alert("Oups", "Greenies insuffisants.");
+        { text: "Confirmer", onPress: async () => {
+            // 1. Transaction via Context (gestion stock Firebase)
+            const successDb = await addCoupon(reward.id);
+            
+            if (successDb) {
+                // 2. Débit des points
+                const pointsOk = spendPoints(reward.pointsCost, `Échange : ${reward.name}`);
+                if (pointsOk) {
+                    Alert.alert("Félicitations !", "Ton coupon est disponible dans l'onglet 'Mes coupons'.");
+                    router.back();
+                }
             }
           },
         },
@@ -88,12 +130,10 @@ export default function RewardDetailScreen() {
     );
   };
 
-  // Couleurs dynamiques
-  const titleColor = isLight ? detailsTheme.textMain : colors.text;
-  const textColor = isLight ? detailsTheme.textMuted : colors.mutedText;
-  const accentColor = isLight ? detailsTheme.accent : colors.accent;
+  const titleColor = isLight ? detailsTheme.textMain : "#FFF";
+  const textColor = isLight ? detailsTheme.textMuted : "#A5C9BF";
+  const accentColor = isLight ? detailsTheme.accent : detailsTheme.darkAccent;
 
-  // Wrapper Fond
   const BackgroundComponent = isLight ? LinearGradient : View;
   const bgProps = isLight
     ? { colors: detailsTheme.bgGradient, style: StyleSheet.absoluteFill }
@@ -103,7 +143,7 @@ export default function RewardDetailScreen() {
     <View style={{ flex: 1 }}>
       <BackgroundComponent {...(bgProps as any)} />
 
-      {/* IMAGE HERO (Carousel simple) */}
+      {/* IMAGE HERO */}
       <View style={styles.heroContainer}>
         <ScrollView
           horizontal
@@ -117,25 +157,26 @@ export default function RewardDetailScreen() {
           }}
           scrollEventThrottle={16}
         >
-          {reward.images.map((img, idx) => (
+          {images.map((img: string, idx: number) => (
             <Image key={idx} source={{ uri: img }} style={styles.heroImage} resizeMode="cover" />
           ))}
         </ScrollView>
         
         {/* Pagination Dots */}
-        <View style={styles.pagination}>
-          {reward.images.map((_, idx) => (
-            <View
-              key={idx}
-              style={[
-                styles.dot,
-                idx === activeImg ? { backgroundColor: "#FFF", width: 20 } : { backgroundColor: "rgba(255,255,255,0.5)" },
-              ]}
-            />
-          ))}
-        </View>
+        {images.length > 1 && (
+            <View style={styles.pagination}>
+            {images.map((_: any, idx: number) => (
+                <View
+                key={idx}
+                style={[
+                    styles.dot,
+                    idx === activeImg ? { backgroundColor: "#FFF", width: 20 } : { backgroundColor: "rgba(255,255,255,0.5)" },
+                ]}
+                />
+            ))}
+            </View>
+        )}
 
-        {/* Bouton Retour Flottant */}
         <SafeAreaView style={styles.backBtnContainer}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name="arrow-back" size={24} color="#000" />
@@ -146,8 +187,8 @@ export default function RewardDetailScreen() {
       {/* CONTENU (Sheet) */}
       <View style={{ flex: 1 }}>
         <LinearGradient
-            colors={isLight ? detailsTheme.glassSheet : ["#1A2F28", "#0F1F1A"]}
-            style={styles.sheet}
+            colors={isLight ? detailsTheme.glassSheet : detailsTheme.darkGlassSheet}
+            style={[styles.sheet, !isLight && { borderColor: "rgba(0, 151, 178, 0.3)", borderWidth: 1, borderBottomWidth: 0 }]}
         >
             <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
                 {/* EN-TÊTE */}
@@ -158,13 +199,13 @@ export default function RewardDetailScreen() {
                             <Ionicons name="location-outline" size={14} /> {reward.city}
                         </Text>
                     </View>
-                    <View style={[styles.priceTag, { backgroundColor: isLight ? "#E0F7EF" : "rgba(255,255,255,0.1)" }]}>
+                    <View style={[styles.priceTag, { backgroundColor: isLight ? "#E0F7EF" : "rgba(0, 151, 178, 0.15)" }]}>
                         <Text style={{ color: accentColor, fontWeight: "800", fontSize: 16 }}>{reward.pointsCost}</Text>
                         <Text style={{ color: accentColor, fontSize: 10, fontWeight: "600" }}>Greenies</Text>
                     </View>
                 </View>
 
-                <View style={styles.divider} />
+                <View style={[styles.divider, { backgroundColor: isLight ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.1)" }]} />
 
                 {/* INFO BLOCKS */}
                 <View style={styles.section}>
@@ -199,7 +240,7 @@ export default function RewardDetailScreen() {
 
             </ScrollView>
 
-            {/* BOUTON D'ACTION (Fixe en bas du sheet) */}
+            {/* BOUTON D'ACTION */}
             <View style={[styles.footer, { borderTopColor: isLight ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.1)" }]}>
                 <TouchableOpacity
                     onPress={handleRedeem}
@@ -208,7 +249,7 @@ export default function RewardDetailScreen() {
                     style={{ flex: 1 }}
                 >
                     <LinearGradient
-                        colors={already ? ["#E2E8F0", "#CBD5E0"] : (canAfford ? ["#008F6B", "#10B981"] : ["#A0AEC0", "#718096"])}
+                        colors={already ? ["#E2E8F0", "#CBD5E0"] : (canAfford ? (isLight ? ["#008F6B", "#10B981"] : ["#0097B2", "#00B4D8"]) : ["#A0AEC0", "#718096"])}
                         start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                         style={styles.actionBtn}
                     >
@@ -226,8 +267,6 @@ export default function RewardDetailScreen() {
 
 const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  
-  // HERO IMAGE
   heroContainer: { height: 320, width: "100%" },
   heroImage: { width: width, height: 320 },
   pagination: {
@@ -235,8 +274,6 @@ const styles = StyleSheet.create({
     flexDirection: "row", justifyContent: "center", gap: 6,
   },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.5)" },
-  
-  // BACK BUTTON
   backBtnContainer: { position: "absolute", top: 10, left: 20 },
   backBtn: {
     width: 40, height: 40, borderRadius: 20,
@@ -244,19 +281,15 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
     shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 4, elevation: 3
   },
-
-  // SHEET CONTENT
   sheet: {
     flex: 1,
-    marginTop: -24, // Chevauchement sur l'image
+    marginTop: -24,
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     paddingTop: 24,
     paddingHorizontal: 24,
     shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 10, elevation: 10
   },
-  
-  // HEADER
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 },
   title: { fontSize: 24, fontFamily: FontFamilies.heading, fontWeight: "800", marginBottom: 4, lineHeight: 28, flex: 1, marginRight: 10 },
   city: { fontSize: 14, fontFamily: FontFamilies.body, opacity: 0.8 },
@@ -264,16 +297,11 @@ const styles = StyleSheet.create({
       paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16, 
       alignItems: "center", justifyContent: "center" 
   },
-
-  divider: { height: 1, backgroundColor: "rgba(0,0,0,0.05)", marginBottom: 20 },
-
-  // SECTIONS
+  divider: { height: 1, marginBottom: 20 },
   section: { marginBottom: 24 },
   sectionHeader: { flexDirection: "row", alignItems: "center", marginBottom: 8, gap: 10 },
   sectionTitle: { fontSize: 16, fontWeight: "700", fontFamily: FontFamilies.heading },
   bodyText: { fontSize: 14, lineHeight: 22, fontFamily: FontFamilies.body, opacity: 0.9, paddingLeft: 30 },
-
-  // FOOTER
   footer: {
     position: "absolute", bottom: 0, left: 0, right: 0,
     padding: 20, paddingBottom: 30,
@@ -282,7 +310,7 @@ const styles = StyleSheet.create({
   },
   actionBtn: {
     paddingVertical: 16, borderRadius: 20, alignItems: "center", justifyContent: "center",
-    shadowColor: "#008F6B", shadowOpacity: 0.2, shadowOffset: {width: 0, height: 4}, elevation: 4
+    shadowColor: "#000", shadowOpacity: 0.2, shadowOffset: {width: 0, height: 4}, elevation: 4
   },
   actionBtnText: { fontSize: 14, fontWeight: "700", fontFamily: FontFamilies.heading, textTransform: "uppercase", letterSpacing: 0.5 },
 });

@@ -23,13 +23,15 @@ interface FriendCardProps {
   onAction?: () => void;
 }
 
-// 🎨 THEME FRIEND CARD
 const friendTheme = {
     glassBg: ["rgba(240, 253, 244, 0.95)", "rgba(255, 255, 255, 0.85)"] as const,
+    // THEME SOMBRE (Menthe Givrée Dark)
+    darkGlassBg: ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"] as const,
     borderColor: "rgba(255, 255, 255, 0.6)",
+    darkBorderColor: "rgba(0, 151, 178, 0.3)",
     textMain: "#0A3F33",
     textMuted: "#4A665F",
-    accent: "#008F6B", // Vert Marque
+    accent: "#008F6B", 
     rankColor: "#008F6B",
 };
 
@@ -37,99 +39,110 @@ export const FriendCard: React.FC<FriendCardProps> = ({ friend, rank, onChat, is
   const { colors, mode } = useThemeMode();
   const isLight = mode === "light";
 
-  // Gestion Couleurs selon thème & isMe
-  const textColor = isMe ? (isLight ? "#0F3327" : "#0F3327") : (isLight ? friendTheme.textMain : colors.text);
+  // COULEURS ADAPTÉES
+  const textColor = isMe ? (isLight ? "#0F3327" : "#0F3327") : (isLight ? friendTheme.textMain : "#FFF");
   const pointsColor = isMe ? (isLight ? "#0F3327" : "#0F3327") : (isLight ? friendTheme.accent : colors.accent);
   const rankColor = isMe ? (isLight ? "#0F3327" : "#0F3327") : (isLight ? friendTheme.rankColor : colors.accent);
 
   const avatarUri = friend.avatar && friend.avatar.length > 0 ? friend.avatar : null;
   const initial = friend.name ? friend.name.charAt(0).toUpperCase() : "?";
 
-  // Wrapper conditionnel
-  const Wrapper = isLight && !isMe ? LinearGradient : TouchableOpacity; // TouchableOpacity pour Dark/Me (fond uni)
+  // Wrapper : Toujours LinearGradient sauf pour "Moi" en dark (on garde le vert uni pour se distinguer)
+  const Wrapper = (isMe && !isLight) ? TouchableOpacity : LinearGradient;
   
-  // Props pour le wrapper
   let wrapperProps: any = {
-      onPress: onChat,
-      activeOpacity: 0.8,
+      // Props communes
       style: [styles.container]
   };
 
-  if (isLight && !isMe) {
-      // Light Mode (Glassmorphism)
+  if (isMe && !isLight) {
+      // CAS SPECIAL : "Moi" en mode sombre -> Fond vert uni
+      wrapperProps.style.push({ backgroundColor: colors.accent });
+      wrapperProps.onPress = onChat;
+      wrapperProps.activeOpacity = 0.8;
+  } else {
+      // CAS STANDARD : Glassmorphism (Light ou Dark)
       wrapperProps = {
           ...wrapperProps,
-          colors: friendTheme.glassBg,
+          colors: isLight ? friendTheme.glassBg : friendTheme.darkGlassBg,
           start: { x: 0, y: 0 },
           end: { x: 1, y: 1 },
-          style: [styles.container, styles.glassEffect]
+          style: [
+              styles.container, 
+              // Bordure adaptée
+              { 
+                  borderWidth: 1, 
+                  borderColor: isLight ? friendTheme.borderColor : friendTheme.darkBorderColor 
+              },
+              isLight && styles.lightShadow // Ombre seulement en light
+          ]
       };
-  } else {
-      // Dark Mode ou "Moi" (Couleur unie)
-      const bg = isMe ? colors.accent : colors.surface;
-      wrapperProps.style.push({ backgroundColor: bg, borderWidth: isMe ? 0 : 1, borderColor: isMe ? 'transparent' : 'rgba(0,151,178,0.3)' });
   }
 
-  // Si c'est un Gradient, on doit envelopper le TouchableOpacity sinon on perd le clic
-  if (isLight && !isMe) {
+  // Rendu du contenu interne
+  const content = (
+    <>
+    <View style={styles.left}>
+      <Text style={[styles.rank, { color: rankColor }]}>#{rank}</Text>
+      
+      {avatarUri ? (
+        <Image source={{ uri: avatarUri }} style={[styles.avatar, isMe && { borderWidth: 2, borderColor: textColor }]} />
+      ) : (
+        <View style={[
+            styles.avatar, 
+            styles.avatarFallback, 
+            { backgroundColor: isLight ? "#E0F7EF" : "rgba(255,255,255,0.1)" }, 
+            isMe && { borderWidth: 2, borderColor: textColor }
+        ]}>
+          <Text style={[styles.avatarInitial, { color: isLight ? friendTheme.textMain : "#fff" }]}>{initial}</Text>
+        </View>
+      )}
+      
+      <View>
+        <Text style={[styles.name, { color: textColor }]} numberOfLines={1}>{friend.name}</Text>
+        {friend.online && <Text style={{ fontSize: 10, color: '#19D07D', fontWeight: '600' }}>En ligne</Text>}
+      </View>
+    </View>
+
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+      <Text style={[styles.points, { color: pointsColor }]}>{friend.points} pts</Text>
+      
+      {(!!actionLabel || !!actionIcon) && !isMe && (
+        <TouchableOpacity 
+            onPress={onAction} 
+            style={[
+                styles.actionBtn, 
+                { backgroundColor: isLight ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.1)" }
+            ]}
+        >
+          {actionIcon ? (
+            <Ionicons name={actionIcon} size={18} color={isLight ? "#D93636" : "#F45B69"} />
+          ) : (
+            <Text style={{ color: isLight ? friendTheme.textMuted : "#CCC", fontSize: 12, fontWeight: '600' }}>{actionLabel}</Text>
+          )}
+        </TouchableOpacity>
+      )}
+    </View>
+    </>
+  );
+
+  // Si c'est un LinearGradient, on l'enveloppe dans un TouchableOpacity pour le clic
+  if (Wrapper === LinearGradient) {
       return (
         <TouchableOpacity activeOpacity={0.8} onPress={onChat}>
-            <LinearGradient {...wrapperProps}>
-                {renderContent()}
-            </LinearGradient>
+            <Wrapper {...wrapperProps}>
+                {content}
+            </Wrapper>
         </TouchableOpacity>
       )
   }
 
+  // Sinon (cas "Moi" dark mode), le TouchableOpacity est déjà le wrapper
   return (
-    <TouchableOpacity {...wrapperProps}>
-        {renderContent()}
-    </TouchableOpacity>
+    <Wrapper {...wrapperProps}>
+        {content}
+    </Wrapper>
   );
-
-  function renderContent() {
-      return (
-        <>
-        <View style={styles.left}>
-          <Text style={[styles.rank, { color: rankColor }]}>#{rank}</Text>
-          
-          {avatarUri ? (
-            <Image source={{ uri: avatarUri }} style={[styles.avatar, isMe && { borderWidth: 2, borderColor: textColor }]} />
-          ) : (
-            <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: isLight ? "#E0F7EF" : "#2F3A36" }, isMe && { borderWidth: 2, borderColor: textColor }]}>
-              <Text style={[styles.avatarInitial, { color: isLight ? friendTheme.textMain : "#fff" }]}>{initial}</Text>
-            </View>
-          )}
-          
-          <View>
-            <Text style={[styles.name, { color: textColor }]} numberOfLines={1}>{friend.name}</Text>
-            {/* Indicateur en ligne (optionnel, sous le nom) */}
-            {friend.online && <Text style={{ fontSize: 10, color: '#19D07D', fontWeight: '600' }}>En ligne</Text>}
-          </View>
-        </View>
-
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <Text style={[styles.points, { color: pointsColor }]}>{friend.points} pts</Text>
-          
-          {(!!actionLabel || !!actionIcon) && !isMe && (
-            <TouchableOpacity 
-                onPress={onAction} 
-                style={[
-                    styles.actionBtn, 
-                    { backgroundColor: isLight ? "rgba(0,0,0,0.05)" : colors.surfaceAlt }
-                ]}
-            >
-              {actionIcon ? (
-                <Ionicons name={actionIcon} size={18} color={isLight ? "#D93636" : colors.text} />
-              ) : (
-                <Text style={{ color: isLight ? friendTheme.textMuted : colors.text, fontSize: 12, fontWeight: '600' }}>{actionLabel}</Text>
-              )}
-            </TouchableOpacity>
-          )}
-        </View>
-        </>
-      );
-  }
 };
 
 const styles = StyleSheet.create({
@@ -142,9 +155,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginBottom: 10,
   },
-  glassEffect: {
-    borderWidth: 1,
-    borderColor: friendTheme.borderColor,
+  lightShadow: {
     shadowColor: "#005c4b",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.05,
