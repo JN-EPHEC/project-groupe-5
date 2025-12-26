@@ -1,3 +1,4 @@
+// components/ui/defi/ChallengeCard.tsx
 import { useChallenges } from "@/hooks/challenges-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -39,6 +40,11 @@ export function ChallengeCard({
   const { colors, mode } = useThemeMode();
   const [confirmVisible, setConfirmVisible] = useState(false);
   const { current, reviewCompleted, reviewRequiredCount } = useChallenges();
+
+  const isValidatedAndClaimed =
+    current?.id === challenge.id &&
+    current?.finalStatus === "validated" &&
+    current?.pointsClaimed === true;
 
   const categoryLabel = categorie === "personnel" ? "Perso" : "Club";
   const categoryIcon = categorie === "personnel" ? "person-outline" : "people-outline";
@@ -221,17 +227,19 @@ export function ChallengeCard({
             </View>
           )}
 
-          {status === "pendingValidation" && (
+          {/* 🟠 WAITING FOR VALIDATION */}
+          {status === "pendingValidation" && !isValidatedAndClaimed && (
             <View style={[styles.statusPill, { backgroundColor: isLightMode ? "#FFFBEB" : "#2A2617", borderColor: "#FCD34D" }]}>
               <Ionicons name="hourglass" size={18} color="#D97706" style={{ marginRight: 6 }} />
               <Text style={{ color: "#D97706", fontWeight: "700" }}>En attente de validation</Text>
             </View>
           )}
 
-          {status === "validated" && (
+          {/* 🟢 FULLY VALIDATED & POINTS CREDITED */}
+          {isValidatedAndClaimed && (
             <View style={[styles.statusPill, { backgroundColor: isLightMode ? "#ECFDF5" : "#142822", borderColor: "#34D399" }]}>
               <Ionicons name="checkmark-circle" size={18} color="#059669" style={{ marginRight: 6 }} />
-              <Text style={{ color: "#059669", fontWeight: "700" }}>Défi validé ! Bravo 🎉</Text>
+              <Text style={{ color: "#059669", fontWeight: "700" }}>Votre défi a été validé 🎉</Text>
             </View>
           )}
         </View>

@@ -1,3 +1,4 @@
+// app/(admin)/list-defis.tsx
 import { AdminNav } from "@/components/ui/(admin)/AdminNav";
 import { DeleteConfirmModal } from "@/components/ui/(admin)/DeleteConfirmModal";
 import { FontFamilies } from "@/constants/fonts";
@@ -6,7 +7,15 @@ import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useRouter } from "expo-router";
-import { collection, deleteDoc, doc, getDocs } from "firebase/firestore";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  orderBy,
+  query,
+  updateDoc
+} from "firebase/firestore";
 import { useEffect, useState } from "react";
 import {
   LayoutAnimation,
@@ -66,6 +75,51 @@ export default function ListDefisScreen() {
     const snap = await getDocs(collection(db, "defis"));
     const list = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Defi[];
     setDefis(list);
+  };
+
+  const rotateDefis = async () => {
+    console.log("🔁 Admin rotation started");
+
+    // 1) fetch ALL defis ordered FIFO
+    const q = query(collection(db, "defis"), orderBy("createdAt", "asc"));
+    const snap = await getDocs(q);
+
+    const all = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+
+    // 2) split
+    const personals = all.filter(d => d.categorie === "personnel");
+    const clubs = all.filter(d => d.categorie === "club");
+
+    // 3) deactivate currently active
+    const active = all.filter(d => d.statut === "rotation");
+    for (const d of active) {
+      await updateDoc(doc(db, "defis", d.id), { statut: "inactive" });
+    }
+
+    // helper to pick first inactive of given difficulty
+    const pickNext = (list: any[], difficulty?: string) => {
+      if (difficulty) {
+        return list.find(d => d.statut === "inactive" && d.difficulte === difficulty);
+      }
+      return list.find(d => d.statut === "inactive");
+    };
+
+    // 4) select next rotation set
+    const nextFacile = pickNext(personals, "facile");
+    const nextMoyen = pickNext(personals, "moyen");
+    const nextDifficile = pickNext(personals, "difficile");
+    const nextClub = pickNext(clubs);
+
+    // 5) activate them
+    const toActivate = [nextFacile, nextMoyen, nextDifficile, nextClub].filter(Boolean);
+
+    for (const d of toActivate) {
+      await updateDoc(doc(db, "defis", d.id), { statut: "rotation" });
+    }
+
+    console.log("✅ Rotation done", toActivate.map(d => d?.titre));
+
+    await loadData();
   };
 
   useEffect(() => {
@@ -131,6 +185,20 @@ export default function ListDefisScreen() {
         </View>
 
         {/* FILTERS */}
+        <TouchableOpacity
+          onPress={rotateDefis}
+          style={{
+            backgroundColor: "#008F6B",
+            paddingVertical: 12,
+            borderRadius: 14,
+            marginBottom: 16,
+            alignItems: "center"
+          }}
+        >
+          <Text style={{ color: "white", fontWeight: "800" }}>
+            🔁 Faire tourner les défis du jour
+          </Text>
+        </TouchableOpacity>
         <View style={styles.filterRow}>
           {[
             { key: "all", label: "TOUS" },
