@@ -16,19 +16,16 @@ import { markDefiDone } from "@/services/notifications";
 import { finalizeProof } from "@/services/proofs";
 import { useRouter } from "expo-router";
 // Remplace la ligne d'import existante par celle-ci :
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
-  addDoc // 👈 C'est ce qu'il manquait !
-  ,
-
-
-
-
+  addDoc,
   collection,
   deleteDoc,
   doc,
   onSnapshot,
   updateDoc
 } from "firebase/firestore";
+
 
 // ------------------------------------------------------------
 // TYPES
@@ -98,6 +95,13 @@ type ChallengesContextType = {
 const ChallengesContext = createContext<ChallengesContextType | undefined>(
   undefined
 );
+
+function isPastNoon(date: Date) {
+  const noon = new Date(date);
+  noon.setHours(12, 0, 0, 0); // 12:00:00
+  return date.getTime() >= noon.getTime();
+}
+
 
 
 export function ChallengesProvider({
@@ -581,6 +585,77 @@ const setFeedback = useCallback(
       history,
     ]
   );
+
+    // ------------------------------------------------------------
+  // DAILY RESET LOGIC (RUNS AFTER 12:00)
+  // ------------------------------------------------------------
+  useEffect(() => {
+    if (!current || !activeDefiRef) return;
+
+    (async () => {
+      const now = new Date();
+
+      // Unique key per user (so multiple accounts on same device don't conflict)
+      const uid = auth.currentUser?.uid;
+      const resetKey = uid ? `lastResetCheck_${uid}` : "lastResetCheck";
+
+      // 🕛 Have we already handled today's reset?
+      const last = await AsyncStorage.getItem(resetKey);
+      if (last) {
+        const lastDate = new Date(last);
+        if (lastDate.toDateString() === now.toDateString()) {
+          // Same calendar day → nothing to do
+          return;
+        }
+      }
+
+      // Only run reset logic AFTER 12:00
+      if (!isPastNoon(now)) return;
+
+      // Mark that we have handled reset for today
+      await AsyncStorage.setItem(resetKey, now.toISOString());
+
+      // ---- SCENARIO 1: user already claimed points → delete ----
+      if (current.pointsClaimed === true) {
+        try {
+          await deleteDoc(activeDefiRef);
+          setCurrent(null);
+          console.log("[RESET] Deleted activeDefi (points claimed)");
+        } catch (err) {
+          console.warn("[RESET] Failed to delete activeDefi (claimed)", err);
+        }
+        return;
+      }
+
+      // ---- SCENARIO 2: validated but not claimed → KEEP ----
+      if (current.finalStatus === "validated") {
+        console.log("[RESET] Kept activeDefi (validated but not claimed)");
+        return;
+      }
+
+      // ---- SCENARIO 3: proof submitted, still pending validation → KEEP ----
+      if (current.status === "pendingValidation") {
+        console.log("[RESET] Kept activeDefi (pendingValidation)");
+        return;
+      }
+
+      // ---- SCENARIO 4: no proof submitted → delete ----
+      if (current.status === "active" && !current.proofSubmitted) {
+        try {
+          await deleteDoc(activeDefiRef);
+          setCurrent(null);
+          console.log("[RESET] Deleted activeDefi (no proof submitted)");
+        } catch (err) {
+          console.warn("[RESET] Failed to delete activeDefi (no proof)", err);
+        }
+        return;
+      }
+
+      // Any other weird combo: we log but don't destroy anything
+      console.log("[RESET] No matching scenario, activeDefi kept as safety.");
+    })();
+  }, [current, activeDefiRef]);
+
 
   return (
     <ChallengesContext.Provider value={value}>
