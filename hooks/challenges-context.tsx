@@ -20,6 +20,9 @@ import {
   addDoc // 👈 C'est ce qu'il manquait !
   ,
 
+
+
+
   collection,
   deleteDoc,
   doc,
@@ -49,6 +52,7 @@ export type ActiveChallenge = Challenge & {
   popupPending?: boolean;
   finalProofId?: string | null;
   validationPhaseDone?: boolean;
+  pointsClaimed?: boolean;
 };
 
 export type ChallengeHistoryEntry = {
@@ -169,6 +173,7 @@ export function ChallengesProvider({
         readyToRetry: data.readyToRetry ?? false,
         popupPending: data.popupPending ?? false,
         finalProofId: data.finalProofId ?? null,
+        pointsClaimed: data.pointsClaimed ?? false,
       });
     });
 
@@ -198,6 +203,19 @@ export function ChallengesProvider({
         if (isSuccess) {
           const { awardClassementPoints } = await import("@/src/classement/services/awardClassementPoints");
           await awardClassementPoints(current.points);
+
+          // 🟢 mark points claimed in Firestore
+          if (activeDefiRef) {
+            await updateDoc(activeDefiRef, {
+              pointsClaimed: true
+            });
+          }
+
+          // 🟢 update local state immediately
+          setCurrent(prev =>
+            prev ? { ...prev, pointsClaimed: true } : prev
+          );
+
           setGoToClassement(true);
         } else {
           stop();
