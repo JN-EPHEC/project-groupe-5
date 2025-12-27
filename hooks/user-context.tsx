@@ -1,6 +1,20 @@
 // hooks/user-context.tsx
 // Keep this context independent of routing
-import { DEV_FORCE_PREMIUM, DEV_TEST_EMAIL, DEV_TEST_UID } from "@/devAuth.env";
+
+// Optional dev-only premium bypass – safe for teammates without the file
+let DEV_FORCE_PREMIUM = false;
+let DEV_TEST_EMAIL: string | undefined = undefined;
+let DEV_TEST_UID: string | undefined = undefined;
+
+try {
+  const dev = require("../devAuth.env"); // path relative to this file
+  DEV_FORCE_PREMIUM = dev.DEV_FORCE_PREMIUM;
+  DEV_TEST_EMAIL = dev.DEV_TEST_EMAIL;
+  DEV_TEST_UID = dev.DEV_TEST_UID;
+} catch {
+  // File missing → ignore silently (normal users, production, teammates)
+}
+
 import { checkPremiumStatus } from "@/services/premiumService";
 import { User as FirebaseUser, onAuthStateChanged } from "firebase/auth";
 import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
