@@ -76,10 +76,12 @@ export function ValidationCard({ item, onValidate, onReject, onReport }: Props) 
           <Text style={[styles.categoryText, { color: "#008F6B" }]}>{categoryConfig.label}</Text>
         </View>
 
-        <View style={[styles.pointsBadge, { backgroundColor: isLight ? "#D1FAE5" : "#1F3A33" }]}>
-          <Ionicons name="leaf" size={14} color={isLight ? "#0F3327" : "#52D192"} />
-          <Text style={[styles.pointsText, { color: isLight ? "#0F3327" : "#52D192" }]}>{item.points} pts</Text>
-        </View>
+        {item.audience !== "Club" && (
+          <View style={[styles.pointsBadge, { backgroundColor: isLight ? "#D1FAE5" : "#1F3A33" }]}>
+            <Ionicons name="leaf" size={14} color={isLight ? "#0F3327" : "#52D192"} />
+            <Text style={[styles.pointsText, { color: isLight ? "#0F3327" : "#52D192" }]}>{item.points} pts</Text>
+          </View>
+        )}
       </View>
 
       {/* TITRE & AUTEUR */}

@@ -4,6 +4,7 @@ export const CATEGORY_CONFIG = {
   Tous: { icon: "earth-outline", label: "Tous" },
   Recyclage: { icon: "leaf-outline", label: "Recyclage" },
   Local: { icon: "storefront-outline", label: "Local" },
+  Club: { icon: "people-outline", label: "Club" },
   Transports: { icon: "bicycle-outline", label: "Transports" },
   Tri: { icon: "trash-outline", label: "Tri" },
   Sensibilisation: { icon: "megaphone-outline", label: "Sensibilisation" },
