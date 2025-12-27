@@ -1,11 +1,11 @@
 // hooks/challenges-context.ts
 import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useState,
 } from "react";
 
 import { Challenge } from "@/components/ui/defi/types";
@@ -18,12 +18,12 @@ import { useRouter } from "expo-router";
 // Remplace la ligne d'import existante par celle-ci :
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  onSnapshot,
-  updateDoc
+    addDoc,
+    collection,
+    deleteDoc,
+    doc,
+    onSnapshot,
+    updateDoc
 } from "firebase/firestore";
 
 
@@ -337,12 +337,8 @@ export function ChallengesProvider({
         : "La preuve du club a été refusée.",
       // For club flows we don't award points or redirect to classement
       primaryLabel: "Fermer",
-      secondaryLabel: "Fermer",
       onPrimary: async () => {
         // No-op for club success — simply close the popup
-      },
-      onSecondary: () => {
-        // Just close popup
       },
     });
 

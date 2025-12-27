@@ -1,7 +1,6 @@
 // components/ui/defi/ChallengeCard.tsx
 import { useChallenges } from "@/hooks/challenges-context";
 import { useThemeMode } from "@/hooks/theme-context";
-import { useClub } from "@/hooks/club-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useMemo, useState } from "react";
@@ -64,10 +63,8 @@ export function ChallengeCard({
     return false;
   }, [isOngoing, reviewCompleted, reviewRequiredCount, current, challenge.id]);
 
-  // For club list items, display a small progress bar (0 / clubMemberCount)
-  // without mentioning points or difficulty (UI parity requirement).
-  const { joinedClub, members } = useClub();
-  const clubMemberCount = joinedClub?.participants ?? members.length ?? 50; // final fallback to 50
+  // For club list items, display a small progress bar (0 / 50)
+  const CLUB_DENOMINATOR = 50;
   const clubProgressValue = 0; // list items show zero until a club cycle is active
 
   const isLightMode = mode === "light";
@@ -184,9 +181,9 @@ export function ChallengeCard({
             <>
               <View style={{ marginTop: 12 }}>
                 <View style={{ height: 8, backgroundColor: isLightMode ? "#E5E7EB" : colors.surfaceAlt, borderRadius: 6, overflow: "hidden" }}>
-                  <View style={{ width: `${Math.round((clubProgressValue / clubMemberCount) * 100)}%`, height: "100%", backgroundColor: accentColor }} />
+                  <View style={{ width: `${Math.round((clubProgressValue / CLUB_DENOMINATOR) * 100)}%`, height: "100%", backgroundColor: accentColor }} />
                 </View>
-                <Text style={{ color: cardMuted, marginTop: 6, fontSize: 13 }}>{clubProgressValue}/{clubMemberCount} membres ont validé</Text>
+                <Text style={{ color: cardMuted, marginTop: 6, fontSize: 13 }}>{clubProgressValue}/{CLUB_DENOMINATOR} membres ont validé</Text>
               </View>
               <TouchableOpacity
                 onPress={() => onToggle(challenge.id)}

@@ -1,12 +1,10 @@
 // components/ui/defi/ClubChallengeCard.tsx
 import { useChallenges } from "@/hooks/challenges-context";
 import { useThemeMode } from "@/hooks/theme-context";
-import { useClub } from "@/hooks/club-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient"; // ✅ Added LinearGradient
 import React, { useEffect, useMemo, useState } from "react";
 import { Image, Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { CATEGORY_CONFIG } from "./constants";
 import type { ClubChallenge } from "./types";
 
 type Props = {
@@ -41,10 +39,8 @@ export function ClubChallengeCard({ challenge, participating, status, onParticip
   const categoryLabel = "Club";
   const categoryIcon = "people-outline" as any;
 
-  // Members / progress
-  const { joinedClub, members } = useClub();
-  const clubMemberCount = joinedClub?.participants ?? members.length ?? 50;
-  // progressCount may come from active currentClub or be passed as part of `challenge`
+  // Members / progress — UI: hardcoded denominator per design
+  const CLUB_DENOMINATOR = 50;
   const progressCount = (challenge as any).progressCount ?? 0;
   const [confirmVisible, setConfirmVisible] = useState(false);
   const { currentClub, reviewCompletedClub, reviewRequiredCountClub } = useChallenges();
@@ -144,12 +140,7 @@ export function ClubChallengeCard({ challenge, participating, status, onParticip
       <Text style={[styles.title, { color: cardText }]}>{challenge.title}</Text>
       <Text style={[styles.description, { color: cardMuted }]}>{challenge.description}</Text>
 
-      <View style={styles.counterRow}>
-        <Ionicons name="people-outline" size={16} color={cardMuted} />
-        <Text style={[styles.counterText, { color: cardMuted }]}>
-          {challenge.participants}/{challenge.goalParticipants} participants
-        </Text>
-      </View>
+
 
       {participating && (
         <LinearGradient
@@ -157,52 +148,74 @@ export function ClubChallengeCard({ challenge, participating, status, onParticip
             style={[styles.timerPill, { borderColor: isLight ? "#BBF7D0" : "rgba(0, 151, 178, 0.4)" }]}
         >
           <Ionicons name="time-outline" size={18} color={accentColor} />
-          <Text style={[styles.timerText, { color: cardText }]}>
-            Temps restant jusqu'à lundi 12:00 : {formatTime(remainingMs)}
-          </Text>
+          <Text style={[styles.timerText, { color: cardText }]}>Temps restant jusqu'à lundi 12:00 : {formatTime(remainingMs)}</Text>
         </LinearGradient>
       )}
 
       {/* 🟢 CLUB PROGRESSION BAR */}
       {participating && (
         <View style={{ marginTop: 14 }}>
-          <Text
-            style={{
-              color: cardText,
-              fontWeight: "700",
-              marginBottom: 6,
-            }}
-          >
-            Progression du club
-          </Text>
+          <Text style={{ color: cardText, fontWeight: "700", marginBottom: 6 }}>Progression du club</Text>
 
-          <View
-            style={{
-              height: 10,
-              borderRadius: 8,
-              backgroundColor: isLight ? "#E5E7EB" : "#0f1f1b",
-              overflow: "hidden",
-            }}
-          >
-            <View
-              style={{
-                width: `${Math.round((progressCount / clubMemberCount) * 100)}%`,
-                height: "100%",
-                backgroundColor: accentColor,
-              }}
-            />
+          <View style={{ height: 10, borderRadius: 8, backgroundColor: isLight ? "#E5E7EB" : "#0f1f1b", overflow: "hidden" }}>
+            <View style={{ width: `${Math.round((progressCount / CLUB_DENOMINATOR) * 100)}%`, height: "100%", backgroundColor: accentColor }} />
           </View>
 
-          <Text
-            style={{
-              color: cardMuted,
-              marginTop: 4,
-            }}
-          >
-            {progressCount}/{clubMemberCount} membres ont validé
-          </Text>
+          <Text style={{ color: cardMuted, marginTop: 4 }}>{progressCount}/{CLUB_DENOMINATOR} membres ont validé</Text>
         </View>
       )}
+
+      <View style={{ marginTop: 20 }}>
+        {participating ? (
+          <>
+            {/* Photo validation button (mirror perso) */}
+            {status === "active" && onValidatePhoto && (
+              <TouchableOpacity
+                style={[styles.shadowBtn]}
+                onPress={onValidatePhoto}
+                activeOpacity={0.9}
+              >
+                <LinearGradient
+                    colors={isLight ? ["#34D399", "#059669"] : [colors.accent, colors.accent]}
+                    style={styles.photoBtn}
+                >
+                    <Ionicons name="camera" size={20} color="#FFF" style={{ marginRight: 8 }} />
+                    <Text style={styles.photoBtnText}>Valider avec photo</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+
+            {/* If proof submitted (pendingValidation), show the proof preview */}
+            {status === "pendingValidation" && (
+              <View style={{ marginTop: 8 }}>
+                <View style={[styles.proofContainer, { borderColor: isLight ? "#fff" : "#333" }]}> 
+                    <Image source={{ uri: (challenge as any).photoUri || "" }} style={{ height: 180, width: '100%' }} resizeMode="cover" />
+                </View>
+
+                {/* Pending status — mirror perso: user cannot cancel after proof submitted */}
+                <View style={{ marginTop: 10, borderRadius: 12, padding: 12, backgroundColor: isLight ? "#FFFBEB" : "#2A2617", borderWidth: 1, borderColor: "#FCD34D" }}>
+                  <Text style={{ color: "#D97706", fontWeight: "700" }}>Ta preuve est en cours de validation</Text>
+                </View>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={[styles.cancelBtn, { borderColor: "#FCA5A5", backgroundColor: isLight ? "#FEF2F2" : "#2A171A", marginTop: 12 }]}
+              onPress={() => setConfirmVisible(true)}
+            >
+              <Text style={[styles.cancelText, { color: "#EF4444" }]}>Annuler le défi</Text>
+              <Ionicons name="close-circle" size={18} color="#EF4444" style={{ marginLeft: 8 }} />
+            </TouchableOpacity>
+          </>
+        ) : (
+          <TouchableOpacity
+            style={[styles.participateBtn, { backgroundColor: accentColor, shadowColor: accentColor }]}
+            onPress={() => onParticipate(challenge.id)}
+          >
+            <Text style={styles.participateText}>Participe</Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
       <View style={{ marginTop: 20 }}>
         {participating ? (
@@ -230,16 +243,23 @@ export function ClubChallengeCard({ challenge, participating, status, onParticip
                 <View style={[styles.proofContainer, { borderColor: isLight ? "#fff" : "#333" }]}>
                     <Image source={{ uri: (challenge as any).photoUri || "" }} style={{ height: 180, width: '100%' }} resizeMode="cover" />
                 </View>
+
+                {/* Pending status — mirror perso: user cannot cancel after proof submitted */}
+                <View style={{ marginTop: 10, borderRadius: 12, padding: 12, backgroundColor: isLight ? "#FFFBEB" : "#2A2617", borderWidth: 1, borderColor: "#FCD34D" }}>
+                  <Text style={{ color: "#D97706", fontWeight: "700" }}>Ta preuve est en cours de validation</Text>
+                </View>
               </View>
             )}
 
-            <TouchableOpacity
-              style={[styles.cancelBtn, { borderColor: "#FCA5A5", backgroundColor: isLight ? "#FEF2F2" : "#2A171A", marginTop: 12 }]}
-              onPress={() => setConfirmVisible(true)}
-            >
-              <Text style={[styles.cancelText, { color: "#EF4444" }]}>Annuler le défi</Text>
-              <Ionicons name="close-circle" size={18} color="#EF4444" style={{ marginLeft: 8 }} />
-            </TouchableOpacity>
+            {status !== "pendingValidation" && (
+              <TouchableOpacity
+                style={[styles.cancelBtn, { borderColor: "#FCA5A5", backgroundColor: isLight ? "#FEF2F2" : "#2A171A", marginTop: 12 }]}
+                onPress={() => setConfirmVisible(true)}
+              >
+                <Text style={[styles.cancelText, { color: "#EF4444" }]}>Annuler le défi</Text>
+                <Ionicons name="close-circle" size={18} color="#EF4444" style={{ marginLeft: 8 }} />
+              </TouchableOpacity>
+            )}
           </>
         ) : (
           <TouchableOpacity
