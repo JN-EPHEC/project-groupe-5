@@ -69,6 +69,7 @@ export type ChallengeHistoryEntry = {
 
 type ChallengesContextType = {
   current: ActiveChallenge | null;
+  currentClub: ActiveChallenge | null;
   start: (challenge: Challenge) => void;
   stop: (id?: number) => void;
   validateWithPhoto: (photoUri: string, comment: string | undefined, proofId: string) => void;
@@ -110,6 +111,7 @@ export function ChallengesProvider({
   children: React.ReactNode;
 }) {
   const [current, setCurrent] = useState<ActiveChallenge | null>(null);
+  const [currentClub, setCurrentClub] = useState<ActiveChallenge | null>(null);
   const [goToClassement, setGoToClassement] = useState(false);
   const [reviewCompleted, setReviewCompleted] = useState(0);
   const [validationPhaseDone, setValidationPhaseDone] = useState(false);
@@ -121,6 +123,9 @@ export function ChallengesProvider({
   const uid = auth.currentUser?.uid;
   const activeDefiRef = uid
     ? doc(collection(doc(db, "users", uid), "activeDefi"), "perso")
+    : null;
+  const activeClubDefiRef = uid
+    ? doc(collection(doc(db, "users", uid), "activeDefi"), "club")
     : null;
   const { showPopup } = useGlobalPopup();
   const router = useRouter();
@@ -183,6 +188,59 @@ export function ChallengesProvider({
 
     return () => unsub();
   }, [activeDefiRef]);
+
+  // ------------------------------------------------------------
+  // LOAD ACTIVE CLUB DEFI
+  // ------------------------------------------------------------
+  useEffect(() => {
+    if (!activeClubDefiRef) return;
+
+    const unsub = onSnapshot(activeClubDefiRef, (snap) => {
+      if (!snap.exists()) {
+        setCurrentClub(null);
+        return;
+      }
+
+      const data = snap.data();
+
+      setCurrentClub({
+        firestoreId: data.defiId,
+        id: data.defiId,
+        title: data.titre,
+        description: data.description,
+        category: data.categorie ?? "Recyclage",
+
+        difficulty:
+          data.difficulte === "facile"
+            ? "Facile"
+            : data.difficulte === "moyen"
+            ? "Moyen"
+            : "Difficile",
+
+        points: data.points,
+        audience: "Club",
+        timeLeft: "Aujourd'hui",
+
+        status: data.status,
+        startedAt: data.startedAt?.toDate?.(),
+        expiresAt: data.expiresAt?.toDate?.(),
+
+        photoUri: data.photoUri ?? null,
+        photoComment: data.photoComment ?? null,
+        proofId: data.proofId ?? null,
+        proofSubmitted: data.proofSubmitted ?? false,
+
+        finalStatus: data.finalStatus ?? null,
+        readyToClaim: data.readyToClaim ?? false,
+        readyToRetry: data.readyToRetry ?? false,
+        popupPending: data.popupPending ?? false,
+        finalProofId: data.finalProofId ?? null,
+        pointsClaimed: data.pointsClaimed ?? false,
+      });
+    });
+
+    return () => unsub();
+  }, [activeClubDefiRef]);
 
 
   // ------------------------------------------------------------
@@ -553,6 +611,7 @@ const setFeedback = useCallback(
   const value = useMemo(
     () => ({
       current,
+      currentClub,
       start,
       stop,
       validateWithPhoto,
