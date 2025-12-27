@@ -51,7 +51,13 @@ export function ChallengeCard({
 
   const shouldHide = useMemo(() => {
     if (!isOngoing) return false;
-    if (reviewCompleted >= reviewRequiredCount) {
+
+    // Only hide other ongoing challenges when the user's own personal
+    // challenge is in the pendingValidation state and the validation
+    // gate has been reached.
+    if (!current || current.status !== "pendingValidation") return false;
+
+    if (reviewRequiredCount > 0 && reviewCompleted >= reviewRequiredCount) {
       if (current && current.id !== challenge.id) return true;
     }
     return false;

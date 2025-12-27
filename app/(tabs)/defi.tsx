@@ -169,10 +169,17 @@ export default function DefiScreen() {
     start,
     startClub,
     stop,
+    stopClub,
     reviewCompleted,
     reviewRequiredCount,
     incrementReview,
+    reviewCompletedClub,
+    reviewRequiredCountClub,
+    incrementReviewClub,
+    validateWithPhotoClub,
     setFeedback,
+    setPhotoComment,
+    setPhotoCommentClub,
   } = useChallenges();
 
   const { users: classementUsers, loading: classementLoading } = useClassement();
@@ -192,6 +199,19 @@ export default function DefiScreen() {
     : null;
   const { queue: validationQueue, removeFromQueue } = useValidationQueue(
     difficultyKey as any
+  );
+
+  const difficultyKeyClub = currentClub
+    ? (
+      currentClub.difficulty.toLowerCase() === "facile" ? "facile" :
+        currentClub.difficulty.toLowerCase() === "moyen" ? "moyen" :
+          "difficile"
+    )
+    : null;
+
+  const { queue: validationQueueClub, removeFromQueue: removeFromQueueClub } = useValidationQueue(
+    difficultyKeyClub as any,
+    "club"
   );
 
   useEffect(() => {
@@ -361,7 +381,17 @@ export default function DefiScreen() {
        let challenge = rotatingChallenges.find((c) => c.id === pendingChallengeId);
        if (!challenge) challenge = clubChallenges.find((c) => c.id === pendingChallengeId);
        
-       if (challenge) start(challenge); // Démarrage effectif
+       if (challenge) {
+         // Start club challenges with the club starter, not the perso starter
+         if (challenge.audience === "Club") {
+           console.log("[AD] Starting club challenge after ad", { pendingChallengeId });
+           startClub(challenge);
+         } else {
+           console.log("[AD] Starting personal challenge after ad", { pendingChallengeId });
+           start(challenge);
+         }
+       }
+
        setPendingChallengeId(null);
     } else if (adScenario === "claim_reward") {
        setRewardModalVisible(true); // Ouvre les récompenses
@@ -371,8 +401,8 @@ export default function DefiScreen() {
 
 
   // 📷 Camera
-  const openCamera = (challengeId: number) => {
-    router.push({ pathname: "/camera", params: { id: String(challengeId) } });
+  const openCamera = (challengeId: number, kind: "perso" | "club" = "perso") => {
+    router.push({ pathname: "/camera", params: { id: String(challengeId), kind } });
   };
 
   const handleSendFeedbackToAdmin = async () => {
@@ -718,6 +748,51 @@ export default function DefiScreen() {
           <View style={{ paddingTop: 20 }}>
             {currentClub ? (
               <>
+                {/* CLUB VALIDATION GATING */}
+                {currentClub && currentClub.status === "pendingValidation" && reviewRequiredCountClub > 0 && (
+                  validationQueueClub.length === 0 ? (
+                    <Text style={[styles.emptyText, { color: colors.mutedText }]}>Aucun défi à valider.</Text>
+                  ) : (
+                    validationQueueClub.map((p, index) => (
+                      <ValidationCard
+                        key={p.id}
+                        item={{
+                          id: index + 1,
+                          title: "Preuve à valider",
+                          description: "",
+                          category: "Local",
+                          difficulty: currentClub?.difficulty ?? "Facile",
+                          points: typeof currentClub?.points === "number" ? currentClub.points : 10,
+                          audience: "Club",
+                          timeLeft: "",
+                          userName: "Utilisateur",
+                          photoUrl: p.photoUrl,
+                          comment: p.commentaire,
+                        }}
+                        onValidate={async () => {
+                          await voteOnProof(p.id, true);
+                          removeFromQueueClub(p.id);
+                          incrementReviewClub();
+                        }}
+                        onReject={async () => {
+                          await voteOnProof(p.id, false);
+                          removeFromQueueClub(p.id);
+                          incrementReviewClub();
+                        }}
+                        onReport={() =>
+                          handleOpenReport(
+                            p.id,
+                            "Preuve à vérifier",
+                            p.defiId,
+                            p.photoUrl,
+                            p.commentaire
+                          )
+                        }
+                      />
+                    ))
+                  )
+                )}
+
                 {/* ACTIVE CLUB CHALLENGE CARD */}
                 <ClubChallengeCard
                   challenge={{
@@ -726,8 +801,10 @@ export default function DefiScreen() {
                     goalParticipants: 50,      // will soon be dynamic
                   }}
                   participating={true}
+                  status={currentClub.status}
+                  onValidatePhoto={() => openCamera(currentClub.id as number, "club")}
                   onParticipate={() => {}}
-                  onCancel={() => {}}
+                  onCancel={() => stopClub()}
                 />
               </>
             ) : (

@@ -70,7 +70,9 @@ const ID = instanceIdRef.current;
 
   const {
     current,
+    currentClub,
     setReviewRequiredCount,
+    setReviewRequiredCountClub,
     //validationPhaseDone, => if code works will need to be removed
     //setValidationPhaseDone,=> if code works will need to be removed
   } = useChallenges();
@@ -94,20 +96,27 @@ const ID = instanceIdRef.current;
     // ---------- HARD EXITS ----------
     if (!uid) {
       setQueue([]);
-      setReviewRequiredCount(0);
+      // choose correct setter based on mode
+      if (mode === "club") setReviewRequiredCountClub(0);
+      else setReviewRequiredCount(0);
       return;
     }
 
-    if (!current || current.status !== "pendingValidation") {
+    // Only proceed if the relevant challenge (perso or club) is in pendingValidation
+    const relevantStatus = mode === "club" ? currentClub?.status : current?.status;
+
+    if (!relevantStatus || relevantStatus !== "pendingValidation") {
       setQueue([]);
-      setReviewRequiredCount(0);
+      if (mode === "club") setReviewRequiredCountClub(0);
+      else setReviewRequiredCount(0);
       hasDecidedRef.current = false; // reset for next challenge
       return;
     }
 
     if (!difficulty) {
       setQueue([]);
-      setReviewRequiredCount(0);
+      if (mode === "club") setReviewRequiredCountClub(0);
+      else setReviewRequiredCount(0);
       return;
     }
 
@@ -188,7 +197,8 @@ vqLog(ID!, "SUBSCRIBE Firestore", {
         hasDecidedRef.current = true;
         //setValidationPhaseDone(true); => if code works will need to be removed
         setQueue([]);
-        setReviewRequiredCount(0);
+        if (mode === "club") setReviewRequiredCountClub(0);
+        else setReviewRequiredCount(0);
         return;
       }
 
@@ -198,7 +208,8 @@ vqLog(ID!, "SUBSCRIBE Firestore", {
       // causing a re-subscription/render loop between hook and context
       const req = Math.min(filtered.length, 3);
       if (prevReqRef.current !== req) {
-        setReviewRequiredCount(req);
+        if (mode === "club") setReviewRequiredCountClub(req);
+        else setReviewRequiredCount(req);
         prevReqRef.current = req;
       }
     });
@@ -216,9 +227,12 @@ vqLog(ID!, "UNSUBSCRIBE Firestore", {
     };
   }, [
     current?.status,
+    currentClub?.status,
     difficulty,
+    mode,
     //validationPhaseDone, => if code works will need to be removed
     setReviewRequiredCount,
+    setReviewRequiredCountClub,
     //setValidationPhaseDone, => if code works will need to be removed
   ]);
 

@@ -11,8 +11,10 @@ import type { ClubChallenge } from "./types";
 type Props = {
   challenge: ClubChallenge;
   participating: boolean;
+  status?: "active" | "pendingValidation" | "validated";
   onParticipate: (id: number) => void;
   onCancel: (id: number) => void;
+  onValidatePhoto?: () => void;
 };
 
 // 🎨 THEME CLUB CHALLENGE CARD
@@ -25,7 +27,7 @@ const clubChallengeTheme = {
   accent: "#008F6B",
 };
 
-export function ClubChallengeCard({ challenge, participating, onParticipate, onCancel }: Props) {
+export function ClubChallengeCard({ challenge, participating, status, onParticipate, onCancel, onValidatePhoto }: Props) {
   const { colors, mode } = useThemeMode();
   const isLight = mode === "light";
   
@@ -43,27 +45,24 @@ export function ClubChallengeCard({ challenge, participating, onParticipate, onC
   };
 
   const [confirmVisible, setConfirmVisible] = useState(false);
-  const { current, reviewCompleted, reviewRequiredCount } = useChallenges();
+  const { currentClub, reviewCompletedClub, reviewRequiredCountClub } = useChallenges();
 
-  // Hide logic — only hide while the user has an active personal challenge
-  // in the "pendingValidation" state and the review threshold has been met.
-  // This prevents starting an unrelated personal challenge (status "active")
-  // from inadvertently hiding the club card when `reviewRequiredCount` is 0.
+  // Hide logic — only hide when the club challenge is itself in pendingValidation
+  // and the club validation counters indicate the gate has been reached.
+
   const shouldHide = useMemo(() => {
     if (!participating) return false;
 
-    // Only consider hiding if there is an active personal challenge
-    // that is currently awaiting validation.
-    if (!current || current.status !== "pendingValidation") return false;
+    if (!currentClub || currentClub.status !== "pendingValidation") return false;
 
-    // Only hide when there is a meaningful required-review count
-    // and the reviews have been completed for that personal challenge.
-    if (reviewRequiredCount > 0 && reviewCompleted >= reviewRequiredCount && current.id !== challenge.id) {
+    if (reviewRequiredCountClub > 0 && reviewCompletedClub >= reviewRequiredCountClub && currentClub.id !== challenge.id) {
       return true;
     }
 
     return false;
-  }, [participating, reviewCompleted, reviewRequiredCount, current, challenge.id]);
+  }, [participating, reviewCompletedClub, reviewRequiredCountClub, currentClub, challenge.id]);
+
+  if (shouldHide) return null;
 
   // Countdown logic
   const [remainingMs, setRemainingMs] = useState<number>(0);
@@ -88,8 +87,6 @@ export function ClubChallengeCard({ challenge, participating, onParticipate, onC
     const s = totalSeconds % 60;
     return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   };
-
-  if (shouldHide) return null;
 
   // Wrapper Selection
   const Wrapper = isLight ? LinearGradient : View;
@@ -191,9 +188,27 @@ export function ClubChallengeCard({ challenge, participating, onParticipate, onC
         {participating ? (
           <>
             <View style={[styles.ongoingPill, { borderColor: accentColor, backgroundColor: isLight ? "#ECFDF5" : "#142822" }]}>
-              <Text style={[styles.ongoingText, { color: accentColor }]}>Défi en cours</Text>
+              <Text style={[styles.ongoingText, { color: accentColor }]}>{status === "active" ? "Défi en cours" : (status === "pendingValidation" ? "En attente de validation" : "Défi en cours")}</Text>
               <Ionicons name="checkmark-circle" size={18} color={accentColor} style={{ marginLeft: 8 }} />
             </View>
+
+            {/* Photo validation button (mirror perso) */}
+            {status === "active" && onValidatePhoto && (
+              <TouchableOpacity
+                style={[styles.shadowBtn]}
+                onPress={onValidatePhoto}
+                activeOpacity={0.9}
+              >
+                <LinearGradient
+                    colors={isLight ? ["#34D399", "#059669"] : [colors.accent, colors.accent]}
+                    style={styles.photoBtn}
+                >
+                    <Ionicons name="camera" size={20} color="#FFF" style={{ marginRight: 8 }} />
+                    <Text style={styles.photoBtnText}>Valider avec photo</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity
               style={[styles.cancelBtn, { borderColor: "#FCA5A5", backgroundColor: isLight ? "#FEF2F2" : "#2A171A", marginTop: 12 }]}
               onPress={() => setConfirmVisible(true)}
@@ -318,6 +333,17 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   timerText: { fontWeight: "600", fontSize: 14 },
+  shadowBtn: {
+    shadowColor: "#000", shadowOpacity: 0.15, shadowOffset: {width: 0, height: 4}, shadowRadius: 8, elevation: 3
+  },
+  photoBtn: {
+    borderRadius: 18,
+    paddingVertical: 12,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  photoBtnText: { color: "#FFF", fontWeight: "700", fontSize: 16 },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.4)",
