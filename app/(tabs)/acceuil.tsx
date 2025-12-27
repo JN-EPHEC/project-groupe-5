@@ -1,7 +1,6 @@
 import { ChallengeOfTheDay } from "@/components/ui/acceuil/ChallengeOfTheDay";
 import { ProgressionCard } from "@/components/ui/acceuil/ProgressionCard";
 import StreakCalendar from "@/components/ui/acceuil/StreakCalendar";
-// ✅ CORRECTION ICI : Ajout des accolades { } car c'est un "export const"
 import { NotificationBell } from "@/components/ui/common/NotificationBell";
 import { Header } from "@/components/ui/profil/Header";
 import PremiumCard from "@/components/ui/recompenses/PremiumCard";
@@ -24,12 +23,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 // 🎨 THEME GLOBAL MENTHE GIVRÉE
 const THEME = {
-    bgGradient: ["#DDF7E8", "#F4FDF9"] as const,
-    glassCardBg: ["rgba(240, 253, 244, 0.95)", "rgba(255, 255, 255, 0.85)"] as const,
-    textMain: "#0A3F33", 
-    textMuted: "#4A665F",
-    accentCoral: "#FF8C66",
-    rankWatermark: "rgba(0, 143, 107, 0.10)", 
+  bgGradient: ["#DDF7E8", "#F4FDF9"] as const,
+  glassCardBg: ["rgba(240, 253, 244, 0.95)", "rgba(255, 255, 255, 0.85)"] as const,
+  textMain: "#0A3F33",
+  textMuted: "#4A665F",
+  accentCoral: "#FF8C66",
+  rankWatermark: "rgba(0, 143, 107, 0.10)",
 };
 
 export default function AcceuilScreen() {
@@ -79,7 +78,7 @@ export default function AcceuilScreen() {
     const currentUser = classementUsers.find((u) => u.isCurrentUser);
     return { position: currentUser?.rank ?? null, totalUsers: 50 };
   }, [classementUsers, classementLoading, user]);
-  
+
   const positionLabel = position ? (position === 1 ? "1er" : `${position}e`) : "—";
 
   // --- CLASSEMENT CLUB (MOCK) ---
@@ -88,7 +87,7 @@ export default function AcceuilScreen() {
 
     const clubs: Array<{ name: string; pts: number; isMine?: boolean; avatar: string }> = [];
     const totalClubPts = members.reduce((sum, m: any) => sum + (m.points || 0), 0) + myPoints;
-    
+
     clubs.push({
       name: joinedClub.name ?? "Mon club",
       pts: totalClubPts,
@@ -97,7 +96,7 @@ export default function AcceuilScreen() {
     });
 
     const mockClubNames = ["Les Écogardiens", "Verte Équipe", "Planète Propre", "Zéro Déchet Squad", "Les Tri-Héros", "Green Sparks", "Eco Runner", "TerraFriends", "BlueLeaf", "GreenMinds"];
-    
+
     while (clubs.length < 50) {
       const name = mockClubNames[clubs.length % mockClubNames.length] + " " + (Math.floor(Math.random() * 90) + 10);
       const pts = Math.floor(Math.random() * 5000) + 200;
@@ -127,78 +126,83 @@ export default function AcceuilScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-        <BackgroundComponent {...(bgProps as any)} />
-        <SafeAreaView style={styles.safeArea} edges={["top", "left", "right", "bottom"]}>
+      <BackgroundComponent {...(bgProps as any)} />
+      <SafeAreaView style={styles.safeArea} edges={["top", "left", "right", "bottom"]}>
         <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
-            {/* HEADER LOGO */}
-            <View style={styles.pageHeader}>
-                <Image source={isLight ? require("../../assets/images/logo_Green_UP_noir_degradé-removebg-preview.png") : require("../../assets/images/logo_fond_vert_degradé__1_-removebg-preview.png")} style={{ width: 160, height: 50 }} resizeMode="contain" />
-                <View style={{ position: 'absolute', right: 8, top: 6 }}><NotificationBell /></View>
-            </View>
-            
-            <Header />
+          {/* HEADER LOGO */}
+          <View style={styles.pageHeader}>
+            <Image source={isLight ? require("../../assets/images/logo_Green_UP_noir_degradé-removebg-preview.png") : require("../../assets/images/logo_fond_vert_degradé__1_-removebg-preview.png")} style={{ width: 160, height: 50 }} resizeMode="contain" />
+            <View style={{ position: 'absolute', right: 8, top: 6 }}><NotificationBell /></View>
+          </View>
 
-            {/* SECTION CLASSEMENT */}
-            <View style={{ marginBottom: 20, marginTop: 8 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 8 }}>
-                    <Ionicons name="trophy-outline" size={20} color={isLight ? THEME.textMain : "#fff"} />
-                    <Text style={{ fontSize: 20, fontFamily: FontFamilies.heading, color: isLight ? THEME.textMain : "#fff" }}>Classement</Text>
-                </View>
+          <Header />
 
-                <View style={{ flexDirection: 'row', gap: 12 }}>
-                    {/* CARTE INDIVIDUEL */}
-                    <TouchableOpacity activeOpacity={0.85} style={{ flex: 1 }} onPress={() => router.push({ pathname: "/defi", params: { view: "classement", rankingTab: "perso" } })}>
-                    <LinearGradient
-                        colors={isLight ? THEME.glassCardBg : ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"]}
-                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                        style={[styles.rankCard, isLight ? styles.glassBorder : styles.darkBorder]}
-                    >
-                        {isLight && (
-                            <View style={styles.rankWatermarkBottomRight}>
-                                <Ionicons name="person" size={80} color={THEME.rankWatermark} />
-                            </View>
-                        )}
-                        <View style={{ zIndex: 10, flex: 1, justifyContent: 'space-between' }}>
-                            <Text style={[styles.rankCardLabel, { color: isLight ? THEME.textMuted : "#9FB9AE" }]}>Individuel</Text>
-                            <Text style={[styles.rankCardValue, { color: isLight ? THEME.textMain : "#fff" }]}>
-                                {positionLabel} <Text style={{ fontSize: 16, fontWeight: '400' }}>sur {totalUsers}</Text>
-                            </Text>
-                        </View>
-                    </LinearGradient>
-                    </TouchableOpacity>
-
-                    {/* CARTE CLUB */}
-                    <TouchableOpacity activeOpacity={0.85} style={{ flex: 1 }} disabled={!joinedClub} onPress={() => router.push({ pathname: "/defi", params: { view: "classement", rankingTab: "club" } })}>
-                    <LinearGradient
-                        colors={isLight ? THEME.glassCardBg : ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"]}
-                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                        style={[styles.rankCard, isLight ? styles.glassBorder : styles.darkBorder]}
-                    >
-                        {isLight && (
-                            <View style={styles.rankWatermarkTopRight}>
-                                <Ionicons name="people" size={80} color={THEME.rankWatermark} />
-                            </View>
-                        )}
-                        <View style={{ zIndex: 10, flex: 1, justifyContent: 'space-between' }}>
-                            <Text style={[styles.rankCardLabel, { color: isLight ? THEME.textMuted : "#9FB9AE" }]}>Club</Text>
-                            <Text style={[styles.rankCardValue, { color: isLight ? THEME.textMain : "#fff" }]}>
-                                {joinedClub ? <>{clubLabel} <Text style={{ fontSize: 16, fontWeight: '400' }}>sur {totalClubs}</Text></> : "—"}
-                            </Text>
-                        </View>
-                    </LinearGradient>
-                    </TouchableOpacity>
-                </View>
+          {/* SECTION CLASSEMENT */}
+          <View style={{ marginBottom: 20, marginTop: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 8 }}>
+              <Ionicons name="trophy-outline" size={20} color={isLight ? THEME.textMain : "#fff"} />
+              <Text style={{ fontSize: 20, fontFamily: FontFamilies.heading, color: isLight ? THEME.textMain : "#fff" }}>Classement</Text>
             </View>
 
-            {/* AUTRES BLOCS */}
-            <View style={styles.blockSpacing}>{hasStreakCalendar && <StreakCalendar />}</View>
-            <View style={styles.blockSpacing}>{hasProgressionCard && <ProgressionCard done={defisFaient} total={defisTotal} pointsText="50 Points gagnés" streakText="2 jours de suite" />}</View>
-            <View style={styles.blockSpacing}>{hasPremiumCard && <PremiumCard onSubscribe={startSubscription} />}</View>
-            {current && current.status === 'active' && hasChallengeOfTheDay && (
-            <View style={styles.blockSpacing}><ChallengeOfTheDay title={current.title} description={current.description} difficulty={current.difficulty} onValidate={() => router.push({ pathname: "/camera", params: { id: String(current.id) } })} /></View>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              {/* CARTE INDIVIDUEL */}
+              <TouchableOpacity activeOpacity={0.85} style={{ flex: 1 }} onPress={() => router.push({ pathname: "/defi", params: { view: "classement", rankingTab: "perso" } })}>
+                <LinearGradient
+                  colors={isLight ? THEME.glassCardBg : ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"]}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                  style={[styles.rankCard, isLight ? styles.glassBorder : styles.darkBorder]}
+                >
+                  {isLight ? (
+                    <View style={styles.rankWatermarkBottomRight}>
+                      <Ionicons name="person" size={80} color={THEME.rankWatermark} />
+                    </View>
+                  ) : null}
+                  <View style={{ zIndex: 10, flex: 1, justifyContent: 'space-between' }}>
+                    <Text style={[styles.rankCardLabel, { color: isLight ? THEME.textMuted : "#9FB9AE" }]}>Individuel</Text>
+                    <Text style={[styles.rankCardValue, { color: isLight ? THEME.textMain : "#fff" }]}>
+                      {positionLabel} <Text style={{ fontSize: 16, fontWeight: '400' }}>sur {totalUsers}</Text>
+                    </Text>
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              {/* CARTE CLUB */}
+              <TouchableOpacity activeOpacity={0.85} style={{ flex: 1 }} disabled={!joinedClub} onPress={() => router.push({ pathname: "/defi", params: { view: "classement", rankingTab: "club" } })}>
+                <LinearGradient
+                  colors={isLight ? THEME.glassCardBg : ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"]}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                  style={[styles.rankCard, isLight ? styles.glassBorder : styles.darkBorder]}
+                >
+                  {isLight ? (
+                    <View style={styles.rankWatermarkTopRight}>
+                      <Ionicons name="people" size={80} color={THEME.rankWatermark} />
+                    </View>
+                  ) : null}
+                  <View style={{ zIndex: 10, flex: 1, justifyContent: 'space-between' }}>
+                    <Text style={[styles.rankCardLabel, { color: isLight ? THEME.textMuted : "#9FB9AE" }]}>Club</Text>
+                    <Text style={[styles.rankCardValue, { color: isLight ? THEME.textMain : "#fff" }]}>
+                      {joinedClub ? <>{clubLabel} <Text style={{ fontSize: 16, fontWeight: '400' }}>sur {totalClubs}</Text></> : "—"}
+                    </Text>
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* AUTRES BLOCS */}
+          <View style={styles.blockSpacing}>{hasStreakCalendar && <StreakCalendar />}</View>
+          <View style={styles.blockSpacing}>
+            {hasProgressionCard && (
+              // @ts-ignore: Ignore l'erreur car les props n'existent pas encore dans ProgressionCard
+              <ProgressionCard done={defisFaient} total={defisTotal} pointsText="50 Points gagnés" streakText="2 jours de suite" />
             )}
+          </View>
+          <View style={styles.blockSpacing}>{hasPremiumCard && <PremiumCard onSubscribe={startSubscription} />}</View>
+          {current && current.status === 'active' && hasChallengeOfTheDay && (
+            <View style={styles.blockSpacing}><ChallengeOfTheDay title={current.title} description={current.description} difficulty={current.difficulty} onValidate={() => router.push({ pathname: "/camera", params: { id: String(current.id) } })} /></View>
+          )}
         </ScrollView>
-        </SafeAreaView>
+      </SafeAreaView>
     </View>
   );
 }

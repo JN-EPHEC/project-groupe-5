@@ -1,9 +1,8 @@
-import { CATEGORY_CONFIG } from "@/components/ui/defi/constants";
 import { FontFamilies } from "@/constants/fonts";
 import { useChallenges } from "@/hooks/challenges-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient"; // ✅ AJOUT
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -62,18 +61,24 @@ export default function CalendarScreen() {
   const monthName = formatMonthYear(displayDate);
   const monthIndex = displayDate.getMonth();
 
+  // Calcul du nombre de jours validés ce mois-ci
   const activeDaysThisMonth = grid
     .filter((d) => d.getMonth() === monthIndex)
-    .filter((d) => activities[d.toISOString().slice(0,10)])
+    .filter((d) => {
+        const key = d.toISOString().slice(0, 10);
+        const act = activities[key];
+        return act && (act as any).status === 'validated';
+    })
     .length;
 
-  // Calcul Streak
+  // Calcul Streak (Logique simplifiée pour l'affichage, à connecter au vrai calcul si besoin)
+  // Ici on laisse 0 pour l'instant ou on peut reprendre la logique de StreakCalendar si on veut l'afficher ici
+  let streakWeeks = 0; 
+
+  // Découpage en semaines pour l'affichage
   const weeks = [] as Date[][];
   for (let i = 0; i < grid.length; i += 7) weeks.push(grid.slice(i, i + 7));
   
-  // (Logique streak simplifiée)
-  let streakWeeks = 0; // À connecter à ta logique réelle si besoin
-
   // Couleurs dynamiques
   const titleColor = isLight ? calendarTheme.textMain : colors.text;
   const textColor = isLight ? calendarTheme.textMuted : colors.mutedText;
@@ -114,7 +119,8 @@ export default function CalendarScreen() {
                 style={[styles.statBox, { borderColor: isLight ? calendarTheme.glassBorder : "rgba(255,255,255,0.1)" }]}
             >
                 <Text style={[styles.statLabel, { color: textColor }]}>Série actuelle</Text>
-                <Text style={[styles.statValue, { color: accentColor }]}>{streakWeeks} <Text style={{ fontSize: 14 }}>semaines</Text></Text>
+                {/* On pourra connecter le vrai streak ici plus tard */}
+                <Text style={[styles.statValue, { color: accentColor }]}>-- <Text style={{ fontSize: 14 }}>jours</Text></Text>
             </LinearGradient>
             <LinearGradient
                 colors={isLight ? ["rgba(255,255,255,0.8)", "rgba(255,255,255,0.4)"] : ["rgba(255,255,255,0.1)", "rgba(255,255,255,0.05)"]}
@@ -142,8 +148,10 @@ export default function CalendarScreen() {
                         const key = d.toISOString().slice(0,10);
                         const inMonth = d.getMonth() === monthIndex;
                         const isToday = d.toDateString() === today.toDateString();
-                        const cat = activities[key];
-                        const has = Boolean(cat);
+                        
+                        const activity = activities[key];
+                        // ✅ Validation stricte comme sur l'accueil
+                        const isValidated = activity && (activity as any).status === 'validated';
 
                         return (
                             <View key={di} style={styles.dayCell}> 
@@ -151,16 +159,17 @@ export default function CalendarScreen() {
                                     style={[
                                         styles.dayBubble, 
                                         { 
-                                            backgroundColor: has ? (isLight ? calendarTheme.bubbleActive : accentColor) : 'transparent',
+                                            backgroundColor: isValidated ? (isLight ? calendarTheme.bubbleActive : accentColor) : 'transparent',
                                             borderColor: isToday ? calendarTheme.bubbleTodayBorder : 'transparent',
                                             borderWidth: isToday ? 2 : 0,
                                             opacity: inMonth ? 1 : 0.3
                                         }
                                     ]}
                                 > 
-                                    {has ? (
+                                    {/* ✅ Icône Checkmark si validé */}
+                                    {isValidated ? (
                                         <Ionicons 
-                                            name={CATEGORY_CONFIG[cat as keyof typeof CATEGORY_CONFIG]?.icon as any || "checkmark"} 
+                                            name="checkmark" 
                                             size={16} 
                                             color="#FFFFFF" 
                                         />

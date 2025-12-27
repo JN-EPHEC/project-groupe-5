@@ -195,9 +195,10 @@ export default function RewardDetailScreen() {
                 <View style={styles.header}>
                     <View style={{ flex: 1 }}>
                         <Text style={[styles.title, { color: titleColor }]}>{reward.name}</Text>
-                        <Text style={[styles.city, { color: textColor }]}>
-                            <Ionicons name="location-outline" size={14} /> {reward.city}
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', opacity: 0.8 }}>
+                            <Ionicons name="location-outline" size={14} color={textColor} />
+                            <Text style={{ fontSize: 14, fontFamily: FontFamilies.body, color: textColor, marginLeft: 4 }}> {reward.city}</Text>
+                        </View>
                     </View>
                     <View style={[styles.priceTag, { backgroundColor: isLight ? "#E0F7EF" : "rgba(0, 151, 178, 0.15)" }]}>
                         <Text style={{ color: accentColor, fontWeight: "800", fontSize: 16 }}>{reward.pointsCost}</Text>
