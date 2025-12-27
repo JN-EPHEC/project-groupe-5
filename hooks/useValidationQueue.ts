@@ -1,6 +1,7 @@
 // hooks/useValidationQueue.ts
 import { auth, db } from "@/firebaseConfig";
 import { useChallenges } from "@/hooks/challenges-context";
+import { useClub } from "@/hooks/club-context";
 import {
   collection,
   DocumentData,
@@ -38,6 +39,8 @@ export type ValidationProof = {
   status: "pending" | "validated" | "rejected";
   votesFor?: number;
   votesAgainst?: number;
+  kind?: "perso" | "club";
+  clubId?: string | null;
 };
 
 type UseValidationQueueReturn = {
@@ -45,11 +48,14 @@ type UseValidationQueueReturn = {
   removeFromQueue: (id: string) => void;
 };
 
+type QueueMode = "perso" | "club";
+
 // =========================
 // Hook
 // =========================
 export function useValidationQueue(
-  difficulty: "facile" | "moyen" | "difficile" | null
+  difficulty: "facile" | "moyen" | "difficile" | null,
+  mode: QueueMode = "perso" // 🔥 NEW, default = old behavior
 ): UseValidationQueueReturn {
 
 
@@ -68,6 +74,8 @@ const ID = instanceIdRef.current;
     //validationPhaseDone, => if code works will need to be removed
     //setValidationPhaseDone,=> if code works will need to be removed
   } = useChallenges();
+  const { joinedClub } = useClub();              // 🔥 NEW
+  const myClubId = joinedClub?.id ?? null;       // 🔥 NEW
 
   const [queue, setQueue] = useState<ValidationProof[]>([]);
   const hasDecidedRef = useRef(false); // 🔒 FINAL decision flag
@@ -141,14 +149,32 @@ vqLog(ID!, "SUBSCRIBE Firestore", {
           status: data.status,
           votesFor: data.votesFor ?? 0,
           votesAgainst: data.votesAgainst ?? 0,
+          kind: (data.kind as "perso" | "club") ?? "perso",
+          clubId: typeof data.clubId === "string" ? data.clubId : null,
         } as ValidationProof;
       });
 
       // filter own + decided
       const filtered = raw.filter((p) => {
+        // 1) never validate your own proofs
         if (p.userId === uid) return false;
+
+        // 2) ignore already-finalised proofs
         if ((p.votesFor ?? 0) >= 3) return false;
         if ((p.votesAgainst ?? 0) >= 3) return false;
+
+        // 3) separate perso vs club queues
+        //    - For old proofs without 'kind', we treat as "perso"
+        const kind: "perso" | "club" = p.kind ?? "perso";
+
+        if (mode === "perso" && kind !== "perso") return false;
+        if (mode === "club" && kind !== "club") return false;
+
+        // 4) NEW RULE: in club mode, do not validate proofs from your own club
+        if (mode === "club" && myClubId && p.clubId && p.clubId === myClubId) {
+          return false;
+        }
+
         return true;
       });
 

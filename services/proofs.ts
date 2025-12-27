@@ -19,7 +19,14 @@ export type ProofStatus = "pending" | "validated" | "rejected";
 export type ProofDoc = {
   userId: string;
   defiId: string;
-  // 🔥 NEW: difficulty of the défi ("facile" | "moyen" | "difficile")
+
+  // 🔥 NEW: origin of the challenge
+  kind?: "perso" | "club";
+
+  // 🔥 NEW: club of the proof owner (if any)
+  clubId?: string | null;
+
+  // difficulty of the défi ("facile" | "moyen" | "difficile")
   difficulty: "facile" | "moyen" | "difficile";
 
   photoUrl: string;
@@ -110,6 +117,18 @@ export async function submitProof(
     console.warn("[proofs] Impossible de lire activeDefi pour la difficulté:", e);
   }
 
+  // 🔥 NEW: fetch user's clubId once
+  let clubId: string | null = null;
+  try {
+    const userSnap = await getDoc(doc(db, "users", user.uid));
+    const userData = userSnap.data();
+    if (userData && typeof userData.clubId === "string") {
+      clubId = userData.clubId;
+    }
+  } catch (e) {
+    console.warn("[proofs] Impossible de lire le clubId de l'utilisateur:", e);
+  }
+
   // 🔥 Choix des validateurs (legacy)
   const validators = await pickRandomValidators(user.uid, 3);
 
@@ -121,6 +140,10 @@ export async function submitProof(
     commentaire: commentaire ?? "",
     createdAt: serverTimestamp(),
     status: "pending", // ⚠️ on garde le comportement actuel
+
+    // 🔥 NEW: origin / club
+    kind: "perso",         // for now, all existing flows are perso
+    clubId,                // null or user's club id
 
     assignedValidators: validators,
     votes: {},

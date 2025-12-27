@@ -1,3 +1,4 @@
+// app/camera.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from 'expo-image-picker'; // ✅ AJOUT: Galerie

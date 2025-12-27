@@ -1,3 +1,4 @@
+// app/commentaire.tsx
 import { useChallenges } from "@/hooks/challenges-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { submitProof } from "@/services/proofs";
