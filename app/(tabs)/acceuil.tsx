@@ -29,6 +29,8 @@ const THEME = {
   textMuted: "#4A665F",
   accentCoral: "#FF8C66",
   rankWatermark: "rgba(0, 143, 107, 0.10)",
+  // ✅ MODIFIÉ : Blanc plus visible (0.2) pour qu'il ressorte mieux sur le fond sombre
+  darkRankWatermark: "rgba(255, 255, 255, 0.2)",
 };
 
 export default function AcceuilScreen() {
@@ -124,6 +126,8 @@ export default function AcceuilScreen() {
   const BackgroundComponent = isLight ? LinearGradient : View;
   const bgProps = isLight ? { colors: THEME.bgGradient, style: styles.backgroundFill } : { style: [styles.backgroundFill, { backgroundColor: "#021114" }] };
 
+  const watermarkColor = isLight ? THEME.rankWatermark : THEME.darkRankWatermark;
+
   return (
     <View style={{ flex: 1 }}>
       <BackgroundComponent {...(bgProps as any)} />
@@ -152,11 +156,10 @@ export default function AcceuilScreen() {
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                   style={[styles.rankCard, isLight ? styles.glassBorder : styles.darkBorder]}
                 >
-                  {isLight ? (
-                    <View style={styles.rankWatermarkBottomRight}>
-                      <Ionicons name="person" size={80} color={THEME.rankWatermark} />
-                    </View>
-                  ) : null}
+                  <View style={styles.rankWatermarkBottomRight}>
+                    <Ionicons name="person" size={80} color={watermarkColor} />
+                  </View>
+                  
                   <View style={{ zIndex: 10, flex: 1, justifyContent: 'space-between' }}>
                     <Text style={[styles.rankCardLabel, { color: isLight ? THEME.textMuted : "#9FB9AE" }]}>Individuel</Text>
                     <Text style={[styles.rankCardValue, { color: isLight ? THEME.textMain : "#fff" }]}>
@@ -173,11 +176,10 @@ export default function AcceuilScreen() {
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                   style={[styles.rankCard, isLight ? styles.glassBorder : styles.darkBorder]}
                 >
-                  {isLight ? (
-                    <View style={styles.rankWatermarkTopRight}>
-                      <Ionicons name="people" size={80} color={THEME.rankWatermark} />
-                    </View>
-                  ) : null}
+                  <View style={styles.rankWatermarkTopRight}>
+                    <Ionicons name="people" size={80} color={watermarkColor} />
+                  </View>
+                  
                   <View style={{ zIndex: 10, flex: 1, justifyContent: 'space-between' }}>
                     <Text style={[styles.rankCardLabel, { color: isLight ? THEME.textMuted : "#9FB9AE" }]}>Club</Text>
                     <Text style={[styles.rankCardValue, { color: isLight ? THEME.textMain : "#fff" }]}>

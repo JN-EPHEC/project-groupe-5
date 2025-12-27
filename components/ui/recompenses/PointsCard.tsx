@@ -18,7 +18,8 @@ export const PointsCard: React.FC<PointsCardProps> = ({ points }) => {
     ? ["#FFFFFF", "rgba(255,255,255,0.6)"] as const
     : ["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"] as const;
     
-  const textColor = isLight ? "#0A3F33" : colors.accent;
+  // Couleurs
+  const activeColor = isLight ? "#008F6B" : colors.accent;
   const mutedColor = isLight ? "#4A665F" : colors.mutedText;
 
   return (
@@ -28,14 +29,22 @@ export const PointsCard: React.FC<PointsCardProps> = ({ points }) => {
         style={[styles.card, { borderColor: isLight ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.1)" }]}
     >
       <View style={styles.content}>
+          {/* Icône Feuille */}
           <View style={[styles.iconBox, { backgroundColor: isLight ? "#E0F7EF" : "rgba(255,255,255,0.1)" }]}>
-            <Ionicons name="leaf" size={24} color={isLight ? "#008F6B" : colors.accent} />
+            <Ionicons name="leaf" size={24} color={activeColor} />
           </View>
+          
           <View>
             <Text style={[styles.label, { color: mutedColor }]}>Solde disponible</Text>
-            <Text style={[styles.value, { color: textColor }]}>
-                {points} <Text style={{ fontSize: 16 }}>Greenies</Text>
-            </Text>
+            
+            <View style={styles.valueRow}>
+                <Text style={[styles.value, { color: activeColor }]}>
+                    {points}
+                </Text>
+                <Text style={[styles.unit, { color: activeColor }]}>
+                    Greenies
+                </Text>
+            </View>
           </View>
       </View>
     </LinearGradient>
@@ -56,6 +65,31 @@ const styles = StyleSheet.create({
   },
   content: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   iconBox: { width: 50, height: 50, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  label: { fontSize: 14, fontFamily: FontFamilies.body, marginBottom: 2 },
-  value: { fontSize: 32, fontFamily: FontFamilies.heading, fontWeight: "800", lineHeight: 36 },
+  
+  label: { 
+      fontSize: 14, 
+      fontFamily: FontFamilies.body, 
+      marginBottom: 0,
+      marginTop: 6 // ✅ Descend un peu le label
+  },
+
+  valueRow: {
+      flexDirection: 'row',
+      alignItems: 'center', 
+      marginTop: -8, // ✅ Resserre encore plus l'espace avec le label
+      gap: 8,               
+  },
+
+  value: { 
+      fontSize: 32, 
+      fontFamily: FontFamilies.heading, 
+      fontWeight: "800", 
+  },
+
+  unit: { 
+      fontSize: 16, 
+      fontFamily: FontFamilies.body,
+      fontWeight: "600",
+      marginTop: 8 // Ajusté pour s'aligner avec le bas du chiffre qui a remonté
+  },
 });

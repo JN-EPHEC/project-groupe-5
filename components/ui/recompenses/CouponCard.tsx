@@ -19,8 +19,8 @@ export function CouponCard({ coupon }: { coupon: Coupon }) {
   const borderColor = isLight ? "rgba(255,255,255,0.8)" : "rgba(0, 151, 178, 0.3)";
   const textColor = isLight ? "#0A3F33" : "#FFF";
   
-  // ✅ RETOUR AU VERT MARQUE pour les accents
-  const brandGreen = "#008F6B";
+  // ✅ MODIFIÉ : Vert Fluo (#00D68F) pour le Dark Mode
+  const brandGreen = isLight ? "#008F6B" : "#00D68F";
 
   return (
     <>
@@ -78,15 +78,17 @@ export function CouponCard({ coupon }: { coupon: Coupon }) {
                 {coupon.voucherAmountEuro}€
             </Text>
             
-            <View style={{ padding: 16, backgroundColor: '#FFF', borderRadius: 16 }}>
+            {/* QR CODE CENTRÉ */}
+            <View style={{ padding: 16, backgroundColor: '#FFF', borderRadius: 16, alignItems: 'center', justifyContent: 'center' }}>
                 <QRCode value={coupon.code} size={200} backgroundColor='white' />
             </View>
 
-            <View style={[styles.codeContainer, { marginTop: 24, paddingVertical: 12, paddingHorizontal: 24, backgroundColor: isLight ? "#F3F4F6" : "rgba(255,255,255,0.1)", borderWidth: 0 }]}>
-                <Text style={{ color: textColor, fontSize: 20, fontWeight: 'bold', letterSpacing: 2 }}>{coupon.code}</Text>
+            {/* CODE TEXTE REMONTÉ (Moins de marge) */}
+            <View style={[styles.codeContainerModal, { backgroundColor: isLight ? "#F3F4F6" : "rgba(255,255,255,0.1)" }]}>
+                <Text style={{ color: textColor, fontSize: 20, fontWeight: 'bold', letterSpacing: 2, textAlign: 'center' }}>{coupon.code}</Text>
             </View>
             
-            <Text style={{ color: isLight ? colors.mutedText : "#6E8580", marginTop: 16, fontSize: 13 }}>Appuyez pour fermer</Text>
+            <Text style={{ color: isLight ? colors.mutedText : "#6E8580", marginTop: 16, fontSize: 13, textAlign: 'center' }}>Appuyez pour fermer</Text>
           </View>
         </Pressable>
       </Modal>
@@ -119,6 +121,16 @@ const styles = StyleSheet.create({
       marginTop: 12, padding: 8, borderRadius: 8, 
       borderWidth: 1, borderStyle: 'dashed', 
       alignSelf: 'flex-start' 
+  },
+  // ✅ MODIFIÉ : Style spécifique pour le code dans la modale (centré, moins de marge)
+  codeContainerModal: {
+      marginTop: 20, // Réduit de 24 à 20
+      paddingVertical: 12, 
+      paddingHorizontal: 24, 
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '100%' // Prend toute la largeur pour bien centrer le texte
   },
   codeText: { fontFamily: 'Courier', fontWeight: '700', fontSize: 14, letterSpacing: 1 },
 

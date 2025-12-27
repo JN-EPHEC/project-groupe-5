@@ -1,37 +1,48 @@
-import React from "react";
-import { StyleSheet, Switch, Text, View } from "react-native";
-
 import { FontFamilies } from "@/constants/fonts";
 import { useThemeMode } from "@/hooks/theme-context";
+import React from "react";
+import { StyleSheet, Switch, Text, View } from "react-native";
 
 interface SettingSwitchProps {
   label: string;
   value: boolean;
-  onValueChange: (next: boolean) => void | Promise<void>;
+  onValueChange: (val: boolean) => void;
   disabled?: boolean;
 }
-export const SettingSwitch: React.FC<SettingSwitchProps> = ({ label, value, onValueChange, disabled }) => {
+
+export const SettingSwitch = ({ label, value, onValueChange, disabled }: SettingSwitchProps) => {
   const { colors, mode } = useThemeMode();
   const isLight = mode === "light";
-  const inactiveThumb = isLight ? "#f4f4f5" : "#2e2e32";
-  const activeThumb = isLight ? colors.cardText : "#f5f5f5";
-  const inactiveTrack = isLight ? "#d4d4d8" : "#3f3f46";
-  const activeTrack = isLight ? colors.accent : "#1f8f5a";
+
+  const textColor = isLight ? "#0A3F33" : colors.text;
+  const accentColor = isLight ? "#008F6B" : colors.accent;
+
   return (
-    <View style={styles.switchRow}>
-      <Text style={[styles.switchText, { color: isLight ? colors.cardText : colors.mutedText }]}>{label}</Text>
+    <View style={styles.container}>
+      <Text style={[styles.label, { color: textColor }]}>{label}</Text>
       <Switch
         value={value}
         onValueChange={onValueChange}
-        thumbColor={value ? activeThumb : inactiveThumb}
-        trackColor={{ false: inactiveTrack, true: activeTrack }}
         disabled={disabled}
+        thumbColor={isLight ? "#fff" : "#f5f5f5"} 
+        trackColor={{ false: "#d1d5db", true: accentColor }} 
       />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  switchRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 8 },
-  switchText: { fontSize: 15, fontFamily: FontFamilies.headingMedium },
+  container: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(0,0,0,0.03)",
+  },
+  label: {
+    fontSize: 14,
+    fontFamily: FontFamilies.body,
+    fontWeight: "500",
+  },
 });

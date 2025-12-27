@@ -48,8 +48,7 @@ export default function EditProfileScreen() {
   const isLight = mode === "light";
 
   // --- ÉTATS ---
-  const [firstName, setFirstName] = useState(user?.firstName ?? "");
-  const [lastName, setLastName] = useState(user?.lastName ?? "");
+  // Suppression de firstName et lastName
   const [username, setUsername] = useState(user?.username ?? "");
   const [bio, setBio] = useState(user?.bio ?? "");
   const [photoURL, setPhotoURL] = useState<string | null>(user?.photoURL ?? null);
@@ -62,9 +61,10 @@ export default function EditProfileScreen() {
 
   const canSave = useMemo(() => !saving && !!auth.currentUser, [saving]);
 
-  // Initiales dynamiques
+  // Initiales dynamiques - Adapté pour n'utiliser que le username
   const getInitials = () => {
-    const name = ([firstName, lastName].filter(Boolean).join(" ") || username || "Inconnu").trim();
+    const name = (username || "Inconnu").trim();
+    // On peut garder la logique de split si le username a des espaces, sinon slice(0,2)
     const parts = name.split(" ");
     if (parts.length > 1) {
       return (parts[0][0] + parts[1][0]).toUpperCase();
@@ -144,8 +144,8 @@ export default function EditProfileScreen() {
       const finalColor = avatarColor.startsWith("#") ? avatarColor : `#${avatarColor}`;
 
       const payload = {
-        firstName: firstName || null,
-        lastName: lastName || null,
+        // firstName: firstName || null, // Supprimé
+        // lastName: lastName || null,   // Supprimé
         username: username || null,
         bio: bio || null,
         photoURL: nextPhotoURL,
@@ -310,32 +310,26 @@ export default function EditProfileScreen() {
               )}
             </View>
 
-            {/* FORMULAIRE */}
-            {[
-              ["Prénom", firstName, setFirstName],
-              ["Nom", lastName, setLastName],
-              ["Nom d'utilisateur", username, setUsername],
-            ].map(([label, value, setter]: any, i) => (
-              <View key={i} style={styles.formGroup}>
-                <Text style={[styles.label, { color: mutedColor }]}>
-                  {label}
-                </Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    {
-                      borderColor: inputBorder,
-                      backgroundColor: inputBg,
-                      color: titleColor,
-                    },
-                  ]}
-                  value={value}
-                  onChangeText={setter}
-                  placeholder={label}
-                  placeholderTextColor={mutedColor}
-                />
-              </View>
-            ))}
+            {/* FORMULAIRE - Modifié pour ne garder que Username */}
+            <View style={styles.formGroup}>
+              <Text style={[styles.label, { color: mutedColor }]}>
+                Nom d'utilisateur
+              </Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    borderColor: inputBorder,
+                    backgroundColor: inputBg,
+                    color: titleColor,
+                  },
+                ]}
+                value={username}
+                onChangeText={setUsername}
+                placeholder="Nom d'utilisateur"
+                placeholderTextColor={mutedColor}
+              />
+            </View>
 
             <View style={styles.formGroup}>
               <Text style={[styles.label, { color: mutedColor }]}>Bio</Text>
@@ -482,4 +476,4 @@ const styles = StyleSheet.create({
 
   saveBtn: { paddingVertical: 16, borderRadius: 16, alignItems: "center" },
   cancelBtn: { paddingVertical: 16, borderRadius: 16, alignItems: "center", marginTop: 12, borderWidth: 1 },
-});
+}); 
