@@ -50,6 +50,7 @@ export type ActiveChallenge = Challenge & {
   finalProofId?: string | null;
   validationPhaseDone?: boolean;
   pointsClaimed?: boolean;
+  progressCount?: number;
 };
 
 export type ChallengeHistoryEntry = {
@@ -237,6 +238,7 @@ export function ChallengesProvider({
         popupPending: data.popupPending ?? false,
         finalProofId: data.finalProofId ?? null,
         pointsClaimed: data.pointsClaimed ?? false,
+        progressCount: data.progressCount ?? 0,
       });
     });
 
@@ -325,6 +327,15 @@ export function ChallengesProvider({
       const votesAgainst = data.votesAgainst ?? 0;
 
       if (votesFor >= 3 || votesAgainst >= 3) {
+        // 🔥 increment club progress on VALIDATED club challenge
+        if (votesFor >= 3 && current?.audience === "Club" && activeClubDefiRef) {
+          import("firebase/firestore").then(({ updateDoc, increment }) => {
+            updateDoc(activeClubDefiRef, {
+              progressCount: increment(1),
+            });
+          });
+        }
+
         if (current.proofId) {
           finalizeProof(current.proofId).catch((err) => {
             console.warn("[finalizeProof error]", err);
@@ -457,6 +468,7 @@ export function ChallengesProvider({
       finalStatus: null,
       popupPending: false,
       pointsClaimed: false,
+      progressCount: 0,
     };
 
     const uid = auth.currentUser?.uid;

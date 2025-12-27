@@ -162,6 +162,7 @@ export default function DefiScreen() {
   const [viewMode, setViewMode] = useState<"defis" | "classement">("defis");
   const {
     current,
+    currentClub,
     goToClassement,
     setGoToClassement,
     start,
@@ -712,9 +713,8 @@ export default function DefiScreen() {
                   key={challenge.id}
                   challenge={challenge}
                   categorie="club"
-                  isOngoing={current?.id === challenge.id}
-                  status={current?.id === challenge.id ? current?.status : undefined}
-                  // 👇 Pub pour défi club aussi
+                  isOngoing={currentClub?.id === challenge.id}
+                  status={currentClub?.id === challenge.id ? currentClub.status : undefined}                  // 👇 Pub pour défi club aussi
                   onToggle={toggleOngoing}
                   onReport={() => handleOpenReport(
                     challenge.firestoreId || String(challenge.id),
@@ -722,11 +722,11 @@ export default function DefiScreen() {
                     challenge.firestoreId || String(challenge.id)
                   )}
                   onValidatePhoto={
-                    current &&
-                      current.id === challenge.id &&
-                      current.status === "active"
-                      ? () => openCamera(challenge.id)
-                      : undefined
+                    currentClub &&
+                    currentClub.id === challenge.id &&
+                    currentClub.status === "active"
+                    ? () => openCamera(challenge.id)
+                    : undefined
                   }
                 />
               ))
