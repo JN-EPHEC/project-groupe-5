@@ -17,8 +17,9 @@ export default function AdminLayout() {
       {/* La Stack gère la navigation interne de l'admin */}
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
-        <Stack.Screen name="create-defi" />
-        <Stack.Screen name="list-defis" />
+        {/* Ordre logique du Menu */}
+        <Stack.Screen name="defis" />
+        <Stack.Screen name="coupons" />  {/* ✅ NOUVEAU */}
         <Stack.Screen name="reports" />
         <Stack.Screen name="feedback" />
       </Stack>

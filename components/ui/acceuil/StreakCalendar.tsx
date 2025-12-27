@@ -1,4 +1,3 @@
-import { CATEGORY_CONFIG } from "@/components/ui/defi/constants";
 import { FontFamilies } from "@/constants/fonts";
 import { useChallenges } from "@/hooks/challenges-context";
 import { useThemeMode } from "@/hooks/theme-context";
@@ -8,10 +7,10 @@ import { useRouter } from "expo-router";
 import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-// ... (getWeekDates function remains same) ...
+// Fonction utilitaire pour obtenir les dates de la semaine (Lundi -> Dimanche)
 function getWeekDates(): Date[] {
   const now = new Date();
-  const day = (now.getDay() + 6) % 7; 
+  const day = (now.getDay() + 6) % 7; // Lundi = 0
   const monday = new Date(now);
   monday.setDate(now.getDate() - day);
   monday.setHours(0, 0, 0, 0);
@@ -22,8 +21,10 @@ function getWeekDates(): Date[] {
   });
 }
 
+// Formatage clé date (YYYY-MM-DD)
+const formatDateKey = (date: Date) => date.toISOString().slice(0, 10);
+
 const THEME = {
-    // ✅ LE FOND VALIDÉ
     glassBg: ["rgba(240, 253, 244, 0.95)", "rgba(255, 255, 255, 0.85)"] as const,
     title: "#0A3F33",
     border: "rgba(255, 255, 255, 0.6)",
@@ -33,10 +34,47 @@ export default function StreakCalendar() {
   const { colors, mode } = useThemeMode();
   const { activities } = useChallenges();
   const router = useRouter();
+  
   const week = useMemo(() => getWeekDates(), []);
   const todayIndex = (new Date().getDay() + 6) % 7;
-  const weekCount = week.reduce((acc, d) => acc + (activities[d.toISOString().slice(0,10)] ? 1 : 0), 0);
   const isLight = mode === "light";
+
+  // 🔥 CALCUL DU STREAK (SÉRIE)
+  const currentStreak = useMemo(() => {
+    let streak = 0;
+    const iterator = new Date();
+    
+    // 1. Vérification d'aujourd'hui
+    const todayKey = formatDateKey(new Date());
+    const todayActivity = activities[todayKey];
+    
+    // ✅ CORRECTION TS : On utilise (as any) pour accéder à .status
+    const todayValid = todayActivity && (todayActivity as any).status === 'validated';
+    
+    if (todayValid) {
+        streak++;
+    }
+
+    // 2. Remonter dans le passé (à partir d'hier)
+    iterator.setDate(iterator.getDate() - 1); 
+    
+    while (true) {
+        const key = formatDateKey(iterator);
+        const act = activities[key];
+        
+        // ✅ CORRECTION TS
+        const isValid = act && (act as any).status === 'validated';
+
+        if (isValid) {
+            streak++;
+            iterator.setDate(iterator.getDate() - 1); // Jour précédent
+        } else {
+            break; // Série brisée
+        }
+    }
+
+    return streak;
+  }, [activities]);
 
   if (isLight) {
       return (
@@ -49,7 +87,8 @@ export default function StreakCalendar() {
         </LinearGradient>
       );
   }
-  // Dark mode return... (same)
+
+  // Dark mode
   return (
     <LinearGradient
         colors={["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"]}
@@ -67,39 +106,64 @@ export default function StreakCalendar() {
             <Text style={[styles.title, { color: light ? THEME.title : colors.text }]}>Votre série d'activités</Text>
             <Text onPress={() => router.push("/calendar")} style={[styles.link, { color: light ? "#008F6B" : colors.accent }]}>Voir le calendrier</Text>
         </View>
+        
         <View style={styles.contentRow}>
             <View style={[styles.flame, { backgroundColor: light ? "#FFF5F2" : colors.pill, borderColor: light ? "#FFE4DC" : colors.accent }]}>
-            <Text style={[styles.flameCount, { color: light ? "#FF8C66" : colors.text, marginRight: 6 }]}>{weekCount}</Text>
-            <Ionicons name="flame" size={18} color={light ? "#FF8C66" : colors.accent} />
+                <Text style={[styles.flameCount, { color: light ? "#FF8C66" : colors.text, marginRight: 6 }]}>
+                    {currentStreak}
+                </Text>
+                <Ionicons name="flame" size={18} color={light ? "#FF8C66" : colors.accent} />
             </View>
+
             <View style={{ flex: 1 }}>
-            <View style={styles.daysRow}>
-                {['L','M','M','J','V','S','D'].map((d, i) => (
-                <View key={i} style={styles.col}><Text style={[styles.dayLabel, { color: light ? "#4A665F" : colors.mutedText }]}>{d}</Text></View>
-                ))}
-            </View>
-            <View style={styles.circlesRow}>
-                {week.map((date, i) => {
-                const isToday = i === todayIndex;
-                const key = date.toISOString().slice(0, 10);
-                const cat = activities[key];
-                const hasActivity = Boolean(cat);
-                const bg = hasActivity ? (light ? "#008F6B" : colors.accent) : "transparent";
-                return (
-                    <View key={i} style={styles.col}>
-                    <View style={[styles.circle, { borderColor: light ? (isToday ? "#0A3F33" : "#E2E8F0") : "rgba(0, 151, 178, 0.3)", backgroundColor: bg, borderWidth: isToday ? 2 : (light && !hasActivity ? 1 : 2) }]}>
-                        {hasActivity ? <Ionicons name={CATEGORY_CONFIG[cat as keyof typeof CATEGORY_CONFIG].icon as any} size={16} color="#FFFFFF" /> : <Text style={[styles.circleText, { color: light ? "#0A3F33" : colors.text }]}>{String(date.getDate())}</Text>}
-                    </View>
-                    </View>
-                );
-                })}
-            </View>
+                <View style={styles.daysRow}>
+                    {['L','M','M','J','V','S','D'].map((d, i) => (
+                        <View key={i} style={styles.col}>
+                            <Text style={[styles.dayLabel, { color: light ? "#4A665F" : colors.mutedText }]}>{d}</Text>
+                        </View>
+                    ))}
+                </View>
+
+                <View style={styles.circlesRow}>
+                    {week.map((date, i) => {
+                        const isToday = i === todayIndex;
+                        const key = formatDateKey(date);
+                        
+                        const activity = activities[key];
+                        // ✅ CORRECTION TS
+                        const isValidated = activity && (activity as any).status === 'validated';
+                        
+                        const bg = isValidated ? (light ? "#008F6B" : colors.accent) : "transparent";
+                        
+                        return (
+                            <View key={i} style={styles.col}>
+                                <View style={[
+                                    styles.circle, 
+                                    { 
+                                        borderColor: light ? (isToday ? "#0A3F33" : "#E2E8F0") : "rgba(0, 151, 178, 0.3)", 
+                                        backgroundColor: bg, 
+                                        borderWidth: isToday ? 2 : (light && !isValidated ? 1 : 2) 
+                                    }
+                                ]}>
+                                    {isValidated ? (
+                                        <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+                                    ) : (
+                                        <Text style={[styles.circleText, { color: light ? "#0A3F33" : colors.text }]}>
+                                            {String(date.getDate())}
+                                        </Text>
+                                    )}
+                                </View>
+                            </View>
+                        );
+                    })}
+                </View>
             </View>
         </View>
         </>
       )
   }
 }
+
 const SIZE = 30;
 const styles = StyleSheet.create({
   card: { borderRadius: 26, padding: 20, width: "100%" },

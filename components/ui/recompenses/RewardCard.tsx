@@ -30,9 +30,17 @@ export const RewardCard: React.FC<RewardCardProps> = ({ item, onRedeem, redeemed
   const router = useRouter();
   const [confirmVisible, setConfirmVisible] = useState(false);
 
-  const cardBg = isLight ? ["rgba(255,255,255,0.9)", "rgba(255,255,255,0.6)"] : ["rgba(255,255,255,0.05)", "rgba(255,255,255,0.02)"];
-  const borderColor = isLight ? "rgba(255,255,255,0.6)" : "transparent";
-  const titleColor = isLight ? "#0A3F33" : colors.text;
+  // --- THEME ---
+  // Fond : Blanc (Light) ou Bleu Glacé (Dark)
+  const cardBg = isLight 
+    ? ["rgba(255,255,255,0.9)", "rgba(255,255,255,0.6)"] 
+    : ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"];
+  
+  const borderColor = isLight ? "rgba(255,255,255,0.6)" : "rgba(0, 151, 178, 0.3)";
+  const titleColor = isLight ? "#0A3F33" : "#FFF";
+  
+  // ✅ RETOUR AU VERT MARQUE pour les actions (même en dark)
+  const brandGreen = "#008F6B"; 
 
   return (
     <>
@@ -57,7 +65,8 @@ export const RewardCard: React.FC<RewardCardProps> = ({ item, onRedeem, redeemed
         {/* CONTENU */}
         <View style={styles.content}>
             <Text style={[styles.name, { color: titleColor }]} numberOfLines={1}>{item.name}</Text>
-            <Text style={[styles.voucher, { color: colors.accent }]}>Bon de {item.voucherAmountEuro}€</Text>
+            {/* Montant en Vert */}
+            <Text style={[styles.voucher, { color: brandGreen }]}>Bon de {item.voucherAmountEuro}€</Text>
             
             <TouchableOpacity
                 onPress={() => {
@@ -67,7 +76,7 @@ export const RewardCard: React.FC<RewardCardProps> = ({ item, onRedeem, redeemed
                 disabled={!canAfford && !redeemed}
                 style={[
                     styles.button,
-                    { backgroundColor: redeemed ? colors.surfaceAlt : (canAfford ? (isLight ? "#008F6B" : colors.accent) : "#E2E8F0") }
+                    { backgroundColor: redeemed ? colors.surfaceAlt : (canAfford ? brandGreen : "#E2E8F0") }
                 ]}
             >
                 <Text style={[styles.btnText, { color: canAfford || redeemed ? (redeemed ? colors.mutedText : "#FFF") : "#A0AEC0" }]}>
@@ -81,17 +90,17 @@ export const RewardCard: React.FC<RewardCardProps> = ({ item, onRedeem, redeemed
     {/* MODAL CONFIRMATION */}
     <Modal transparent visible={confirmVisible} animationType="fade" onRequestClose={() => setConfirmVisible(false)}>
         <View style={styles.modalOverlay}>
-            <View style={[styles.modalCard, { backgroundColor: isLight ? "#FFF" : colors.card }]}> 
+            <View style={[styles.modalCard, { backgroundColor: isLight ? "#FFF" : "#021114", borderColor: isLight ? "transparent" : borderColor, borderWidth: isLight ? 0 : 1 }]}> 
             <Text style={[styles.modalTitle, { color: titleColor }]}>Confirmer l'échange</Text>
-            <Text style={{ color: isLight ? "#4A665F" : colors.mutedText, marginTop: 8, marginBottom: 20, lineHeight: 22 }}>
-                Veux-tu dépenser <Text style={{ fontWeight: 'bold' }}>{item.pointsCost} Greenies</Text> pour obtenir un bon de <Text style={{ fontWeight: 'bold' }}>{item.voucherAmountEuro}€</Text> chez {item.name} ?
+            <Text style={{ color: isLight ? "#4A665F" : "#A5C9BF", marginTop: 8, marginBottom: 20, lineHeight: 22 }}>
+                Veux-tu dépenser <Text style={{ fontWeight: 'bold', color: isLight ? "#000" : "#FFF" }}>{item.pointsCost} Greenies</Text> pour obtenir un bon de <Text style={{ fontWeight: 'bold', color: isLight ? "#000" : "#FFF" }}>{item.voucherAmountEuro}€</Text> chez {item.name} ?
             </Text>
             <View style={styles.modalButtons}>
                 <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setConfirmVisible(false)}>
-                    <Text style={{ color: "#4A665F", fontWeight: '600' }}>Annuler</Text>
+                    <Text style={{ color: isLight ? "#4A665F" : "#FFF", fontWeight: '600' }}>Annuler</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                    style={[styles.modalBtnConfirm, { backgroundColor: isLight ? "#008F6B" : colors.accent }]}
+                    style={[styles.modalBtnConfirm, { backgroundColor: brandGreen }]}
                     onPress={() => {
                         setConfirmVisible(false);
                         onRedeem?.(item.id, item.pointsCost);
@@ -117,9 +126,7 @@ const styles = StyleSheet.create({
   voucher: { fontSize: 12, fontWeight: '700', marginBottom: 10 },
   button: { paddingVertical: 8, borderRadius: 10, alignItems: 'center', marginTop: 'auto' },
   btnText: { fontSize: 12, fontWeight: '700' },
-
-  // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 24 },
   modalCard: { width: '100%', borderRadius: 24, padding: 24 },
   modalTitle: { fontSize: 20, fontFamily: FontFamilies.heading },
   modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12 },

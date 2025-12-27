@@ -1,176 +1,191 @@
-import {
-    getNotificationPreference,
-    initializeNotificationSystem,
-    notificationsSupported,
-    setNotificationPreferenceEnabled,
-} from "@/services/notifications";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { db } from "@/firebaseConfig";
+import { useUser } from "@/hooks/user-context";
 import * as Notifications from "expo-notifications";
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { Alert, Platform } from "react-native";
+import { collection, deleteDoc, doc, onSnapshot, orderBy, query, writeBatch } from "firebase/firestore";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
+import { Alert, Linking } from "react-native";
 
-interface NotificationsContextValue {
-  enabled: boolean;
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+    priority: Notifications.AndroidNotificationPriority.HIGH,
+  } as any),
+});
+
+type NotificationItem = {
+  id: string;
+  title: string;
+  body: string;
+  read: boolean;
+  createdAt: any;
+  type?: 'info' | 'alert' | 'success';
+};
+
+type NotificationsContextType = {
+  notifications: NotificationItem[];
+  unreadCount: number;
   loading: boolean;
-  setEnabled: (next: boolean) => Promise<boolean>;
-  unread: number;
+  markAllAsRead: () => Promise<void>;
+  deleteNotification: (id: string) => Promise<void>;
+  enabled: boolean;
+  setEnabled: (value: boolean) => Promise<void>;
   resetUnread: () => Promise<void>;
-}
+};
 
-const NotificationsContext = createContext<NotificationsContextValue | undefined>(undefined);
-
-const UNREAD_KEY = "unread_notifications";
+const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
 
 export function NotificationsProvider({ children }: { children: React.ReactNode }) {
-  const [enabled, setEnabledState] = useState(false);
+  const { user } = useUser();
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [prompted, setPrompted] = useState(false);
-  const [unread, setUnread] = useState(0);
+  const [enabled, setEnabledState] = useState(false);
+  
+  const lastCountRef = useRef(0);
 
-  const requestInitialConsent = useCallback(() => {
-    if (!notificationsSupported()) {
+  useEffect(() => {
+    (async () => {
+      const { status } = await Notifications.getPermissionsAsync();
+      const isGranted = status === 'granted';
+      setEnabledState(isGranted);
+
+      if (isGranted) {
+        await scheduleDailyReminder();
+      }
+    })();
+  }, []);
+
+  // ✅ CORRECTION ICI : Ajout du type 'CALENDAR'
+  const scheduleDailyReminder = async () => {
+    await Notifications.cancelAllScheduledNotificationsAsync();
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "🌱 Défi du jour",
+        body: "N'oubliez pas de valider votre défi écologique aujourd'hui !",
+        sound: true,
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.CALENDAR, // <--- C'est la ligne magique
+        hour: 7,
+        minute: 0,
+        repeats: true,
+      },
+    });
+  };
+
+  const setEnabled = async (shouldEnable: boolean) => {
+    if (shouldEnable) {
+      const { status } = await Notifications.getPermissionsAsync();
+      
+      if (status === 'granted') {
+        setEnabledState(true);
+        scheduleDailyReminder();
+      } else if (status === 'denied') {
+        Alert.alert(
+          "Notifications désactivées",
+          "Pour recevoir les notifications, vous devez les autoriser dans les réglages.",
+          [
+            { text: "Annuler", style: "cancel" },
+            { text: "Réglages", onPress: () => Linking.openSettings() }
+          ]
+        );
+        setEnabledState(false);
+      } else {
+        const { status: newStatus } = await Notifications.requestPermissionsAsync();
+        if (newStatus === 'granted') {
+          setEnabledState(true);
+          scheduleDailyReminder();
+        }
+      }
+    } else {
+      Alert.alert(
+        "Désactiver",
+        "Pour désactiver les notifications, veuillez aller dans les réglages de votre appareil.",
+        [
+            { text: "Annuler", style: "cancel", onPress: () => setEnabledState(true) },
+            { text: "Réglages", onPress: () => Linking.openSettings() }
+        ]
+      );
+    }
+  };
+
+  useEffect(() => {
+    if (!user) {
+      setNotifications([]);
       return;
     }
 
-    setTimeout(() => {
-      Alert.alert(
-        "Activer les notifications",
-        "Souhaites-tu recevoir un rappel quotidien à 20h ?",
-        [
-          {
-            text: "Non merci",
-            style: "cancel",
-            onPress: async () => {
-              await setNotificationPreferenceEnabled(false);
-              setEnabledState(false);
-            },
-          },
-          {
-            text: "Oui",
-            onPress: async () => {
-              const result = await setNotificationPreferenceEnabled(true);
-              if (!result && Platform.OS !== "web") {
-                Alert.alert(
-                  "Notification bloquée",
-                  "Autorise les notifications dans les réglages de ton appareil pour recevoir nos rappels."
-                );
-              }
-              setEnabledState(result);
-            },
-          },
-        ]
-      );
-    }, 500);
-  }, []);
+    const q = query(
+      collection(db, "users", user.uid, "notifications"),
+      orderBy("createdAt", "desc")
+    );
+    
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as NotificationItem[];
+      
+      const newUnreadCount = list.filter(n => !n.read).length;
 
-  useEffect(() => {
-    let mounted = true;
-    let listener: any | null = null;
-
-    if (!notificationsSupported()) {
-      setEnabledState(false);
-      setLoading(false);
-      return () => {
-        mounted = false;
-      };
-    }
-
-    (async () => {
-      const pref = await getNotificationPreference();
-      let currentEnabled = false;
-      if (pref === true) {
-        currentEnabled = await initializeNotificationSystem();
-      }
-
-      try {
-        const raw = await AsyncStorage.getItem(UNREAD_KEY);
-        if (raw) {
-          const parsed = parseInt(raw, 10);
-          if (!isNaN(parsed) && mounted) setUnread(parsed);
+      if (!loading && newUnreadCount > lastCountRef.current) {
+        const latest = list[0];
+        if (latest && !latest.read) {
+            await Notifications.scheduleNotificationAsync({
+                content: {
+                    title: latest.title,
+                    body: latest.body,
+                    sound: true,
+                    data: { url: '/(tabs)/notifications' }
+                },
+                trigger: null,
+            });
         }
-      } catch (e) {
-        // ignore
       }
 
-      // Listen to incoming notifications and increment unread counter
-      if (notificationsSupported()) {
-        listener = Notifications.addNotificationReceivedListener(async () => {
-          try {
-            const prevRaw = await AsyncStorage.getItem(UNREAD_KEY);
-            const prev = prevRaw ? parseInt(prevRaw, 10) || 0 : 0;
-            const next = prev + 1;
-            await AsyncStorage.setItem(UNREAD_KEY, String(next));
-            if (mounted) setUnread(next);
-          } catch (e) {
-            console.warn("[notifications] failed to update unread", e);
-          }
-        });
-      }
-      if (!mounted) {
-        return;
-      }
-
-      setEnabledState(currentEnabled);
+      lastCountRef.current = newUnreadCount;
+      setNotifications(list);
       setLoading(false);
+      Notifications.setBadgeCountAsync(newUnreadCount);
+    });
+    
+    return () => unsubscribe();
+  }, [user, loading]);
 
-      if (pref === null && !prompted) {
-        setPrompted(true);
-        requestInitialConsent();
-      }
-    })();
+  const markAllAsRead = async () => {
+    if (!user) return;
+    const batch = writeBatch(db);
+    notifications.forEach(n => {
+      if (!n.read) batch.update(doc(db, "users", user.uid, "notifications", n.id), { read: true });
+    });
+    await batch.commit();
+  };
+  
+  const resetUnread = markAllAsRead;
 
-    return () => {
-      mounted = false;
-      if (listener) {
-        try { listener.remove && listener.remove(); } catch {};
-        listener = null;
-      }
-    };
-  }, [prompted, requestInitialConsent]);
+  const deleteNotification = async (id: string) => {
+    if (!user) return;
+    await deleteDoc(doc(db, "users", user.uid, "notifications", id));
+  };
 
-  const setEnabled = useCallback(async (next: boolean) => {
-    setLoading(true);
-    const result = await setNotificationPreferenceEnabled(next);
-    setEnabledState(result);
-    setLoading(false);
-
-    if (next && !result && Platform.OS !== "web") {
-      Alert.alert(
-        "Notification bloquée",
-        "Autorise les notifications dans les réglages de ton appareil pour recevoir nos rappels."
-      );
-    }
-
-    return result;
-  }, []);
-
-  const resetUnread = useCallback(async () => {
-    try {
-      await AsyncStorage.setItem(UNREAD_KEY, "0");
-      setUnread(0);
-    } catch (e) {
-      console.warn("[notifications] failed to reset unread", e);
-    }
-  }, []);
-
-  const value = useMemo(
-    () => ({
-      enabled,
-      loading,
+  return (
+    <NotificationsContext.Provider value={{ 
+      notifications, 
+      unreadCount: notifications.filter(n => !n.read).length, 
+      loading, 
+      markAllAsRead, 
+      deleteNotification, 
+      enabled, 
       setEnabled,
-      unread,
-      resetUnread,
-    }),
-    [enabled, loading, setEnabled, unread, resetUnread]
+      resetUnread 
+    }}>
+      {children}
+    </NotificationsContext.Provider>
   );
-
-  return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>;
 }
 
-export function useNotificationsSettings() {
-  const context = useContext(NotificationsContext);
-  if (!context) {
-    throw new Error("useNotificationsSettings must be used within a NotificationsProvider");
-  }
-  return context;
+export function useNotifications() {
+  const ctx = useContext(NotificationsContext);
+  if (!ctx) throw new Error("useNotifications must be used within NotificationsProvider");
+  return ctx;
 }
+
+export const useNotificationsSettings = useNotifications;

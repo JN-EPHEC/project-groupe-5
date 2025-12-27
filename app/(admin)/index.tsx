@@ -8,12 +8,12 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 // 🎨 THEME ADMIN
 const adminTheme = {
-    bgGradient: ["#F9FAFB", "#F3F4F6"] as const, // Fond très neutre (blanc/gris)
+    bgGradient: ["#F9FAFB", "#F3F4F6"] as const,
     glassCardBg: ["#FFFFFF", "rgba(255, 255, 255, 0.8)"] as const,
     borderColor: "rgba(0, 0, 0, 0.05)",
-    textMain: "#111827", // Gris très foncé (presque noir)
-    textMuted: "#6B7280", // Gris moyen
-    accent: "#008F6B", // Vert Marque (pour garder le lien)
+    textMain: "#111827",
+    textMuted: "#6B7280",
+    accent: "#008F6B",
     danger: "#EF4444",
 };
 
@@ -110,34 +110,38 @@ export default function AdminHome() {
 
         {/* MENU GRID */}
         <View style={styles.menuContainer}>
+          {/* 1. DÉFIS (Fusionné) */}
           <AdminCard
-            title="Créer un défi"
-            subtitle="Lancer un nouveau challenge"
-            icon="add-circle-outline" // Icone plus moderne
-            route="/(admin)/create-defi"
+            title="Défis"
+            subtitle="Gérer le catalogue des défis"
+            icon="trophy-outline"
+            route="/(admin)/defis"
             variant="accent"
           />
 
+          {/* 2. COUPONS */}
           <AdminCard
-            title="Gérer les défis"
-            subtitle="Modifier ou supprimer"
-            icon="list-outline"
-            route="/(admin)/list-defis"
+            title="Gestion Coupons"
+            subtitle="Récompenses & Stocks"
+            icon="ticket-outline"
+            route="/(admin)/coupons"
           />
 
-          <AdminCard
-            title="Signalements"
-            subtitle="Modération de la communauté"
-            icon="shield-half-outline" // Icone plus "sécurité"
-            route="/(admin)/reports"
-            variant="danger"
-          />
-
+          {/* 3. AVIS (Avant-dernier) */}
           <AdminCard
             title="Avis & Retours"
             subtitle="Feedback des utilisateurs"
             icon="chatbubbles-outline"
             route="/(admin)/feedback"
+          />
+
+          {/* 4. SIGNALEMENTS (Dernier) */}
+          <AdminCard
+            title="Signalements"
+            subtitle="Modération de la communauté"
+            icon="shield-half-outline"
+            route="/(admin)/reports"
+            variant="danger"
           />
         </View>
       </View>

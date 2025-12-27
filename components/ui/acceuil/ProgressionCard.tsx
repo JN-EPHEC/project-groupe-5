@@ -6,11 +6,9 @@ import { StyleSheet, Text, View } from "react-native";
 import ProgressCircle from "../common/ProgressCircle";
 
 export type ProgressionCardProps = {
-  done: number;
-  total: number;
-  pointsText: string;
-  streakText: string;
-  title?: string;
+  weeklyDays: number;   
+  weeklyPoints: number; 
+  daysRemaining: number; // ✅ Nouvelle prop calculée
 };
 
 const cardTheme = {
@@ -22,14 +20,21 @@ const cardTheme = {
 };
 
 export function ProgressionCard({
-  done,
-  total,
-  pointsText,
-  streakText,
-  title = "Progression de la semaine",
+  weeklyDays = 0,
+  weeklyPoints = 0,
+  daysRemaining = 0,
 }: ProgressionCardProps) {
   const { mode, colors } = useThemeMode();
   const isLight = mode === "light";
+
+  // Textes (Sécurisés avec || 0 pour éviter undefined)
+  const title = "Progression de la semaine";
+  const pointsLabel = `${weeklyPoints || 0} points gagnés`;
+  
+  // Logique d'affichage jours restants
+  const streakLabel = daysRemaining <= 0 
+    ? "Semaine terminée !" 
+    : `${daysRemaining} jour${daysRemaining > 1 ? 's' : ''} restant${daysRemaining > 1 ? 's' : ''}`;
 
   if (!isLight) {
     const gradientColors = ["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"] as const;
@@ -37,31 +42,30 @@ export function ProgressionCard({
       <LinearGradient colors={gradientColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.card, { borderWidth: 1, borderColor: 'rgba(0, 151, 178, 0.3)' }]}>
         <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
         <View style={styles.row}>
-          <ProgressCircle done={done} total={total} />
+          <ProgressCircle done={weeklyDays} total={7} />
           <View style={{ marginLeft: 16 }}>
-            <Text style={[styles.points, { color: colors.text }]}>{pointsText}</Text>
-            <Text style={[styles.streak, { color: colors.mutedText }]}>{streakText}</Text>
+            <Text style={[styles.points, { color: colors.text }]}>{pointsLabel}</Text>
+            <Text style={[styles.streak, { color: colors.mutedText }]}>{streakLabel}</Text>
           </View>
         </View>
       </LinearGradient>
     );
   }
 
-  // --- LIGHT MODE CLEAN ---
   return (
     <LinearGradient
       colors={cardTheme.glassBg}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
+      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
       style={[styles.card, styles.glassEffect]}
     >
       <View style={{ zIndex: 10 }}>
         <Text style={[styles.title, { color: cardTheme.titleMain }]}>{title}</Text>
         <View style={styles.row}>
-          <ProgressCircle done={done} total={total} />
+          <ProgressCircle done={weeklyDays} total={7} />
           <View style={{ marginLeft: 16 }}>
-            <Text style={[styles.points, { color: cardTheme.textAccent }]}>{pointsText}</Text>
-            <Text style={[styles.streak, { color: cardTheme.textMuted }]}>{streakText}</Text>
+            {/* ✅ Vert appliqué ici */}
+            <Text style={[styles.points, { color: cardTheme.textAccent }]}>{pointsLabel}</Text>
+            <Text style={[styles.streak, { color: cardTheme.textMuted }]}>{streakLabel}</Text>
           </View>
         </View>
       </View>
@@ -70,24 +74,10 @@ export function ProgressionCard({
 }
 
 const styles = StyleSheet.create({
-  card: {
-    padding: 20,
-    borderRadius: 26,
-    width: "100%",
-    minHeight: 130,
-    justifyContent: "center",
-  },
-  glassEffect: {
-    borderWidth: 1,
-    borderColor: cardTheme.borderColor,
-    shadowColor: "#005c4b",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.06,
-    shadowRadius: 16,
-    elevation: 3,
-  },
+  card: { padding: 20, borderRadius: 26, width: "100%", minHeight: 130, justifyContent: "center" },
+  glassEffect: { borderWidth: 1, borderColor: cardTheme.borderColor, shadowColor: "#005c4b", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.06, shadowRadius: 16, elevation: 3 },
   title: { marginBottom: 16, fontSize: 18, fontFamily: FontFamilies.heading },
   row: { flexDirection: "row", alignItems: "center" },
-  points: { fontSize: 16, fontFamily: FontFamilies.heading },
-  streak: { marginTop: 6, fontFamily: FontFamilies.headingMedium },
+  points: { fontSize: 16, fontFamily: FontFamilies.heading, fontWeight: '700' },
+  streak: { marginTop: 4, fontFamily: FontFamilies.body, fontSize: 13 },
 });

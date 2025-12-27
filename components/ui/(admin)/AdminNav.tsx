@@ -1,110 +1,94 @@
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter, useSegments } from "expo-router";
+import { usePathname, useRouter } from "expo-router";
+import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-export function AdminNav() {
-  const { colors } = useThemeMode();
+export const AdminNav = () => {
   const router = useRouter();
-  const segments = useSegments();
+  const pathname = usePathname();
+  const { theme } = useThemeMode();
+  const insets = useSafeAreaInsets();
+  const isDark = theme === "dark";
 
-  const active = segments[segments.length - 1];
-
-  const isActive = (route: string) =>
-    active === route.replace("/(admin)/", "") ||
-    (!active && route === "/(admin)/");
-
-  const Btn = ({
-    icon,
-    label,
-    route,
-  }: {
-    icon: any;
-    label: string;
-    route: string;
-  }) => {
-    const activeHere = isActive(route);
-
-    return (
-      <TouchableOpacity
-        onPress={() => router.push(route as any)}
-        style={[
-          styles.btn,
-          {
-            backgroundColor: activeHere ? colors.accent : "transparent",
-          },
-        ]}
-      >
-        <Ionicons
-          name={icon}
-          size={20}
-          color={activeHere ? "#fff" : colors.text}
-        />
-        <Text
-          numberOfLines={1}
-          style={{
-            color: activeHere ? "#fff" : colors.text,
-            fontSize: 9, 
-            marginTop: 2,
-            fontWeight: activeHere ? "700" : "400",
-          }}
-        >
-          {label}
-        </Text>
-      </TouchableOpacity>
-    );
-  };
+  const tabs = [
+    { label: "Accueil", icon: "home-outline", route: "/(admin)" },
+    // FUSIONNÉ ICI : "Défis" pointe vers la page unique
+    { label: "Défis", icon: "trophy-outline", route: "/(admin)/defis" }, 
+    { label: "Coupons", icon: "ticket-outline", route: "/(admin)/coupons" }, 
+    { label: "Avis", icon: "star-outline", route: "/(admin)/feedback" },
+    { label: "Alertes", icon: "alert-circle-outline", route: "/(admin)/reports" },
+  ];
 
   return (
-    <View pointerEvents="box-none" style={styles.wrapper}>
-      <View
-        style={[
-          styles.bar,
-          {
-            backgroundColor: colors.surface,
-            shadowColor: "#000",
-          },
-        ]}
-      >
-        <Btn icon="home-outline" label="Accueil" route="/(admin)/" />
-        <Btn icon="add-circle-outline" label="Créer" route="/(admin)/create-defi" />
-        <Btn icon="list-outline" label="Liste" route="/(admin)/list-defis" />
-        <Btn icon="star-outline" label="Avis" route="/(admin)/feedback" />
-        <Btn icon="alert-circle-outline" label="Alertes" route="/(admin)/reports" />
-      </View>
+    <View style={[
+      styles.container, 
+      { 
+        backgroundColor: isDark ? "#1F2937" : "#FFFFFF", 
+        paddingBottom: insets.bottom > 0 ? insets.bottom : 20,
+        borderTopColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)"
+      }
+    ]}>
+      {tabs.map((tab, index) => {
+        // Détection de l'onglet actif
+        // Si on est sur "/(admin)" tout court, c'est l'accueil
+        // Sinon on vérifie si le pathname commence par la route (pour les sous-pages éventuelles)
+        const isActive = tab.route === "/(admin)" 
+            ? pathname === "/(admin)" || pathname === "/(admin)/"
+            : pathname.startsWith(tab.route);
+
+        const activeColor = "#008F6B";
+        const inactiveColor = isDark ? "#9CA3AF" : "#6B7280";
+
+        return (
+          <TouchableOpacity
+            key={index}
+            onPress={() => router.push(tab.route as any)}
+            style={styles.tab}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.iconContainer, isActive && { backgroundColor: isDark ? "rgba(0,143,107,0.2)" : "#E0F7EF" }]}>
+              <Ionicons 
+                name={tab.icon as any} 
+                size={24} 
+                color={isActive ? activeColor : inactiveColor} 
+              />
+            </View>
+            <Text style={[styles.label, { color: isActive ? activeColor : inactiveColor }]}>
+              {tab.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
-  wrapper: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingBottom: 8,
-    paddingTop: 4,
-    backgroundColor: "transparent",
-  },
-  bar: {
-    marginHorizontal: 10,
-    borderRadius: 22,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+  container: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    justifyContent: "space-around",
+    paddingTop: 12,
+    borderTopWidth: 1,
     elevation: 10,
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
   },
-  btn: {
+  tab: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 6,
-    paddingHorizontal: 2,
-    borderRadius: 16,
-    width: "19%", 
+    flex: 1,
+  },
+  iconContainer: {
+    padding: 6,
+    borderRadius: 12,
+    marginBottom: 4,
+  },
+  label: {
+    fontSize: 10,
+    fontWeight: "600",
   },
 });
