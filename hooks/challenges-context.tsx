@@ -71,6 +71,7 @@ type ChallengesContextType = {
   current: ActiveChallenge | null;
   currentClub: ActiveChallenge | null;
   start: (challenge: Challenge) => void;
+  startClub: (challenge: Challenge) => void;
   stop: (id?: number) => void;
   validateWithPhoto: (photoUri: string, comment: string | undefined, proofId: string) => void;
   approveCurrent: () => void;
@@ -416,6 +417,81 @@ export function ChallengesProvider({
 
 
   // ------------------------------------------------------------
+  // START A CLUB DEFI (7 days)
+  // ------------------------------------------------------------
+  const startClub = useCallback(async (challenge: Challenge) => {
+    if (!challenge.firestoreId) {
+      console.warn("Missing Firestore ID for club challenge");
+      return;
+    }
+
+    const startedAt = new Date();
+
+    // 🗓️ 7-day expiration
+    const expiresAt = new Date(startedAt.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    const activeData = {
+      defiId: challenge.firestoreId,
+      titre: challenge.title,
+      description: challenge.description,
+      categorie: challenge.category,
+      difficulte:
+        challenge.difficulty === "Facile"
+          ? "facile"
+          : challenge.difficulty === "Moyen"
+          ? "moyen"
+          : "difficile",
+      points: challenge.points,
+
+      startedAt,
+      expiresAt,
+      status: "active",
+
+      // proof-related
+      photoUri: null,
+      photoComment: "",
+      proofId: null,
+      proofSubmitted: false,
+
+      // final phase
+      finalStatus: null,
+      popupPending: false,
+      pointsClaimed: false,
+    };
+
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+
+    // Firestore write
+    await import("firebase/firestore").then(async ({ doc, setDoc }) => {
+      await setDoc(
+        doc(db, "users", uid, "activeDefi", "club"),
+        activeData
+      );
+    });
+
+    // local state mirror
+    setCurrentClub({
+      ...challenge,
+      firestoreId: challenge.firestoreId,
+      status: "active",
+      startedAt,
+      expiresAt,
+      audience: "Club",
+      photoUri: null,
+      photoComment: null,
+      proofId: null,
+      proofSubmitted: false,
+      pointsClaimed: false,
+    });
+
+    console.log("[CH] startClub -> new club cycle", {
+      uid,
+      defiId: challenge.firestoreId,
+    });
+  }, []);
+
+  // ------------------------------------------------------------
   // STOP (CANCEL)
   // ------------------------------------------------------------
   const stop = useCallback(async () => {
@@ -613,6 +689,7 @@ const setFeedback = useCallback(
       current,
       currentClub,
       start,
+      startClub,
       stop,
       validateWithPhoto,
       approveCurrent,

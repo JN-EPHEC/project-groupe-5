@@ -165,6 +165,7 @@ export default function DefiScreen() {
     goToClassement,
     setGoToClassement,
     start,
+    startClub,
     stop,
     reviewCompleted,
     reviewRequiredCount,
@@ -311,20 +312,26 @@ export default function DefiScreen() {
 
   // 🔴 LOGIQUE DÉMARRAGE (AVEC BYPASS PREMIUM)
   const toggleOngoing = (id: number) => {
-    // 1. Si c'est pour arrêter le défi en cours
     if (current && current.id === id) {
       stop();
       return;
     }
 
-    // 2. VÉRIFICATION PREMIUM
+    let challenge =
+      rotatingChallenges.find((c) => c.id === id) ||
+      clubChallenges.find((c) => c.id === id);
+
+    if (!challenge) return;
+
+    const isClub = challenge.audience === "Club";
+
     if (isPremium) {
-      // 🚀 PREMIUM : Démarrage direct (On cherche le défi et on le lance)
-      let challenge = rotatingChallenges.find((c) => c.id === id);
-      if (!challenge) challenge = clubChallenges.find((c) => c.id === id);
-      if (challenge) start(challenge);
+      if (isClub) {
+        startClub(challenge);
+      } else {
+        start(challenge);
+      }
     } else {
-      // 🎬 NON-PREMIUM : On lance la pub
       setPendingChallengeId(id);
       setAdScenario("start_challenge");
       setShowAd(true);
