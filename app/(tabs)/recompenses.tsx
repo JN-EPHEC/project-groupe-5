@@ -19,7 +19,8 @@ const rewardTheme = {
     activeTabText: "#FFFFFF",
     inactiveTabText: "#4A665F",
     textMain: "#0A3F33",
-    darkActiveTabBg: "#0097B2", 
+    // ✅ MODIFIÉ : Vert (#008F6B) pour le bouton actif en mode sombre
+    darkActiveTabBg: "#008F6B", 
 };
 
 export default function RewardsScreen() {
@@ -61,6 +62,7 @@ export default function RewardsScreen() {
           <PointsCard points={points} />
 
           <View style={styles.tabsContainer}>
+             {/* ✅ On garde le fond et la bordure bleutés (0, 151, 178) en mode sombre */}
              <LinearGradient
                 colors={isLight ? ["rgba(255,255,255,0.8)", "rgba(255,255,255,0.5)"] : ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"]}
                 style={[styles.tabsWrapper, { borderColor: isLight ? "rgba(255,255,255,0.5)" : "rgba(0, 151, 178, 0.3)" }]}
@@ -74,7 +76,6 @@ export default function RewardsScreen() {
             <View>
               <Text style={[styles.sectionTitle, { color: isLight ? rewardTheme.textMain : colors.text }]}>Offres du moment</Text>
               <View style={styles.grid}>
-                {/* ✅ CORRECTION ICI : typage explicite (item: any) */}
                 {liveRewards
                     .filter((r: any) => !hasCoupon(r.id))
                     .map((item: any) => {
@@ -148,7 +149,8 @@ function TabButton({ label, active, onPress, isLight }: { label: string; active:
         flex: 1,
         paddingVertical: 10,
         borderRadius: 20,
-        backgroundColor: active ? (isLight ? "#008F6B" : "#0097B2") : "transparent",
+        // ✅ CHANGÉ : Utilise rewardTheme.darkActiveTabBg (vert) en mode sombre
+        backgroundColor: active ? (isLight ? rewardTheme.activeTabBg : rewardTheme.darkActiveTabBg) : "transparent",
         alignItems: 'center',
         shadowColor: active ? "#000" : "transparent",
         shadowOpacity: active ? 0.1 : 0,

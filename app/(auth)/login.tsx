@@ -191,7 +191,8 @@ export default function Login() {
               disabled={!canSubmit || loading}
               onPress={handleLogin}
               activeOpacity={0.9}
-              style={{ shadowColor: authTheme.accent, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: {width: 0, height: 4}, elevation: 4 }}
+              // ✅ MODIFIÉ : Suppression des ombres / effet lumineux
+              style={{ width: '100%' }}
             >
                 <LinearGradient
                     colors={(!canSubmit || loading) ? ["#A0AEC0", "#CBD5E0"] : ["#008F6B", "#10B981"]}

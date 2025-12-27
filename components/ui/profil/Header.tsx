@@ -10,12 +10,14 @@ import React, { useEffect, useState } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
 
 const headerTheme = {
-    glassBg: ["rgba(240, 253, 244, 0.95)", "rgba(255, 255, 255, 0.85)"] as const,
-    borderColor: "rgba(255, 255, 255, 0.6)",
-    textMain: "#0A3F33",
-    textMuted: "#4A665F",
-    coralBadge: "#FF8C66",
-    watermarkColor: "rgba(0, 143, 107, 0.12)", // Un peu plus subtil
+  glassBg: ["rgba(240, 253, 244, 0.95)", "rgba(255, 255, 255, 0.85)"] as const,
+  borderColor: "rgba(255, 255, 255, 0.6)",
+  textMain: "#0A3F33",
+  textMuted: "#4A665F",
+  coralBadge: "#FF8C66",
+  watermarkColor: "rgba(0, 143, 107, 0.12)",
+  // ✅ AJOUT : Couleur filigrane pour le mode sombre (blanc très subtil)
+  darkWatermarkColor: "rgba(255, 255, 255, 0.15)",
 };
 
 export const Header = () => {
@@ -44,6 +46,9 @@ export const Header = () => {
   const finalBorderWidth = isPremium ? 3 : (isWhiteBg ? 1 : 0);
   const badgeColor = isLight ? headerTheme.coralBadge : colors.accent;
 
+  // Couleur du filigrane dynamique
+  const watermarkColor = isLight ? headerTheme.watermarkColor : headerTheme.darkWatermarkColor;
+
   return (
     <LinearGradient
       colors={isLight ? headerTheme.glassBg : (["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"] as const)}
@@ -54,13 +59,10 @@ export const Header = () => {
         isLight && styles.lightShadow
       ]}
     >
-      {/* 🍃 FEUILLE ÉLÉGANTE (Référence Récompenses) */}
-      {isLight && (
-        <View style={styles.watermarkContainer} pointerEvents="none">
-            {/* Utilisation de 'leaf' mais plus petit et bien placé */}
-            <Ionicons name="leaf" size={100} color={headerTheme.watermarkColor} />
-        </View>
-      )}
+      {/* 🍃 FEUILLE ÉLÉGANTE (Filigrane visible Light & Dark) */}
+      <View style={styles.watermarkContainer} pointerEvents="none">
+          <Ionicons name="leaf" size={100} color={watermarkColor} />
+      </View>
 
       <View style={{ zIndex: 10, alignItems: 'center' }}>
         <View style={styles.avatarContainer}>

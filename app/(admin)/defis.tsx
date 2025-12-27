@@ -7,7 +7,17 @@ import { useUser } from "@/hooks/user-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { addDoc, collection, deleteDoc, doc, getDocs, serverTimestamp, updateDoc } from "firebase/firestore";
+import {
+    addDoc,
+    collection,
+    deleteDoc,
+    doc,
+    getDocs,
+    orderBy,
+    query,
+    serverTimestamp,
+    updateDoc
+} from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
     Alert,
@@ -87,9 +97,55 @@ export default function DefisManagerScreen() {
     setDefis(list);
   };
 
+  // --- LOGIQUE DE ROTATION (AJOUTÉE) ---
+  const rotateDefis = async () => {
+    console.log("🔁 Admin rotation started");
+
+    // 1) fetch ALL defis ordered FIFO
+    const q = query(collection(db, "defis"), orderBy("createdAt", "asc"));
+    const snap = await getDocs(q);
+
+    const all = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+
+    // 2) split
+    const personals = all.filter(d => d.categorie === "personnel");
+    const clubs = all.filter(d => d.categorie === "club");
+
+    // 3) deactivate currently active
+    const active = all.filter(d => d.statut === "rotation");
+    for (const d of active) {
+      await updateDoc(doc(db, "defis", d.id), { statut: "inactive" });
+    }
+
+    // helper to pick first inactive of given difficulty
+    const pickNext = (list: any[], difficulty?: string) => {
+      if (difficulty) {
+        return list.find(d => d.statut === "inactive" && d.difficulte === difficulty);
+      }
+      return list.find(d => d.statut === "inactive");
+    };
+
+    // 4) select next rotation set
+    const nextFacile = pickNext(personals, "facile");
+    const nextMoyen = pickNext(personals, "moyen");
+    const nextDifficile = pickNext(personals, "difficile");
+    const nextClub = pickNext(clubs);
+
+    // 5) activate them
+    const toActivate = [nextFacile, nextMoyen, nextDifficile, nextClub].filter(Boolean);
+
+    for (const d of toActivate) {
+      await updateDoc(doc(db, "defis", d.id), { statut: "rotation" });
+    }
+
+    console.log("✅ Rotation done", toActivate.map(d => d?.titre));
+    Alert.alert("Rotation effectuée", "Les nouveaux défis du jour sont en ligne !");
+    await loadData();
+  };
+
   useEffect(() => {
     loadData();
-  }, [isEditingMode]); // Recharger quand on quitte le mode édition
+  }, [isEditingMode]);
 
   // 2. FILTRAGE
   const filtered = defis.filter((d) => {
@@ -120,10 +176,7 @@ export default function DefisManagerScreen() {
   const openEdit = (d: Defi) => {
     setEditingId(d.id);
     setTitre(d.titre); setDescription(d.description); setCategorie(d.categorie);
-    
-    // ✅ CORRECTION ICI : On force le type avec "as 1 | 7"
     setDuree(d.duree as 1 | 7); 
-    
     setPoints(String(d.points)); setStatut(d.statut);
     setPreuve(d.preuve || ""); setDifficulte(d.difficulte);
     setIsEditingMode(true);
@@ -282,6 +335,16 @@ export default function DefisManagerScreen() {
             />
         </View>
 
+        {/* --- BOUTON ROTATION (AJOUTÉ) --- */}
+        <TouchableOpacity
+          onPress={rotateDefis}
+          style={styles.rotationBtn}
+        >
+          <Text style={styles.rotationBtnText}>
+            Faire tourner les défis du jour
+          </Text>
+        </TouchableOpacity>
+
         {/* FILTERS (2 Lignes) */}
         <View style={{ marginBottom: 20 }}>
             {/* Ligne 1 : Statut */}
@@ -388,6 +451,21 @@ const styles = StyleSheet.create({
   
   searchBar: { flexDirection: 'row', alignItems: 'center', height: 50, borderRadius: 16, paddingHorizontal: 16, marginBottom: 16, borderWidth: 1 },
   searchInput: { flex: 1, marginLeft: 10, fontSize: 15 },
+
+  // Nouveau style pour le bouton Rotation
+  rotationBtn: {
+    backgroundColor: "#008F6B",
+    paddingVertical: 12,
+    borderRadius: 14,
+    marginBottom: 16,
+    alignItems: "center",
+    elevation: 3,
+  },
+  rotationBtnText: {
+    color: "white",
+    fontWeight: "800",
+    fontSize: 14
+  },
   
   filterPill: { paddingVertical: 6, paddingHorizontal: 14, borderRadius: 20, borderWidth: 1, marginRight: 6 },
   

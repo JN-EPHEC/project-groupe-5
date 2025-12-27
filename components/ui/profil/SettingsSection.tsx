@@ -5,7 +5,7 @@ import { useUser } from "@/hooks/user-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Camera } from "expo-camera";
 import { LinearGradient } from "expo-linear-gradient";
-import * as Linking from 'expo-linking'; // ✅ Toujours garder cet import Expo
+import * as Linking from 'expo-linking';
 import { useRouter } from "expo-router";
 import { signOut } from "firebase/auth";
 import { collection, deleteDoc, doc, getDocs, limit, query, updateDoc, where } from "firebase/firestore";
@@ -15,7 +15,6 @@ import { ActivityIndicator, Alert, StyleSheet, Switch, Text, TextInput, Touchabl
 import { auth, db, storage } from "../../../firebaseConfig";
 import { SettingSwitch } from "./SettingSwitch";
 
-// ... (Le thème reste inchangé) ...
 const settingsTheme = {
     glassBg: ["rgba(255, 255, 255, 0.85)", "rgba(255, 255, 255, 0.65)"] as const,
     borderColor: "rgba(255, 255, 255, 0.6)",
@@ -26,7 +25,6 @@ const settingsTheme = {
 };
 
 export const SettingsSection = () => {
-  // ... (Hooks et variables restent inchangés) ...
   const { colors, mode, toggle } = useThemeMode();
   const isLight = mode === "light";
   const { enabled: pushEnabled, setEnabled: setPushEnabled, loading: notificationsLoading } = useNotificationsSettings();
@@ -46,7 +44,6 @@ export const SettingsSection = () => {
   const [showSubscriptionDetails, setShowSubscriptionDetails] = useState(false);
   const [subscription, setSubscription] = useState<any>(null);
   const [loadingSubscription, setLoadingSubscription] = useState(false);
-  // ❌ On retire portalLoading car le lien s'ouvre instantanément maintenant
 
   useEffect(() => {
     if (user) fetchSubscription();
@@ -82,12 +79,8 @@ export const SettingsSection = () => {
     return date.toLocaleDateString("fr-FR");
   };
 
-  // ✅ NOUVELLE VERSION : LIEN DIRECT STABLE
   const handleManageSubscription = () => {
-    // Votre lien Stripe
     const baseUrl = "https://billing.stripe.com/p/login/test_dRm9ASdG9dC12VA24S3Ru00";
-    
-    // Astuce : On pré-remplit l'email de l'utilisateur pour qu'il n'ait pas à le taper
     const portalUrl = user?.email 
         ? `${baseUrl}?prefilled_email=${encodeURIComponent(user.email)}`
         : baseUrl;
@@ -107,9 +100,6 @@ export const SettingsSection = () => {
     );
   };
 
-  // ... (Le reste du code : COMPTE, DESIGN, JSX... reste exactement le même qu'avant)
-  // Je remets juste la partie JSX de l'abonnement pour montrer qu'on a enlevé le loading spinner du bouton
-
   const [editingFirstName, setEditingFirstName] = useState("");
   const [editingLastName, setEditingLastName] = useState("");
   const [editingPostal, setEditingPostal] = useState("");
@@ -117,7 +107,6 @@ export const SettingsSection = () => {
   const [savingAccount, setSavingAccount] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{ [k: string]: boolean }>({});
 
-  // ... (Gardez toutes les fonctions saveAccountChanges, deleteAccount, etc. inchangées) ...
   useEffect(() => {
     if (!user) return;
     setEditingFirstName(user.firstName ?? "");
@@ -385,8 +374,8 @@ export const SettingsSection = () => {
           <Switch
             value={mode === "dark"}
             onValueChange={toggle}
-            thumbColor={mode === "dark" ? "#f5f5f5" : "#fff"}
-            trackColor={{ false: "#E2E8F0", true: accentColor }}
+            thumbColor={isLight ? "#fff" : "#f5f5f5"} 
+            trackColor={{ false: "#d1d5db", true: accentColor }} 
           />
         </View>
 
@@ -536,7 +525,7 @@ export const SettingsSection = () => {
                 <Text style={{ color: mutedColor, marginTop: 6, marginBottom: 20 }}>
                 Êtes-vous sûr de vouloir supprimer votre compte ? Cette action est irréversible.
                 </Text>
-                <View style={styles.modalButtons}>
+                <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
                 <TouchableOpacity
                     style={[styles.modalBtn, { backgroundColor: isLight ? "#F3F4F6" : "#333" }]}
                     onPress={() => setAccountDeleteVisible(false)}

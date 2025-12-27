@@ -31,7 +31,6 @@ export const RewardCard: React.FC<RewardCardProps> = ({ item, onRedeem, redeemed
   const [confirmVisible, setConfirmVisible] = useState(false);
 
   // --- THEME ---
-  // Fond : Blanc (Light) ou Bleu Glacé (Dark)
   const cardBg = isLight 
     ? ["rgba(255,255,255,0.9)", "rgba(255,255,255,0.6)"] 
     : ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"];
@@ -39,8 +38,10 @@ export const RewardCard: React.FC<RewardCardProps> = ({ item, onRedeem, redeemed
   const borderColor = isLight ? "rgba(255,255,255,0.6)" : "rgba(0, 151, 178, 0.3)";
   const titleColor = isLight ? "#0A3F33" : "#FFF";
   
-  // ✅ RETOUR AU VERT MARQUE pour les actions (même en dark)
-  const brandGreen = "#008F6B"; 
+  // ✅ MODIFIÉ : Couleur dynamique inspirée de StreakCalendar
+  // Light: Vert Marque (#008F6B)
+  // Dark: colors.accent (pour matcher "Voir le calendrier")
+  const actionColor = isLight ? "#008F6B" : colors.accent;
 
   return (
     <>
@@ -65,8 +66,8 @@ export const RewardCard: React.FC<RewardCardProps> = ({ item, onRedeem, redeemed
         {/* CONTENU */}
         <View style={styles.content}>
             <Text style={[styles.name, { color: titleColor }]} numberOfLines={1}>{item.name}</Text>
-            {/* Montant en Vert */}
-            <Text style={[styles.voucher, { color: brandGreen }]}>Bon de {item.voucherAmountEuro}€</Text>
+            {/* Montant avec la couleur dynamique */}
+            <Text style={[styles.voucher, { color: actionColor }]}>Bon de {item.voucherAmountEuro}€</Text>
             
             <TouchableOpacity
                 onPress={() => {
@@ -76,7 +77,7 @@ export const RewardCard: React.FC<RewardCardProps> = ({ item, onRedeem, redeemed
                 disabled={!canAfford && !redeemed}
                 style={[
                     styles.button,
-                    { backgroundColor: redeemed ? colors.surfaceAlt : (canAfford ? brandGreen : "#E2E8F0") }
+                    { backgroundColor: redeemed ? colors.surfaceAlt : (canAfford ? actionColor : "#E2E8F0") }
                 ]}
             >
                 <Text style={[styles.btnText, { color: canAfford || redeemed ? (redeemed ? colors.mutedText : "#FFF") : "#A0AEC0" }]}>
@@ -100,7 +101,7 @@ export const RewardCard: React.FC<RewardCardProps> = ({ item, onRedeem, redeemed
                     <Text style={{ color: isLight ? "#4A665F" : "#FFF", fontWeight: '600' }}>Annuler</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                    style={[styles.modalBtnConfirm, { backgroundColor: brandGreen }]}
+                    style={[styles.modalBtnConfirm, { backgroundColor: actionColor }]}
                     onPress={() => {
                         setConfirmVisible(false);
                         onRedeem?.(item.id, item.pointsCost);
