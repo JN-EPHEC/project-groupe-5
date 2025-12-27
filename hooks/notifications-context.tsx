@@ -3,7 +3,7 @@ import { useUser } from "@/hooks/user-context";
 import * as Notifications from "expo-notifications";
 import { collection, deleteDoc, doc, onSnapshot, orderBy, query, writeBatch } from "firebase/firestore";
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
-import { Alert, Linking } from "react-native";
+import { Alert, Linking, Platform } from "react-native";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -58,20 +58,27 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 
   // ✅ CORRECTION ICI : Ajout du type 'CALENDAR'
   const scheduleDailyReminder = async () => {
-    await Notifications.cancelAllScheduledNotificationsAsync();
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: "🌱 Défi du jour",
-        body: "N'oubliez pas de valider votre défi écologique aujourd'hui !",
-        sound: true,
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.CALENDAR, // <--- C'est la ligne magique
-        hour: 7,
-        minute: 0,
-        repeats: true,
-      },
-    });
+    if (typeof Notifications?.scheduleNotificationAsync !== "function") return;
+
+    await Notifications.cancelAllScheduledNotificationsAsync().catch(() => {});
+
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "🌱 Défi du jour",
+          body: "N'oubliez pas de valider votre défi écologique aujourd'hui !",
+          sound: true,
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+          hour: 7,
+          minute: 0,
+          repeats: true,
+        },
+      });
+    } catch {
+      // ignore web
+    }
   };
 
   const setEnabled = async (shouldEnable: boolean) => {
@@ -129,22 +136,30 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       if (!loading && newUnreadCount > lastCountRef.current) {
         const latest = list[0];
         if (latest && !latest.read) {
-            await Notifications.scheduleNotificationAsync({
-                content: {
+            if (typeof Notifications?.scheduleNotificationAsync === "function") {
+              try {
+                await Notifications.scheduleNotificationAsync({
+                  content: {
                     title: latest.title,
                     body: latest.body,
                     sound: true,
                     data: { url: '/(tabs)/notifications' }
-                },
-                trigger: null,
-            });
+                  },
+                  trigger: null,
+                });
+              } catch (e) {
+                // ignore on web
+              }
+            }
         }
       }
 
       lastCountRef.current = newUnreadCount;
       setNotifications(list);
       setLoading(false);
-      Notifications.setBadgeCountAsync(newUnreadCount);
+      if (Platform.OS !== "web") {
+        Notifications.setBadgeCountAsync(newUnreadCount);
+      }
     });
     
     return () => unsubscribe();

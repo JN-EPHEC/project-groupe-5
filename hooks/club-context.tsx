@@ -1,3 +1,4 @@
+// hooks/club-context.tsx
 import React, {
   createContext,
   useContext,
@@ -118,7 +119,11 @@ export const ClubProvider = ({ children }: { children: React.ReactNode }) => {
         id: uid,
         name: String(displayName),
         avatar: avatarUri,
-        points: typeof data.points === "number" ? data.points : 0,
+
+        // use classement points if present
+        points: typeof data.rankingPoints === "number"
+          ? data.rankingPoints
+          : (typeof data.points === "number" ? data.points : 0),
       };
 
       setMembers((prev) => {

@@ -1,3 +1,4 @@
+// app/commentaire.tsx
 import { useChallenges } from "@/hooks/challenges-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { submitProof } from "@/services/proofs";
@@ -28,9 +29,10 @@ const commentTheme = {
 
 export default function CommentaireScreen() {
   const { colors, mode } = useThemeMode();
-  const { current, validateWithPhoto, setPhotoComment } = useChallenges();
+  const { current, currentClub, validateWithPhoto, validateWithPhotoClub, setPhotoComment, setPhotoCommentClub } = useChallenges();
   const router = useRouter();
-  const params = useLocalSearchParams();
+  const params = useLocalSearchParams<{ photoUri?: string; kind?: "perso" | "club" }>();
+  const incomingKind = Array.isArray(params.kind) ? params.kind[0] : params.kind ?? "perso";
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isLight = mode === "light";
 
@@ -44,7 +46,7 @@ export default function CommentaireScreen() {
 
   const canSend = wordCount >= 3;
 
-  if (!current || !photoUri) {
+  if ((incomingKind === "club" && !currentClub) || (incomingKind === "perso" && !current) || !photoUri) {
     router.replace("/(tabs)/defi");
     return null;
   }
@@ -52,7 +54,9 @@ export default function CommentaireScreen() {
   async function sendProof(forcedComment?: string) {
     if (isSubmitting) return; 
     
-    if (!current?.firestoreId || !photoUri) {
+    const activeDefiId = incomingKind === "club" ? currentClub?.firestoreId : current?.firestoreId;
+
+    if (!activeDefiId || !photoUri) {
       router.replace("/(tabs)/defi");
       return;
     }
@@ -62,13 +66,19 @@ export default function CommentaireScreen() {
 
     try {
       const { id: proofId } = await submitProof(
-        current.firestoreId,
+        activeDefiId!,
         photoUri,
-        finalComment
+        finalComment,
+        incomingKind
       );
 
-      await validateWithPhoto(photoUri, finalComment, proofId);
-      await setPhotoComment(finalComment);
+      if (incomingKind === "club") {
+        await validateWithPhotoClub(photoUri, finalComment, proofId);
+        await setPhotoCommentClub(finalComment);
+      } else {
+        await validateWithPhoto(photoUri, finalComment, proofId);
+        await setPhotoComment(finalComment);
+      }
 
       router.replace("/(tabs)/defi");
     } catch (e) {

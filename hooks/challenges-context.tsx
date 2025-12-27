@@ -50,6 +50,7 @@ export type ActiveChallenge = Challenge & {
   finalProofId?: string | null;
   validationPhaseDone?: boolean;
   pointsClaimed?: boolean;
+  progressCount?: number;
 };
 
 export type ChallengeHistoryEntry = {
@@ -69,23 +70,36 @@ export type ChallengeHistoryEntry = {
 
 type ChallengesContextType = {
   current: ActiveChallenge | null;
+  currentClub: ActiveChallenge | null;
   start: (challenge: Challenge) => void;
+  startClub: (challenge: Challenge) => void;
   stop: (id?: number) => void;
+  stopClub: () => void;
   validateWithPhoto: (photoUri: string, comment: string | undefined, proofId: string) => void;
+  validateWithPhotoClub: (photoUri: string, comment: string | undefined, proofId: string) => void;
   approveCurrent: () => void;
   activities: Record<string, Challenge["category"]>;
   canceledIds: number[]; // ← FIX
+  // perso validation state
   reviewRequiredCount: number;
   reviewCompleted: number;
   incrementReview: () => void;
+  setReviewRequiredCount: (n: number) => void;
+  validationPhaseDone: boolean;
+  setValidationPhaseDone: (v: boolean) => void;
+  // club validation state
+  reviewRequiredCountClub: number;
+  reviewCompletedClub: number;
+  incrementReviewClub: () => void;
+  setReviewRequiredCountClub: (n: number) => void;
+  validationPhaseDoneClub: boolean;
+  setValidationPhaseDoneClub: (v: boolean) => void;
   setFeedback: (rating: number, comment: string) => void;
   history: ChallengeHistoryEntry[];
   setPhotoComment: (comment: string) => void;
-  setReviewRequiredCount: (n: number) => void;
+  setPhotoCommentClub: (comment: string) => void;
   goToClassement: boolean;
   setGoToClassement: (v: boolean) => void;
-  validationPhaseDone: boolean;
-  setValidationPhaseDone: (v: boolean) => void;
 };
 
 // ------------------------------------------------------------
@@ -110,10 +124,16 @@ export function ChallengesProvider({
   children: React.ReactNode;
 }) {
   const [current, setCurrent] = useState<ActiveChallenge | null>(null);
+  const [currentClub, setCurrentClub] = useState<ActiveChallenge | null>(null);
   const [goToClassement, setGoToClassement] = useState(false);
   const [reviewCompleted, setReviewCompleted] = useState(0);
-  const [validationPhaseDone, setValidationPhaseDone] = useState(false);
   const [reviewRequiredCount, setReviewRequiredCount] = useState(3);
+  const [validationPhaseDone, setValidationPhaseDone] = useState(false);
+
+  // Club-specific validation state (separate from perso)
+  const [reviewCompletedClub, setReviewCompletedClub] = useState(0);
+  const [reviewRequiredCountClub, setReviewRequiredCountClub] = useState(3);
+  const [validationPhaseDoneClub, setValidationPhaseDoneClub] = useState(false);
   const { addPoints } = usePoints();
   const [history, setHistory] = useState<ChallengeHistoryEntry[]>([]);
   const [activities, setActivities] = useState<Record<string, Challenge["category"]>>({});
@@ -121,6 +141,9 @@ export function ChallengesProvider({
   const uid = auth.currentUser?.uid;
   const activeDefiRef = uid
     ? doc(collection(doc(db, "users", uid), "activeDefi"), "perso")
+    : null;
+  const activeClubDefiRef = uid
+    ? doc(collection(doc(db, "users", uid), "activeDefi"), "club")
     : null;
   const { showPopup } = useGlobalPopup();
   const router = useRouter();
@@ -184,6 +207,60 @@ export function ChallengesProvider({
     return () => unsub();
   }, [activeDefiRef]);
 
+  // ------------------------------------------------------------
+  // LOAD ACTIVE CLUB DEFI
+  // ------------------------------------------------------------
+  useEffect(() => {
+    if (!activeClubDefiRef) return;
+
+    const unsub = onSnapshot(activeClubDefiRef, (snap) => {
+      if (!snap.exists()) {
+        setCurrentClub(null);
+        return;
+      }
+
+      const data = snap.data();
+
+      setCurrentClub({
+        firestoreId: data.defiId,
+        id: data.defiId,
+        title: data.titre,
+        description: data.description,
+        category: data.categorie ?? "Recyclage",
+
+        difficulty:
+          data.difficulte === "facile"
+            ? "Facile"
+            : data.difficulte === "moyen"
+            ? "Moyen"
+            : "Difficile",
+
+        points: data.points,
+        audience: "Club",
+        timeLeft: "Aujourd'hui",
+
+        status: data.status,
+        startedAt: data.startedAt?.toDate?.(),
+        expiresAt: data.expiresAt?.toDate?.(),
+
+        photoUri: data.photoUri ?? null,
+        photoComment: data.photoComment ?? null,
+        proofId: data.proofId ?? null,
+        proofSubmitted: data.proofSubmitted ?? false,
+
+        finalStatus: data.finalStatus ?? null,
+        readyToClaim: data.readyToClaim ?? false,
+        readyToRetry: data.readyToRetry ?? false,
+        popupPending: data.popupPending ?? false,
+        finalProofId: data.finalProofId ?? null,
+        pointsClaimed: data.pointsClaimed ?? false,
+        progressCount: data.progressCount ?? 0,
+      });
+    });
+
+    return () => unsub();
+  }, [activeClubDefiRef]);
+
 
   // ------------------------------------------------------------
   // POPUP WHEN PROOF IS VALIDATED / REJECTED
@@ -242,6 +319,39 @@ export function ChallengesProvider({
     );
   }, [current?.popupPending, current?.finalStatus]);
 
+  // ------------------------------------------------------------
+  // POPUP WHEN CLUB PROOF IS VALIDATED / REJECTED (mirror of personal)
+  // ------------------------------------------------------------
+  useEffect(() => {
+    if (!currentClub) return;
+    if (!currentClub.popupPending) return;
+    if (!currentClub.finalStatus) return;
+
+    const isSuccess = currentClub.finalStatus === "validated";
+
+    showPopup({
+      variant: isSuccess ? "success" : "error",
+      title: isSuccess ? "Défi de club validé 🎉" : "Preuve refusée",
+      description: isSuccess
+        ? `Le défi de ton club a progressé.`
+        : "La preuve du club a été refusée.",
+      // For club flows we don't award points or redirect to classement
+      primaryLabel: "Fermer",
+      onPrimary: async () => {
+        // No-op for club success — simply close the popup
+      },
+    });
+
+    // Clear popupPending flag on Firestore
+    if (activeClubDefiRef) {
+      updateDoc(activeClubDefiRef, { popupPending: false }).catch((err) =>
+        console.warn("[challenges] failed to clear club popupPending:", err)
+      );
+    }
+
+    setCurrentClub((prev) => (prev ? { ...prev, popupPending: false } : prev));
+  }, [currentClub?.popupPending, currentClub?.finalStatus]);
+
 
   // ------------------------------------------------------------
   // AUTO-FINALISATION: listen to the proof’s vote counters
@@ -277,6 +387,36 @@ export function ChallengesProvider({
     return () => unsub();
   }, [current?.proofId, current?.status]);
 
+
+  // ------------------------------------------------------------
+  // AUTO-FINALISATION (CLUB PROOFS)
+  // Mirrors personal flow so that if votes reach threshold remotely,
+  // we still finalize the proof and update active club state locally.
+  // ------------------------------------------------------------
+  useEffect(() => {
+    if (!currentClub) return;
+    if (!currentClub.proofId) return;
+    if (currentClub.status !== "pendingValidation") return;
+
+    const proofRef = doc(db, "preuves", currentClub.proofId);
+    const unsub = onSnapshot(proofRef, (snap) => {
+      if (!snap.exists()) return;
+
+      const data = snap.data() as any;
+      const votesFor = data.votesFor ?? 0;
+      const votesAgainst = data.votesAgainst ?? 0;
+
+      if (votesFor >= 3 || votesAgainst >= 3) {
+        if (currentClub.proofId) {
+          finalizeProof(currentClub.proofId).catch((err) => {
+            console.warn("[finalizeProof error club]", err);
+          });
+        }
+      }
+    });
+
+    return () => unsub();
+  }, [currentClub?.proofId, currentClub?.status]);
 
 
   // ------------------------------------------------------------
@@ -358,6 +498,82 @@ export function ChallengesProvider({
 
 
   // ------------------------------------------------------------
+  // START A CLUB DEFI (7 days)
+  // ------------------------------------------------------------
+  const startClub = useCallback(async (challenge: Challenge) => {
+    if (!challenge.firestoreId) {
+      console.warn("Missing Firestore ID for club challenge");
+      return;
+    }
+
+    const startedAt = new Date();
+
+    // 🗓️ 7-day expiration
+    const expiresAt = new Date(startedAt.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    const activeData = {
+      defiId: challenge.firestoreId,
+      titre: challenge.title,
+      description: challenge.description,
+      categorie: challenge.category,
+      difficulte:
+        challenge.difficulty === "Facile"
+          ? "facile"
+          : challenge.difficulty === "Moyen"
+          ? "moyen"
+          : "difficile",
+      points: challenge.points,
+
+      startedAt,
+      expiresAt,
+      status: "active",
+
+      // proof-related
+      photoUri: null,
+      photoComment: "",
+      proofId: null,
+      proofSubmitted: false,
+
+      // final phase
+      finalStatus: null,
+      popupPending: false,
+      pointsClaimed: false,
+      progressCount: 0,
+    };
+
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+
+    // Firestore write
+    await import("firebase/firestore").then(async ({ doc, setDoc }) => {
+      await setDoc(
+        doc(db, "users", uid, "activeDefi", "club"),
+        activeData
+      );
+    });
+
+    // local state mirror
+    setCurrentClub({
+      ...challenge,
+      firestoreId: challenge.firestoreId,
+      status: "active",
+      startedAt,
+      expiresAt,
+      audience: "Club",
+      photoUri: null,
+      photoComment: null,
+      proofId: null,
+      proofSubmitted: false,
+      pointsClaimed: false,
+    });
+
+    console.log("[CH] startClub -> new club cycle", {
+      uid,
+      defiId: challenge.firestoreId,
+    });
+  }, []);
+
+  // ------------------------------------------------------------
   // STOP (CANCEL)
   // ------------------------------------------------------------
   const stop = useCallback(async () => {
@@ -404,7 +620,7 @@ console.log("[CH] stop -> reset cycle", { uid: auth.currentUser?.uid });
   proofId,
 });
 
-      // 🔥 RESET validation cycle HERE
+      // 🔥 RESET validation cycle HERE (perso)
       setValidationPhaseDone(false);
 
       setCurrent((p) =>
@@ -426,6 +642,48 @@ console.log("[CH] stop -> reset cycle", { uid: auth.currentUser?.uid });
     [current, activeDefiRef]
   );
 
+  // ------------------------------------------------------------
+  // VALIDATE PHOTO FOR CLUB (mirror of perso)
+  // ------------------------------------------------------------
+  const validateWithPhotoClub = useCallback(
+    async (photoUri: string, comment: string | undefined, proofId: string) => {
+      if (!currentClub || !activeClubDefiRef) return;
+
+      await updateDoc(activeClubDefiRef, {
+        photoUri,
+        photoComment: comment ?? "",
+        status: "pendingValidation",
+        draftProofId: proofId,
+        proofSubmitted: true,
+      });
+
+      console.log("[CH] validateWithPhotoClub -> pendingValidation", {
+        uid: auth.currentUser?.uid,
+        proofId,
+      });
+
+      // 🔥 RESET validation cycle HERE (club)
+      setValidationPhaseDoneClub(false);
+
+      setCurrentClub((p) =>
+        p
+          ? {
+              ...p,
+              status: "pendingValidation",
+              photoUri,
+              photoComment: comment ?? "",
+              proofId,
+              proofSubmitted: true,
+            }
+          : p
+      );
+
+      setReviewCompletedClub(0);
+
+    },
+    [currentClub, activeClubDefiRef]
+  );
+
 
   // ------------------------------------------------------------
   // APPROVE (AFTER GATING)
@@ -435,6 +693,14 @@ console.log("[CH] stop -> reset cycle", { uid: auth.currentUser?.uid });
 
     const dateKey = new Date().toISOString().slice(0, 10);
     addPoints(current.points);
+
+    // 🟢 NEW: real classement points
+    try {
+      const { awardClassementPoints } = await import("@/src/classement/services/awardClassementPoints");
+      await awardClassementPoints(current.points);
+    } catch (e) {
+      console.warn("Failed to award classement points", e);
+    }
 
     setActivities(prev => ({ ...prev, [dateKey]: current.category }));
 
@@ -531,6 +797,20 @@ const setFeedback = useCallback(
     [current, activeDefiRef]
   );
 
+  const setPhotoCommentClub = useCallback(
+    async (comment: string) => {
+      if (!currentClub || !activeClubDefiRef) return;
+
+      await updateDoc(activeClubDefiRef, {
+        photoComment: comment,
+      });
+
+      setCurrentClub((prev) => (prev ? { ...prev, photoComment: comment } : prev));
+    },
+    [currentClub, activeClubDefiRef]
+  );
+
+
   // ------------------------------------------------------------
   // GATING
   // ------------------------------------------------------------
@@ -546,6 +826,43 @@ const setFeedback = useCallback(
     });
   }, [reviewRequiredCount]);
 
+  // Club-specific increment
+  const incrementReviewClub = useCallback(() => {
+    setReviewCompletedClub((p) => {
+      const next = Math.min(p + 1, reviewRequiredCountClub);
+
+      if (next >= reviewRequiredCountClub) {
+        setValidationPhaseDoneClub(true);
+      }
+
+      return next;
+    });
+  }, [reviewRequiredCountClub]);
+
+  // ------------------------------------------------------------
+  // STOP CLUB (cancel club activeDefi)
+  // ------------------------------------------------------------
+  const stopClub = useCallback(async () => {
+    if (!activeClubDefiRef) {
+      console.log("❌ activeClubDefiRef is NULL");
+      return;
+    }
+
+    try {
+      await deleteDoc(activeClubDefiRef);
+      console.log("✔ Successfully deleted Firestore club doc");
+    } catch (err) {
+      console.log("❌ FAILED deleting Firestore club doc:", err);
+    }
+
+    setReviewCompletedClub(0);
+    setReviewRequiredCountClub(3);
+    setValidationPhaseDoneClub(false);
+
+    setCurrentClub(null);
+    console.log("✔ local state currentClub = null");
+  }, [activeClubDefiRef]);
+
 
   // ------------------------------------------------------------
   // VALUE
@@ -553,37 +870,58 @@ const setFeedback = useCallback(
   const value = useMemo(
     () => ({
       current,
+      currentClub,
       start,
+      startClub,
       stop,
+      stopClub,
       validateWithPhoto,
+      validateWithPhotoClub,
       approveCurrent,
       activities,
       canceledIds,
+      // perso validation state
       reviewRequiredCount,
       reviewCompleted,
       incrementReview,
-      setFeedback,
-      setPhotoComment,
-      history,
       setReviewRequiredCount,
-      goToClassement,
-      setGoToClassement,
       validationPhaseDone,
       setValidationPhaseDone,
+      // club validation state
+      reviewRequiredCountClub,
+      reviewCompletedClub,
+      incrementReviewClub,
+      setReviewRequiredCountClub,
+      validationPhaseDoneClub,
+      setValidationPhaseDoneClub,
+      setFeedback,
+      setPhotoComment,
+      setPhotoCommentClub,
+      history,
+      goToClassement,
+      setGoToClassement,
     }),
     [
       current,
+      currentClub,
       start,
       stop,
+      startClub,
       validateWithPhoto,
+      validateWithPhotoClub,
       approveCurrent,
       reviewRequiredCount,
       reviewCompleted,
       incrementReview,
+      validationPhaseDone,
+      reviewRequiredCountClub,
+      reviewCompletedClub,
+      incrementReviewClub,
+      validationPhaseDoneClub,
       setFeedback,
       setPhotoComment,
-      history,
-    ]
+      setPhotoCommentClub,
+      history,    ]
   );
 
     // ------------------------------------------------------------

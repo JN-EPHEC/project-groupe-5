@@ -19,7 +19,14 @@ export type ProofStatus = "pending" | "validated" | "rejected";
 export type ProofDoc = {
   userId: string;
   defiId: string;
-  // 🔥 NEW: difficulty of the défi ("facile" | "moyen" | "difficile")
+
+  // 🔥 NEW: origin of the challenge
+  kind?: "perso" | "club";
+
+  // 🔥 NEW: club of the proof owner (if any)
+  clubId?: string | null;
+
+  // difficulty of the défi ("facile" | "moyen" | "difficile")
   difficulty: "facile" | "moyen" | "difficile";
 
   photoUrl: string;
@@ -86,7 +93,8 @@ export async function pickRandomValidators(
 export async function submitProof(
   defiId: string,
   photoUri: string,
-  commentaire: string
+  commentaire: string,
+  kind: "perso" | "club" = "perso"
 ) {
   const user = auth.currentUser;
   if (!user) throw new Error("Utilisateur non connecté");
@@ -100,14 +108,27 @@ export async function submitProof(
   // 🔥 Récupérer la difficulté depuis le activeDefi de l'utilisateur
   let difficulty: "facile" | "moyen" | "difficile" = "facile";
   try {
+    const activeRefPath = kind === "club" ? "club" : "perso";
     const activeSnap = await getDoc(
-      doc(db, "users", user.uid, "activeDefi", "perso")
+      doc(db, "users", user.uid, "activeDefi", activeRefPath)
     );
     const activeData = activeSnap.data();
     if (activeData?.difficulte === "moyen") difficulty = "moyen";
     else if (activeData?.difficulte === "difficile") difficulty = "difficile";
   } catch (e) {
     console.warn("[proofs] Impossible de lire activeDefi pour la difficulté:", e);
+  }
+
+  // 🔥 NEW: fetch user's clubId once
+  let clubId: string | null = null;
+  try {
+    const userSnap = await getDoc(doc(db, "users", user.uid));
+    const userData = userSnap.data();
+    if (userData && typeof userData.clubId === "string") {
+      clubId = userData.clubId;
+    }
+  } catch (e) {
+    console.warn("[proofs] Impossible de lire le clubId de l'utilisateur:", e);
   }
 
   // 🔥 Choix des validateurs (legacy)
@@ -121,6 +142,10 @@ export async function submitProof(
     commentaire: commentaire ?? "",
     createdAt: serverTimestamp(),
     status: "pending", // ⚠️ on garde le comportement actuel
+
+    // 🔥 NEW: origin / club
+    kind: kind,
+    clubId,                // null or user's club id
 
     assignedValidators: validators,
     votes: {},
@@ -213,16 +238,28 @@ export async function finalizeProof(proofId: string) {
     console.warn("Failed to send challenge result notification", e);
   }
 
-  // Update activeDefi
-  const activeRef = doc(db, "users", uid, "activeDefi", "perso");
+  // Update activeDefi (respect proof kind: perso | club)
+  const kind: "perso" | "club" = (data.kind as any) === "club" ? "club" : "perso";
+  const activeRef = doc(db, "users", uid, "activeDefi", kind === "club" ? "club" : "perso");
 
-  await updateDoc(activeRef, {
-    finalStatus: validated ? "validated" : "rejected",
-    finalProofId: proofId,
-    popupPending: true,     // <-- important for global popup
-    readyToClaim: validated,
-    readyToRetry: rejected,
-  });
+  try {
+    const payload: any = {
+      finalStatus: validated ? "validated" : "rejected",
+      finalProofId: proofId,
+      popupPending: true,
+      readyToClaim: validated,
+      readyToRetry: rejected,
+    };
+
+    await updateDoc(activeRef, payload);
+
+    // If it's a validated club proof, increment the club progress counter
+    if (validated && kind === "club") {
+      await updateDoc(activeRef, { progressCount: increment(1) });
+    }
+  } catch (e) {
+    console.warn("[finalizeProof] failed to update activeDefi (maybe missing):", e);
+  }
 
   // Clean database: delete the proof
   await deleteDoc(ref);

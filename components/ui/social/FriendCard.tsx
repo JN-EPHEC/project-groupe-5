@@ -1,3 +1,4 @@
+// components/ui/social/FriendCard.tsx
 import { FontFamilies } from "@/constants/fonts";
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";

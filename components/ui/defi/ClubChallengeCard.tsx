@@ -1,17 +1,19 @@
+// components/ui/defi/ClubChallengeCard.tsx
 import { useChallenges } from "@/hooks/challenges-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient"; // ✅ Added LinearGradient
 import React, { useEffect, useMemo, useState } from "react";
-import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { CATEGORY_CONFIG } from "./constants";
+import { Image, Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import type { ClubChallenge } from "./types";
 
 type Props = {
   challenge: ClubChallenge;
   participating: boolean;
+  status?: "active" | "pendingValidation" | "validated";
   onParticipate: (id: number) => void;
   onCancel: (id: number) => void;
+  onValidatePhoto?: () => void;
 };
 
 // 🎨 THEME CLUB CHALLENGE CARD
@@ -24,7 +26,7 @@ const clubChallengeTheme = {
   accent: "#008F6B",
 };
 
-export function ClubChallengeCard({ challenge, participating, onParticipate, onCancel }: Props) {
+export function ClubChallengeCard({ challenge, participating, status, onParticipate, onCancel, onValidatePhoto }: Props) {
   const { colors, mode } = useThemeMode();
   const isLight = mode === "light";
   
@@ -33,51 +35,78 @@ export function ClubChallengeCard({ challenge, participating, onParticipate, onC
   const cardMuted = isLight ? clubChallengeTheme.textMuted : colors.mutedText;
   const accentColor = isLight ? clubChallengeTheme.accent : colors.accent;
 
-  // Configuration retrieval with fallback
-  const rawCategory = CATEGORY_CONFIG[challenge.category as keyof typeof CATEGORY_CONFIG];
-  const category = rawCategory || {
-    icon: "help-circle-outline" as any,
-    label: challenge.category || "Divers",
-    color: "#7DCAB0",
-  };
+  // Show club label explicitly and hide points/difficulty for club cards
+  const categoryLabel = "Club";
+  const categoryIcon = "people-outline" as any;
 
+  // Members / progress — UI: hardcoded denominator per design
+  const CLUB_DENOMINATOR = 50;
+  const progressCount = (challenge as any).progressCount ?? 0;
   const [confirmVisible, setConfirmVisible] = useState(false);
-  const { current, reviewCompleted, reviewRequiredCount } = useChallenges();
+  const { currentClub, reviewCompletedClub, reviewRequiredCountClub } = useChallenges();
 
-  // Hide logic
+  // Hide logic — only hide when the club challenge is itself in pendingValidation
+  // and the club validation counters indicate the gate has been reached.
+
   const shouldHide = useMemo(() => {
     if (!participating) return false;
-    if (reviewCompleted >= reviewRequiredCount) {
-      if (current && current.id !== challenge.id) return true;
-    }
-    return false;
-  }, [participating, reviewCompleted, reviewRequiredCount, current, challenge.id]);
 
-  // Countdown logic
+    if (!currentClub || currentClub.status !== "pendingValidation") return false;
+
+    if (reviewRequiredCountClub > 0 && reviewCompletedClub >= reviewRequiredCountClub && currentClub.id !== challenge.id) {
+      return true;
+    }
+
+    return false;
+  }, [participating, reviewCompletedClub, reviewRequiredCountClub, currentClub, challenge.id]);
+
+  if (shouldHide) return null;
+
+  // Countdown logic: next Monday at 12:00
   const [remainingMs, setRemainingMs] = useState<number>(0);
   useEffect(() => {
     if (!participating) return;
-    const computeEndOfDay = () => {
+
+    const computeNextMondayNoon = () => {
       const now = new Date();
-      const end = new Date(now);
-      end.setHours(23, 59, 59, 999);
-      const diff = end.getTime() - now.getTime();
+
+      // Get next Monday (0=Sun .. 1=Mon .. 6=Sat)
+      const day = now.getDay();
+      const daysUntilMonday = (8 - day) % 7; // if today is Monday and before noon -> 0
+
+      const target = new Date(now);
+
+      // If today is Monday and before 12:00, target is today at 12:00
+      if (day === 1 && now.getHours() < 12) {
+        target.setHours(12, 0, 0, 0);
+      } else {
+        const addDays = daysUntilMonday === 0 ? 7 : daysUntilMonday;
+        target.setDate(now.getDate() + addDays);
+        target.setHours(12, 0, 0, 0);
+      }
+
+      const diff = target.getTime() - now.getTime();
       setRemainingMs(Math.max(0, diff));
     };
-    computeEndOfDay();
-    const timer = setInterval(computeEndOfDay, 1000);
+
+    computeNextMondayNoon();
+    const timer = setInterval(computeNextMondayNoon, 1000);
     return () => clearInterval(timer);
   }, [participating]);
 
   const formatTime = (ms: number) => {
     const totalSeconds = Math.floor(ms / 1000);
-    const h = Math.floor(totalSeconds / 3600);
-    const m = Math.floor((totalSeconds % 3600) / 60);
-    const s = totalSeconds % 60;
-    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  };
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
 
-  if (shouldHide) return null;
+    if (days > 0) {
+      return `${days}j ${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m`;
+    }
+
+    return `${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
+  };
 
   // Wrapper Selection
   const Wrapper = isLight ? LinearGradient : View;
@@ -101,26 +130,17 @@ export function ClubChallengeCard({ challenge, participating, onParticipate, onC
 
   return (
     <Wrapper {...(wrapperProps as any)}>
-      <View style={styles.header}>
+      <View style={styles.header}> 
         <View style={[styles.categoryPill, { backgroundColor: isLight ? "rgba(0,143,107,0.1)" : colors.surfaceAlt }]}>
-          <Ionicons name={category.icon} size={14} color={accentColor} />
-          <Text style={[styles.categoryText, { color: accentColor }]}>{category.label}</Text>
-        </View>
-        <View style={[styles.pointsBadge, { backgroundColor: isLight ? "#D1FAE5" : "#1F3A33" }]}>
-          <Ionicons name="leaf" size={14} color={isLight ? "#0F3327" : "#52D192"} />
-          <Text style={[styles.pointsText, { color: isLight ? "#0F3327" : "#52D192" }]}>{challenge.points} pts</Text>
+          <Ionicons name={categoryIcon} size={14} color={accentColor} />
+          <Text style={[styles.categoryText, { color: accentColor }]}>{categoryLabel}</Text>
         </View>
       </View>
 
       <Text style={[styles.title, { color: cardText }]}>{challenge.title}</Text>
       <Text style={[styles.description, { color: cardMuted }]}>{challenge.description}</Text>
 
-      <View style={styles.counterRow}>
-        <Ionicons name="people-outline" size={16} color={cardMuted} />
-        <Text style={[styles.counterText, { color: cardMuted }]}>
-          {challenge.participants}/{challenge.goalParticipants} participants
-        </Text>
-      </View>
+
 
       {participating && (
         <LinearGradient
@@ -128,26 +148,66 @@ export function ClubChallengeCard({ challenge, participating, onParticipate, onC
             style={[styles.timerPill, { borderColor: isLight ? "#BBF7D0" : "rgba(0, 151, 178, 0.4)" }]}
         >
           <Ionicons name="time-outline" size={18} color={accentColor} />
-          <Text style={[styles.timerText, { color: cardText }]}>
-            Temps restant aujourd'hui: {formatTime(remainingMs)}
-          </Text>
+          <Text style={[styles.timerText, { color: cardText }]}>Temps restant jusqu'à lundi 12:00 : {formatTime(remainingMs)}</Text>
         </LinearGradient>
+      )}
+
+      {/* 🟢 CLUB PROGRESSION BAR */}
+      {participating && (
+        <View style={{ marginTop: 14 }}>
+          <Text style={{ color: cardText, fontWeight: "700", marginBottom: 6 }}>Progression du club</Text>
+
+          <View style={{ height: 10, borderRadius: 8, backgroundColor: isLight ? "#E5E7EB" : "#0f1f1b", overflow: "hidden" }}>
+            <View style={{ width: `${Math.round((progressCount / CLUB_DENOMINATOR) * 100)}%`, height: "100%", backgroundColor: accentColor }} />
+          </View>
+
+          <Text style={{ color: cardMuted, marginTop: 4 }}>{progressCount}/{CLUB_DENOMINATOR} membres ont validé</Text>
+        </View>
       )}
 
       <View style={{ marginTop: 20 }}>
         {participating ? (
           <>
-            <View style={[styles.ongoingPill, { borderColor: accentColor, backgroundColor: isLight ? "#ECFDF5" : "#142822" }]}>
-              <Text style={[styles.ongoingText, { color: accentColor }]}>Défi en cours</Text>
-              <Ionicons name="checkmark-circle" size={18} color={accentColor} style={{ marginLeft: 8 }} />
-            </View>
-            <TouchableOpacity
-              style={[styles.cancelBtn, { borderColor: "#FCA5A5", backgroundColor: isLight ? "#FEF2F2" : "#2A171A", marginTop: 12 }]}
-              onPress={() => setConfirmVisible(true)}
-            >
-              <Text style={[styles.cancelText, { color: "#EF4444" }]}>Annuler le défi</Text>
-              <Ionicons name="close-circle" size={18} color="#EF4444" style={{ marginLeft: 8 }} />
-            </TouchableOpacity>
+            {/* Photo validation button (mirror perso) */}
+            {status === "active" && onValidatePhoto && (
+              <TouchableOpacity
+                style={[styles.shadowBtn]}
+                onPress={onValidatePhoto}
+                activeOpacity={0.9}
+              >
+                <LinearGradient
+                    colors={isLight ? ["#34D399", "#059669"] : [colors.accent, colors.accent]}
+                    style={styles.photoBtn}
+                >
+                    <Ionicons name="camera" size={20} color="#FFF" style={{ marginRight: 8 }} />
+                    <Text style={styles.photoBtnText}>Valider avec photo</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+
+            {/* If proof submitted (pendingValidation), show the proof preview */}
+            {status === "pendingValidation" && (
+              <View style={{ marginTop: 8 }}>
+                <View style={[styles.proofContainer, { borderColor: isLight ? "#fff" : "#333" }]}>
+                    <Image source={{ uri: (challenge as any).photoUri || "" }} style={{ height: 180, width: '100%' }} resizeMode="cover" />
+                </View>
+
+                {/* Pending status — mirror perso: user cannot cancel after proof submitted */}
+                <View style={{ marginTop: 10, borderRadius: 12, padding: 12, backgroundColor: isLight ? "#FFFBEB" : "#2A2617", borderWidth: 1, borderColor: "#FCD34D" }}>
+                  <Text style={{ color: "#D97706", fontWeight: "700" }}>Ta preuve est en cours de validation</Text>
+                </View>
+              </View>
+            )}
+
+            {status !== "pendingValidation" && (
+              <TouchableOpacity
+                style={[styles.cancelBtn, { borderColor: "#FCA5A5", backgroundColor: isLight ? "#FEF2F2" : "#2A171A", marginTop: 12 }]}
+                onPress={() => setConfirmVisible(true)}
+              >
+                <Text style={[styles.cancelText, { color: "#EF4444" }]}>Annuler le défi</Text>
+                <Ionicons name="close-circle" size={18} color="#EF4444" style={{ marginLeft: 8 }} />
+              </TouchableOpacity>
+            )}
           </>
         ) : (
           <TouchableOpacity
@@ -265,6 +325,18 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   timerText: { fontWeight: "600", fontSize: 14 },
+  shadowBtn: {
+    shadowColor: "#000", shadowOpacity: 0.15, shadowOffset: {width: 0, height: 4}, shadowRadius: 8, elevation: 3
+  },
+  photoBtn: {
+    borderRadius: 18,
+    paddingVertical: 12,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  photoBtnText: { color: "#FFF", fontWeight: "700", fontSize: 16 },
+  proofContainer: { borderWidth: 1, borderRadius: 12, overflow: "hidden" },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.4)",

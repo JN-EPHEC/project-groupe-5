@@ -1,8 +1,9 @@
+// app/camera.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from 'expo-image-picker'; // ✅ AJOUT: Galerie
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useRef, useState } from "react";
 import {
   Alert,
@@ -29,6 +30,8 @@ export default function CameraScreen() {
   const cameraRef = useRef<CameraView>(null);
   const [facing, setFacing] = useState<"back" | "front">("back");
   const router = useRouter();
+  const params = useLocalSearchParams<{ id?: string; kind?: "perso" | "club" }>();
+  const incomingKind = Array.isArray(params.kind) ? params.kind[0] : params.kind;
   const [navigating, setNavigating] = useState(false);
   const insets = useSafeAreaInsets();
 
@@ -160,7 +163,7 @@ export default function CameraScreen() {
                         const uriToSend = photoUri;
                         router.push({
                             pathname: "/commentaire",
-                            params: { photoUri: uriToSend },
+                            params: { photoUri: uriToSend, kind: incomingKind },
                         });
                         setTimeout(() => {
                             setPhotoUri(null);

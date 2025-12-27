@@ -58,7 +58,7 @@ export function PointsProvider({ children }: { children: ReactNode }) {
       try {
         const userRef = doc(db, "users", user.uid);
         await updateDoc(userRef, {
-          points: increment(delta),
+          rankingPoints: increment(delta),
         });
       } catch (error) {
         console.warn("Impossible de synchroniser les points", error);
