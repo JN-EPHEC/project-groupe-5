@@ -45,12 +45,23 @@ export function ClubChallengeCard({ challenge, participating, onParticipate, onC
   const [confirmVisible, setConfirmVisible] = useState(false);
   const { current, reviewCompleted, reviewRequiredCount } = useChallenges();
 
-  // Hide logic
+  // Hide logic — only hide while the user has an active personal challenge
+  // in the "pendingValidation" state and the review threshold has been met.
+  // This prevents starting an unrelated personal challenge (status "active")
+  // from inadvertently hiding the club card when `reviewRequiredCount` is 0.
   const shouldHide = useMemo(() => {
     if (!participating) return false;
-    if (reviewCompleted >= reviewRequiredCount) {
-      if (current && current.id !== challenge.id) return true;
+
+    // Only consider hiding if there is an active personal challenge
+    // that is currently awaiting validation.
+    if (!current || current.status !== "pendingValidation") return false;
+
+    // Only hide when there is a meaningful required-review count
+    // and the reviews have been completed for that personal challenge.
+    if (reviewRequiredCount > 0 && reviewCompleted >= reviewRequiredCount && current.id !== challenge.id) {
+      return true;
     }
+
     return false;
   }, [participating, reviewCompleted, reviewRequiredCount, current, challenge.id]);
 
@@ -133,6 +144,47 @@ export function ClubChallengeCard({ challenge, participating, onParticipate, onC
             Temps restant aujourd'hui: {formatTime(remainingMs)}
           </Text>
         </LinearGradient>
+      )}
+
+      {/* 🟢 CLUB PROGRESSION BAR */}
+      {participating && (
+        <View style={{ marginTop: 14 }}>
+          <Text
+            style={{
+              color: cardText,
+              fontWeight: "700",
+              marginBottom: 6,
+            }}
+          >
+            Progression du club
+          </Text>
+
+          <View
+            style={{
+              height: 10,
+              borderRadius: 8,
+              backgroundColor: isLight ? "#E5E7EB" : "#0f1f1b",
+              overflow: "hidden",
+            }}
+          >
+            <View
+              style={{
+                width: `${Math.round((12 / 50) * 100)}%`, // temporary
+                height: "100%",
+                backgroundColor: accentColor,
+              }}
+            />
+          </View>
+
+          <Text
+            style={{
+              color: cardMuted,
+              marginTop: 4,
+            }}
+          >
+            12/50 membres ont validé
+          </Text>
+        </View>
       )}
 
       <View style={{ marginTop: 20 }}>

@@ -21,6 +21,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ChallengeCard } from "@/components/ui/defi/ChallengeCard";
+import { ClubChallengeCard } from "@/components/ui/defi/ClubChallengeCard";
 import { TabSwitcher } from "@/components/ui/defi/TabSwitcher";
 import { ValidationCard } from "@/components/ui/defi/ValidationCard";
 import { useChallenges } from "@/hooks/challenges-context";
@@ -503,32 +504,44 @@ export default function DefiScreen() {
               )
             )}
 
-            {!gatingActive &&
-              challengesToDisplay.map((challenge: any) => {
-                return (
+            {!gatingActive && (
+              <>
+                {current ? (
+                  // ---------- ACTIVE PERSO CHALLENGE ----------
                   <ChallengeCard
-                    key={challenge.id}
-                    challenge={challenge}
+                    key={current.id}
+                    challenge={current}
                     categorie="personnel"
-                    isOngoing={current?.id === challenge.id}
-                    status={current?.id === challenge.id ? current?.status : undefined}
-                    // 👇 Utilisation de la nouvelle fonction qui lance la pub
+                    isOngoing={true}
+                    status={current.status}
                     onToggle={toggleOngoing}
-                    onReport={() => handleOpenReport(
-                      challenge.firestoreId || String(challenge.id),
-                      challenge.title,
-                      challenge.firestoreId || String(challenge.id)
-                    )}
                     onValidatePhoto={
-                      current &&
-                        current.id === challenge.id &&
-                        current.status === "active"
-                        ? () => openCamera(challenge.id)
+                      current.status === "active"
+                        ? () => openCamera(current.id as number)
                         : undefined
                     }
                   />
-                );
-              })}
+                ) : (
+                  // ---------- LIST OF AVAILABLE PERSO CHALLENGES ----------
+                  rotatingChallenges.map((challenge: any) => (
+                    <ChallengeCard
+                      key={challenge.id}
+                      challenge={challenge}
+                      categorie="personnel"
+                      isOngoing={false}
+                      onToggle={toggleOngoing}
+                      onReport={() =>
+                        handleOpenReport(
+                          challenge.firestoreId || String(challenge.id),
+                          challenge.title,
+                          challenge.firestoreId || String(challenge.id)
+                        )
+                      }
+                    />
+                  ))
+                )}
+              </>
+            )}
 
             {current &&
               current.status === "pendingValidation" &&
@@ -701,39 +714,44 @@ export default function DefiScreen() {
           </>
         )}
 
-        {(activeTab === "club" && viewMode === 'defis') && (
+        {(activeTab === "club" && viewMode === "defis") && (
           <View style={{ paddingTop: 20 }}>
-            {clubChallenges.length === 0 ? (
-              <Text style={{ color: colors.mutedText, textAlign: "center", marginTop: 20 }}>
-                Aucun défi de club actif pour le moment.
-              </Text>
-            ) : (
-              clubChallenges.map((challenge) => (
-                <ChallengeCard
-                  key={challenge.id}
-                  challenge={challenge}
-                  categorie="club"
-                  isOngoing={currentClub?.id === challenge.id}
-                  status={currentClub?.id === challenge.id ? currentClub.status : undefined}                  // 👇 Pub pour défi club aussi
-                  onToggle={toggleOngoing}
-                  onReport={() => handleOpenReport(
-                    challenge.firestoreId || String(challenge.id),
-                    challenge.title,
-                    challenge.firestoreId || String(challenge.id)
-                  )}
-                  onValidatePhoto={
-                    currentClub &&
-                    currentClub.id === challenge.id &&
-                    currentClub.status === "active"
-                    ? () => openCamera(challenge.id)
-                    : undefined
-                  }
+            {currentClub ? (
+              <>
+                {/* ACTIVE CLUB CHALLENGE CARD */}
+                <ClubChallengeCard
+                  challenge={{
+                    ...currentClub,
+                    participants: 12,          // temporary static values
+                    goalParticipants: 50,      // will soon be dynamic
+                  }}
+                  participating={true}
+                  onParticipate={() => {}}
+                  onCancel={() => {}}
                 />
-              ))
+              </>
+            ) : (
+              // LIST OF CLUB CHALLENGES WHEN NONE ACTIVE
+              <>
+                {clubChallenges.length === 0 ? (
+                  <Text style={{ color: colors.mutedText, textAlign: "center", marginTop: 20 }}>
+                    Aucun défi de club actif pour le moment.
+                  </Text>
+                ) : (
+                  clubChallenges.map((challenge) => (
+                    <ChallengeCard
+                      key={challenge.id}
+                      challenge={challenge}
+                      categorie="club"
+                      isOngoing={false}
+                      onToggle={toggleOngoing}
+                    />
+                  ))
+                )}
+              </>
             )}
           </View>
         )}
-
       </ScrollView>
 
       {/* MODAL SIGNALEMENT */}
