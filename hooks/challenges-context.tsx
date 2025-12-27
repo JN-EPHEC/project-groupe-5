@@ -1,11 +1,11 @@
 // hooks/challenges-context.ts
 import React, {
-    createContext,
-    useCallback,
-    useContext,
-    useEffect,
-    useMemo,
-    useState,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
 } from "react";
 
 import { Challenge } from "@/components/ui/defi/types";
@@ -18,12 +18,12 @@ import { useRouter } from "expo-router";
 // Remplace la ligne d'import existante par celle-ci :
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
-    addDoc,
-    collection,
-    deleteDoc,
-    doc,
-    onSnapshot,
-    updateDoc
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  updateDoc
 } from "firebase/firestore";
 
 
@@ -693,6 +693,14 @@ console.log("[CH] stop -> reset cycle", { uid: auth.currentUser?.uid });
 
     const dateKey = new Date().toISOString().slice(0, 10);
     addPoints(current.points);
+
+    // 🟢 NEW: real classement points
+    try {
+      const { awardClassementPoints } = await import("@/src/classement/services/awardClassementPoints");
+      await awardClassementPoints(current.points);
+    } catch (e) {
+      console.warn("Failed to award classement points", e);
+    }
 
     setActivities(prev => ({ ...prev, [dateKey]: current.category }));
 

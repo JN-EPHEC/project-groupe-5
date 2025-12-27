@@ -1,3 +1,4 @@
+// components/ui/social/ClubCard.tsx
 import { GradientButton } from "@/components/ui/common/GradientButton";
 import { FontFamilies } from "@/constants/fonts";
 import { useThemeMode } from "@/hooks/theme-context";

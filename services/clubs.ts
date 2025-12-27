@@ -1,3 +1,4 @@
+// services/clubs.ts
 import { auth, db, storage } from "@/firebaseConfig";
 import {
   arrayRemove,

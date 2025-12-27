@@ -1,3 +1,4 @@
+// hooks/friends-context.tsx
 import { db } from "@/firebaseConfig";
 import { collection, doc, onSnapshot } from "firebase/firestore";
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
@@ -39,7 +40,10 @@ function buildFriend(id: string, payload: Record<string, any> | undefined): Frie
   return {
     id,
     name: fallbackName,
-    points: typeof payload?.points === "number" ? payload.points : 0,
+    points:
+      typeof payload?.rankingPoints === "number"
+        ? payload.rankingPoints
+        : (typeof payload?.points === "number" ? payload.points : 0),
     online: Boolean(payload?.online),
     avatar: avatarUrl,
   };

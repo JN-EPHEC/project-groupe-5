@@ -10,7 +10,6 @@ import { addDoc, collection, getDocs, serverTimestamp } from "firebase/firestore
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
-  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -37,6 +36,7 @@ import { RewardDistributionModal } from "@/src/classement/components/RewardDistr
 import { useClassement } from "@/src/classement/hooks/useClassement";
 
 
+import { ClubClassementList } from "@/src/clubClassement/components/ClubClassementList";
 import { AVPlaybackStatus, ResizeMode, Video } from "expo-av";
 import { LinearGradient } from "expo-linear-gradient";
 import { Modal } from "react-native";
@@ -456,7 +456,7 @@ export default function DefiScreen() {
       <ScrollView
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 140 }}
+        contentContainerStyle={{ paddingBottom: 220 }}
       >
         {(activeTab === "perso" && viewMode === 'defis') && (
           <>
@@ -697,48 +697,7 @@ export default function DefiScreen() {
                     </View>
                   </View>
                 </View>
-                {(() => {
-                  const clubs: Array<{ name: string; pts: number; isMine?: boolean; avatar: string }> = [];
-                  if (joinedClub) {
-                    const totalClubPts = members.reduce((sum, m: any) => sum + (m.points || 0), 0);
-                    clubs.push({ name: joinedClub.name ?? 'Mon club', pts: totalClubPts, isMine: true, avatar: joinedClub.logo || 'https://api.dicebear.com/8.x/shapes/svg?seed=myclub' });
-                  }
-                  const mockClubNames = ['Les Écogardiens', 'Verte Équipe', 'Planète Propre', 'Zéro Déchet Squad', 'Les Tri-Héros', 'Green Sparks', 'Eco Runner', 'TerraFriends', 'BlueLeaf', 'GreenMinds'];
-                  while (clubs.length < 50) {
-                    const name = mockClubNames[(clubs.length) % mockClubNames.length] + ' ' + (Math.floor(Math.random() * 90) + 10);
-                    const pts = Math.floor(Math.random() * 5000) + 200;
-                    const avatar = `https://api.dicebear.com/8.x/shapes/svg?seed=${encodeURIComponent(name)}`;
-                    clubs.push({ name, pts, avatar });
-                  }
-                  const sorted = clubs.sort((a, b) => b.pts - a.pts).slice(0, 50);
-                  const myIndex = sorted.findIndex(c => c.isMine);
-                  return (
-                    <View style={{ marginTop: 12 }}>
-                      {sorted.map((c, idx) => {
-                        const isMine = c.isMine;
-                        const rankColor = idx === 0 ? '#52D192' : idx === 1 ? '#F6D365' : idx === 2 ? '#F45B69' : colors.surfaceAlt;
-                        return (
-                          <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 14, marginBottom: 8, backgroundColor: isMine ? '#1A2F28' : colors.surfaceAlt }}>
-                            <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: rankColor, alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
-                              <Text style={{ color: '#0F3327', fontWeight: '800' }}>{idx + 1}</Text>
-                            </View>
-                            <Image source={{ uri: c.avatar }} style={{ width: 28, height: 28, borderRadius: 14, marginRight: 10 }} />
-                            <View style={{ flex: 1 }}>
-                              <Text style={{ color: colors.text, fontWeight: isMine ? '800' : '600' }}>{c.name}</Text>
-                              {isMine && <Text style={{ color: colors.mutedText, fontSize: 12 }}>Ton club</Text>}
-                            </View>
-                            <View style={{ backgroundColor: '#D4F7E7', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6 }}>
-                              <Text style={{ color: '#0F3327', fontWeight: '800' }}>{c.pts} pts</Text>
-                            </View>
-                          </View>
-                        );
-                      })}
-                      <View style={{ marginTop: 8, borderTopWidth: 1, borderColor: colors.surfaceAlt, paddingTop: 8 }}>
-                        <Text style={{ color: colors.text, fontWeight: '700' }}>Position club: {myIndex >= 0 ? myIndex + 1 : '—'}</Text>
-                      </View>
-                    </View>
-                  );
-                })()}
+                {activeTab === "club" && <ClubClassementList />}
               </LinearGradient>
             )}
           </>
