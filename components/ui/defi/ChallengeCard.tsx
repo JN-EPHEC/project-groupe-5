@@ -1,6 +1,7 @@
 // components/ui/defi/ChallengeCard.tsx
 import { useChallenges } from "@/hooks/challenges-context";
 import { useThemeMode } from "@/hooks/theme-context";
+import { useClub } from "@/hooks/club-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useMemo, useState } from "react";
@@ -62,6 +63,12 @@ export function ChallengeCard({
     }
     return false;
   }, [isOngoing, reviewCompleted, reviewRequiredCount, current, challenge.id]);
+
+  // For club list items, display a small progress bar (0 / clubMemberCount)
+  // without mentioning points or difficulty (UI parity requirement).
+  const { joinedClub, members } = useClub();
+  const clubMemberCount = joinedClub?.participants ?? members.length ?? 50; // final fallback to 50
+  const clubProgressValue = 0; // list items show zero until a club cycle is active
 
   const isLightMode = mode === "light";
   
@@ -138,17 +145,21 @@ export function ChallengeCard({
               <Text style={[styles.pillText, { color: accentColor }]}>{categoryLabel}</Text>
             </View>
 
-            {/* 2. Difficulté (Déplacé ici) */}
-            <View style={[styles.pill, { backgroundColor: diffStyle.bg }]}>
-                <Ionicons name="speedometer-outline" size={13} color={diffStyle.text} />
-                <Text style={[styles.pillText, { color: diffStyle.text }]}>{challenge.difficulty}</Text>
-            </View>
+            {/* 2. Difficulté (only for personal) */}
+            {categorie === "personnel" && (
+              <View style={[styles.pill, { backgroundColor: diffStyle.bg }]}>
+                  <Ionicons name="speedometer-outline" size={13} color={diffStyle.text} />
+                  <Text style={[styles.pillText, { color: diffStyle.text }]}>{challenge.difficulty}</Text>
+              </View>
+            )}
 
-            {/* 3. Points */}
-            <View style={[styles.pill, { backgroundColor: isLightMode ? "#D1FAE5" : "#1F3A33" }]}>
-              <Ionicons name="leaf" size={13} color={isLightMode ? "#0F3327" : "#52D192"} />
-              <Text style={[styles.pillText, { color: isLightMode ? "#0F3327" : "#52D192" }]}>{challenge.points} pts</Text>
-            </View>
+            {/* 3. Points (only for personal) */}
+            {categorie === "personnel" && (
+              <View style={[styles.pill, { backgroundColor: isLightMode ? "#D1FAE5" : "#1F3A33" }]}>
+                <Ionicons name="leaf" size={13} color={isLightMode ? "#0F3327" : "#52D192"} />
+                <Text style={[styles.pillText, { color: isLightMode ? "#0F3327" : "#52D192" }]}>{challenge.points} pts</Text>
+              </View>
+            )}
         </View>
 
         {onReport && (
@@ -167,13 +178,34 @@ export function ChallengeCard({
 
       {/* Bouton RELEVER (Si inactif) */}
       {!isOngoing && (
-        <TouchableOpacity
-            onPress={() => onToggle(challenge.id)}
-            style={[styles.mainBtn, { backgroundColor: accentColor }]}
-        >
-            <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 14 }}>Relever</Text>
-            <Ionicons name="arrow-forward" size={16} color="#FFF" />
-        </TouchableOpacity>
+        <>
+          {categorie === "club" ? (
+            // Club list item: show small progress bar under the description
+            <>
+              <View style={{ marginTop: 12 }}>
+                <View style={{ height: 8, backgroundColor: isLightMode ? "#E5E7EB" : colors.surfaceAlt, borderRadius: 6, overflow: "hidden" }}>
+                  <View style={{ width: `${Math.round((clubProgressValue / clubMemberCount) * 100)}%`, height: "100%", backgroundColor: accentColor }} />
+                </View>
+                <Text style={{ color: cardMuted, marginTop: 6, fontSize: 13 }}>{clubProgressValue}/{clubMemberCount} membres ont validé</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => onToggle(challenge.id)}
+                style={[styles.mainBtn, { backgroundColor: accentColor, marginTop: 12 }]}
+              >
+                <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 14 }}>Relever</Text>
+                <Ionicons name="arrow-forward" size={16} color="#FFF" />
+              </TouchableOpacity>
+            </>
+          ) : (
+            <TouchableOpacity
+                onPress={() => onToggle(challenge.id)}
+                style={[styles.mainBtn, { backgroundColor: accentColor }]}
+            >
+                <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 14 }}>Relever</Text>
+                <Ionicons name="arrow-forward" size={16} color="#FFF" />
+            </TouchableOpacity>
+          )}
+        </>
       )}
 
       {/* --- ACTIONS (Si Actif) --- */}

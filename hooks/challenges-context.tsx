@@ -333,14 +333,13 @@ export function ChallengesProvider({
       variant: isSuccess ? "success" : "error",
       title: isSuccess ? "Défi de club validé 🎉" : "Preuve refusée",
       description: isSuccess
-        ? `Le défi de ton club a progressé (${currentClub.points} pts).`
+        ? `Le défi de ton club a progressé.`
         : "La preuve du club a été refusée.",
-      primaryLabel: isSuccess ? "Voir le classement" : "Fermer",
+      // For club flows we don't award points or redirect to classement
+      primaryLabel: "Fermer",
       secondaryLabel: "Fermer",
       onPrimary: async () => {
-        if (isSuccess) {
-          setGoToClassement(true);
-        }
+        // No-op for club success — simply close the popup
       },
       onSecondary: () => {
         // Just close popup
@@ -392,6 +391,36 @@ export function ChallengesProvider({
     return () => unsub();
   }, [current?.proofId, current?.status]);
 
+
+  // ------------------------------------------------------------
+  // AUTO-FINALISATION (CLUB PROOFS)
+  // Mirrors personal flow so that if votes reach threshold remotely,
+  // we still finalize the proof and update active club state locally.
+  // ------------------------------------------------------------
+  useEffect(() => {
+    if (!currentClub) return;
+    if (!currentClub.proofId) return;
+    if (currentClub.status !== "pendingValidation") return;
+
+    const proofRef = doc(db, "preuves", currentClub.proofId);
+    const unsub = onSnapshot(proofRef, (snap) => {
+      if (!snap.exists()) return;
+
+      const data = snap.data() as any;
+      const votesFor = data.votesFor ?? 0;
+      const votesAgainst = data.votesAgainst ?? 0;
+
+      if (votesFor >= 3 || votesAgainst >= 3) {
+        if (currentClub.proofId) {
+          finalizeProof(currentClub.proofId).catch((err) => {
+            console.warn("[finalizeProof error club]", err);
+          });
+        }
+      }
+    });
+
+    return () => unsub();
+  }, [currentClub?.proofId, currentClub?.status]);
 
 
   // ------------------------------------------------------------

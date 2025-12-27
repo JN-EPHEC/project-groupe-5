@@ -1,10 +1,11 @@
 // components/ui/defi/ClubChallengeCard.tsx
 import { useChallenges } from "@/hooks/challenges-context";
 import { useThemeMode } from "@/hooks/theme-context";
+import { useClub } from "@/hooks/club-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient"; // ✅ Added LinearGradient
 import React, { useEffect, useMemo, useState } from "react";
-import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { CATEGORY_CONFIG } from "./constants";
 import type { ClubChallenge } from "./types";
 
@@ -36,14 +37,15 @@ export function ClubChallengeCard({ challenge, participating, status, onParticip
   const cardMuted = isLight ? clubChallengeTheme.textMuted : colors.mutedText;
   const accentColor = isLight ? clubChallengeTheme.accent : colors.accent;
 
-  // Configuration retrieval with fallback
-  const rawCategory = CATEGORY_CONFIG[challenge.category as keyof typeof CATEGORY_CONFIG];
-  const category = rawCategory || {
-    icon: "help-circle-outline" as any,
-    label: challenge.category || "Divers",
-    color: "#7DCAB0",
-  };
+  // Show club label explicitly and hide points/difficulty for club cards
+  const categoryLabel = "Club";
+  const categoryIcon = "people-outline" as any;
 
+  // Members / progress
+  const { joinedClub, members } = useClub();
+  const clubMemberCount = joinedClub?.participants ?? members.length ?? 50;
+  // progressCount may come from active currentClub or be passed as part of `challenge`
+  const progressCount = (challenge as any).progressCount ?? 0;
   const [confirmVisible, setConfirmVisible] = useState(false);
   const { currentClub, reviewCompletedClub, reviewRequiredCountClub } = useChallenges();
 
@@ -64,28 +66,50 @@ export function ClubChallengeCard({ challenge, participating, status, onParticip
 
   if (shouldHide) return null;
 
-  // Countdown logic
+  // Countdown logic: next Monday at 12:00
   const [remainingMs, setRemainingMs] = useState<number>(0);
   useEffect(() => {
     if (!participating) return;
-    const computeEndOfDay = () => {
+
+    const computeNextMondayNoon = () => {
       const now = new Date();
-      const end = new Date(now);
-      end.setHours(23, 59, 59, 999);
-      const diff = end.getTime() - now.getTime();
+
+      // Get next Monday (0=Sun .. 1=Mon .. 6=Sat)
+      const day = now.getDay();
+      const daysUntilMonday = (8 - day) % 7; // if today is Monday and before noon -> 0
+
+      const target = new Date(now);
+
+      // If today is Monday and before 12:00, target is today at 12:00
+      if (day === 1 && now.getHours() < 12) {
+        target.setHours(12, 0, 0, 0);
+      } else {
+        const addDays = daysUntilMonday === 0 ? 7 : daysUntilMonday;
+        target.setDate(now.getDate() + addDays);
+        target.setHours(12, 0, 0, 0);
+      }
+
+      const diff = target.getTime() - now.getTime();
       setRemainingMs(Math.max(0, diff));
     };
-    computeEndOfDay();
-    const timer = setInterval(computeEndOfDay, 1000);
+
+    computeNextMondayNoon();
+    const timer = setInterval(computeNextMondayNoon, 1000);
     return () => clearInterval(timer);
   }, [participating]);
 
   const formatTime = (ms: number) => {
     const totalSeconds = Math.floor(ms / 1000);
-    const h = Math.floor(totalSeconds / 3600);
-    const m = Math.floor((totalSeconds % 3600) / 60);
-    const s = totalSeconds % 60;
-    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    if (days > 0) {
+      return `${days}j ${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m`;
+    }
+
+    return `${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
   };
 
   // Wrapper Selection
@@ -110,14 +134,10 @@ export function ClubChallengeCard({ challenge, participating, status, onParticip
 
   return (
     <Wrapper {...(wrapperProps as any)}>
-      <View style={styles.header}>
+      <View style={styles.header}> 
         <View style={[styles.categoryPill, { backgroundColor: isLight ? "rgba(0,143,107,0.1)" : colors.surfaceAlt }]}>
-          <Ionicons name={category.icon} size={14} color={accentColor} />
-          <Text style={[styles.categoryText, { color: accentColor }]}>{category.label}</Text>
-        </View>
-        <View style={[styles.pointsBadge, { backgroundColor: isLight ? "#D1FAE5" : "#1F3A33" }]}>
-          <Ionicons name="leaf" size={14} color={isLight ? "#0F3327" : "#52D192"} />
-          <Text style={[styles.pointsText, { color: isLight ? "#0F3327" : "#52D192" }]}>{challenge.points} pts</Text>
+          <Ionicons name={categoryIcon} size={14} color={accentColor} />
+          <Text style={[styles.categoryText, { color: accentColor }]}>{categoryLabel}</Text>
         </View>
       </View>
 
@@ -138,7 +158,7 @@ export function ClubChallengeCard({ challenge, participating, status, onParticip
         >
           <Ionicons name="time-outline" size={18} color={accentColor} />
           <Text style={[styles.timerText, { color: cardText }]}>
-            Temps restant aujourd'hui: {formatTime(remainingMs)}
+            Temps restant jusqu'à lundi 12:00 : {formatTime(remainingMs)}
           </Text>
         </LinearGradient>
       )}
@@ -166,7 +186,7 @@ export function ClubChallengeCard({ challenge, participating, status, onParticip
           >
             <View
               style={{
-                width: `${Math.round((12 / 50) * 100)}%`, // temporary
+                width: `${Math.round((progressCount / clubMemberCount) * 100)}%`,
                 height: "100%",
                 backgroundColor: accentColor,
               }}
@@ -179,7 +199,7 @@ export function ClubChallengeCard({ challenge, participating, status, onParticip
               marginTop: 4,
             }}
           >
-            12/50 membres ont validé
+            {progressCount}/{clubMemberCount} membres ont validé
           </Text>
         </View>
       )}
@@ -187,11 +207,6 @@ export function ClubChallengeCard({ challenge, participating, status, onParticip
       <View style={{ marginTop: 20 }}>
         {participating ? (
           <>
-            <View style={[styles.ongoingPill, { borderColor: accentColor, backgroundColor: isLight ? "#ECFDF5" : "#142822" }]}>
-              <Text style={[styles.ongoingText, { color: accentColor }]}>{status === "active" ? "Défi en cours" : (status === "pendingValidation" ? "En attente de validation" : "Défi en cours")}</Text>
-              <Ionicons name="checkmark-circle" size={18} color={accentColor} style={{ marginLeft: 8 }} />
-            </View>
-
             {/* Photo validation button (mirror perso) */}
             {status === "active" && onValidatePhoto && (
               <TouchableOpacity
@@ -207,6 +222,15 @@ export function ClubChallengeCard({ challenge, participating, status, onParticip
                     <Text style={styles.photoBtnText}>Valider avec photo</Text>
                 </LinearGradient>
               </TouchableOpacity>
+            )}
+
+            {/* If proof submitted (pendingValidation), show the proof preview */}
+            {status === "pendingValidation" && (
+              <View style={{ marginTop: 8 }}>
+                <View style={[styles.proofContainer, { borderColor: isLight ? "#fff" : "#333" }]}>
+                    <Image source={{ uri: (challenge as any).photoUri || "" }} style={{ height: 180, width: '100%' }} resizeMode="cover" />
+                </View>
+              </View>
             )}
 
             <TouchableOpacity
@@ -344,6 +368,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   photoBtnText: { color: "#FFF", fontWeight: "700", fontSize: 16 },
+  proofContainer: { borderWidth: 1, borderRadius: 12, overflow: "hidden" },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.4)",
