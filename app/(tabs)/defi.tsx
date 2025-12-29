@@ -30,11 +30,11 @@ import { voteOnProof } from "@/services/proofs";
 import { Challenge, TabKey } from "@/components/ui/defi/types";
 import { db } from "@/firebaseConfig";
 import { useUser } from "@/hooks/user-context";
+import { subscribeToAdRequests } from "@/services/adBridge";
 import { sendReport } from "@/services/reports";
 import { ClassementList } from "@/src/classement/components/ClassementList";
 import { RewardDistributionModal } from "@/src/classement/components/RewardDistributionModal";
 import { useClassement } from "@/src/classement/hooks/useClassement";
-
 
 import { ClubClassementList } from "@/src/clubClassement/components/ClubClassementList";
 import { AVPlaybackStatus, ResizeMode, Video } from "expo-av";
@@ -83,7 +83,7 @@ export default function DefiScreen() {
   
   // --- GESTION DES PUBS ---
   const [showAd, setShowAd] = useState(false);
-  const [adScenario, setAdScenario] = useState<"start_challenge" | "claim_reward" | null>(null);
+  const [adScenario, setAdScenario] = useState<"start_challenge" | "claim_reward" | "claim_points" | null>(null);
   const [pendingChallengeId, setPendingChallengeId] = useState<number | null>(null); // Stocke l'ID du défi en attente de pub
 
   const [rewardModalVisible, setRewardModalVisible] = useState(false);
@@ -93,6 +93,7 @@ export default function DefiScreen() {
   // --- ÉTATS POUR LA PUB ---
   const insets = useSafeAreaInsets();
   const videoRef = useRef<Video>(null);
+  const afterAdActionRef = useRef<null | (() => void)>(null);
   const [adFinished, setAdFinished] = useState(false);
 
   // Recharge la vidéo quand la pub s'ouvre
@@ -103,6 +104,21 @@ export default function DefiScreen() {
     } else {
       videoRef.current?.pauseAsync();
     }
+  }, [showAd]);
+
+  useEffect(() => {
+    const unsub = subscribeToAdRequests((req) => {
+      // If an ad is already showing, ignore new requests (safest)
+      if (showAd) return;
+
+      // store the callback to run after the ad closes
+      afterAdActionRef.current = req.onDone ?? null;
+
+      setAdScenario(req.scenario as any);
+      setShowAd(true);
+    });
+
+    return unsub;
   }, [showAd]);
 
   // Callback de fin de vidéo
@@ -362,15 +378,9 @@ export default function DefiScreen() {
 
   // 🔴 LOGIQUE RÉCOMPENSES (AVEC BYPASS PREMIUM)
   const handleOpenRewards = () => {
-    if (isPremium) {
-      // 🚀 PREMIUM : Ouverture directe
-      setRewardModalVisible(true);
-    } else {
-      // 🎬 NON-PREMIUM : On lance la pub d'abord
-      setAdScenario("claim_reward");
-      setShowAd(true);
-    }
+    setRewardModalVisible(true);
   };
+
 
   // 🔴 CALLBACK FIN DE PUB (À placer avant le return)
   const handleAdFinished = () => {
@@ -395,7 +405,12 @@ export default function DefiScreen() {
        setPendingChallengeId(null);
     } else if (adScenario === "claim_reward") {
        setRewardModalVisible(true); // Ouvre les récompenses
+    } else if (adScenario === "claim_points") {
+      // Run whatever the popup wanted to do after the ad
+      afterAdActionRef.current?.();
+      afterAdActionRef.current = null;
     }
+
     setAdScenario(null);
   };
 

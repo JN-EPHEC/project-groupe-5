@@ -16,6 +16,8 @@ import { markDefiDone } from "@/services/notifications";
 import { finalizeProof } from "@/services/proofs";
 import { useRouter } from "expo-router";
 // Remplace la ligne d'import existante par celle-ci :
+import { useUser } from "@/hooks/user-context";
+import { requestAd } from "@/services/adBridge";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   addDoc,
@@ -116,6 +118,24 @@ function isPastNoon(date: Date) {
   return date.getTime() >= noon.getTime();
 }
 
+function getDefiDayKeyFromTimestamp(date: Date): string {
+  // Europe/Brussels offset handling via locale string
+  const brussels = new Date(
+    date.toLocaleString("en-US", { timeZone: "Europe/Brussels" })
+  );
+
+  const hours = brussels.getHours();
+
+  // If BEFORE 12:00 → count as previous calendar day
+  if (hours < 12) {
+    brussels.setDate(brussels.getDate() - 1);
+  }
+
+  // Return YYYY-MM-DD
+  return brussels.toISOString().slice(0, 10);
+}
+
+
 
 
 export function ChallengesProvider({
@@ -129,6 +149,7 @@ export function ChallengesProvider({
   const [reviewCompleted, setReviewCompleted] = useState(0);
   const [reviewRequiredCount, setReviewRequiredCount] = useState(3);
   const [validationPhaseDone, setValidationPhaseDone] = useState(false);
+  const { isPremium } = useUser();
 
   // Club-specific validation state (separate from perso)
   const [reviewCompletedClub, setReviewCompletedClub] = useState(0);
@@ -279,31 +300,41 @@ export function ChallengesProvider({
         ? `Tu as gagné ${current.points} points dans le classement.`
         : "Ta preuve a été refusée. Tu peux réessayer avec un autre défi.",
       primaryLabel: isSuccess ? "Voir le classement" : "Choisir un défi",
-      secondaryLabel: "Fermer",
       onPrimary: async () => {
-        if (isSuccess) {
+        if (!isSuccess) {
+          stop();
+          return;
+        }
+
+        const runClaimLogic = async () => {
           const { awardClassementPoints } = await import("@/src/classement/services/awardClassementPoints");
           await awardClassementPoints(current.points);
 
-          // 🟢 mark points claimed in Firestore
           if (activeDefiRef) {
-            await updateDoc(activeDefiRef, {
-              pointsClaimed: true
-            });
+            await updateDoc(activeDefiRef, { pointsClaimed: true });
           }
 
-          // 🟢 update local state immediately
-          setCurrent(prev =>
-            prev ? { ...prev, pointsClaimed: true } : prev
-          );
-
+          setCurrent(prev => (prev ? { ...prev, pointsClaimed: true } : prev));
+          // 🔥 STREAK: add day based on startedAt
+          try {
+            const { addStreakDayFromStartedAt } = await import("@/services/streaks");
+            await addStreakDayFromStartedAt(current.startedAt);
+          } catch (e) {
+            console.warn("[STREAK] failed to add streak day", e);
+          }
           setGoToClassement(true);
+        };
+
+        if (isPremium) {
+          await runClaimLogic();
         } else {
-          stop();
+          requestAd({
+            scenario: "claim_points",
+            onDone: () => {
+              void runClaimLogic();
+            },
+          });
         }
-      },
-      onSecondary: () => {
-        // Just close popup, user stays where they are
       },
     });
 
@@ -336,9 +367,14 @@ export function ChallengesProvider({
         ? `Le défi de ton club a progressé.`
         : "La preuve du club a été refusée.",
       // For club flows we don't award points or redirect to classement
-      primaryLabel: "Fermer",
+      primaryLabel: "OK",
       onPrimary: async () => {
-        // No-op for club success — simply close the popup
+        if (isPremium) return;
+
+        requestAd({
+          scenario: "claim_points",
+          // no onDone: we keep behavior identical (just closes)
+        });
       },
     });
 
@@ -952,6 +988,39 @@ const setFeedback = useCallback(
 
       // Mark that we have handled reset for today
       await AsyncStorage.setItem(resetKey, now.toISOString());
+
+      // 🔥 STREAK SAFE FREEZE LOGIC
+      try {
+        const { getBelgiumDateKey } = await import("@/utils/dateKey");
+
+        const now = new Date();
+
+        const yesterday = new Date();
+        yesterday.setDate(now.getDate() - 1);
+
+        const yesterdayKey = getBelgiumDateKey(yesterday);
+
+        // A) if yesterday is already a streak day → streak protected
+        if (activities && (activities as any)[yesterdayKey]) {
+          console.log("[STREAK] yesterday already validated — streak safe");
+        } else {
+          // B) otherwise check activeDefi from yesterday in frozen state
+          const startedKey = current.startedAt ? getBelgiumDateKey(current.startedAt) : null;
+
+          const freeze =
+            startedKey === yesterdayKey &&
+            (
+              current.status === "pendingValidation" ||
+              (current.finalStatus === "validated" && !current.pointsClaimed)
+            );
+
+          if (freeze) {
+            console.log("[STREAK] activeDefi freeze prevents streak break");
+          }
+        }
+      } catch (e) {
+        console.warn("[STREAK] freeze check error", e);
+      }
 
       // ---- SCENARIO 1: user already claimed points → delete ----
       if (current.pointsClaimed === true) {
