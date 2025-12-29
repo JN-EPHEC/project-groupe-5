@@ -2,12 +2,12 @@
 import type { PopupVariant } from "@/hooks/global-popup-context";
 import React, { useEffect, useRef } from "react";
 import {
-    Animated,
-    Modal,
-    Pressable,
-    StyleSheet,
-    Text,
-    View,
+  Animated,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 
 type GlobalPopupProps = {
@@ -28,9 +28,7 @@ export function GlobalPopup({
   description,
   variant = "info",
   primaryLabel = "OK",
-  secondaryLabel,
   onPrimary,
-  onSecondary,
   onClose,
 }: GlobalPopupProps) {
   const opacity = useRef(new Animated.Value(0)).current;
@@ -94,20 +92,6 @@ export function GlobalPopup({
           ) : null}
 
           <View style={styles.actionsRow}>
-            {secondaryLabel ? (
-              <Pressable
-                style={[styles.button, styles.secondaryButton]}
-                onPress={() => {
-                  onSecondary?.();
-                  onClose();
-                }}
-              >
-                <Text style={[styles.buttonText, styles.secondaryButtonText]}>
-                  {secondaryLabel}
-                </Text>
-              </Pressable>
-            ) : null}
-
             <Pressable
               style={[styles.button, { backgroundColor: accentColor }]}
               onPress={() => {

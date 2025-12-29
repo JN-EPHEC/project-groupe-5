@@ -16,6 +16,8 @@ import { markDefiDone } from "@/services/notifications";
 import { finalizeProof } from "@/services/proofs";
 import { useRouter } from "expo-router";
 // Remplace la ligne d'import existante par celle-ci :
+import { useUser } from "@/hooks/user-context";
+import { requestAd } from "@/services/adBridge";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   addDoc,
@@ -129,6 +131,7 @@ export function ChallengesProvider({
   const [reviewCompleted, setReviewCompleted] = useState(0);
   const [reviewRequiredCount, setReviewRequiredCount] = useState(3);
   const [validationPhaseDone, setValidationPhaseDone] = useState(false);
+  const { isPremium } = useUser();
 
   // Club-specific validation state (separate from perso)
   const [reviewCompletedClub, setReviewCompletedClub] = useState(0);
@@ -279,31 +282,34 @@ export function ChallengesProvider({
         ? `Tu as gagné ${current.points} points dans le classement.`
         : "Ta preuve a été refusée. Tu peux réessayer avec un autre défi.",
       primaryLabel: isSuccess ? "Voir le classement" : "Choisir un défi",
-      secondaryLabel: "Fermer",
       onPrimary: async () => {
-        if (isSuccess) {
+        if (!isSuccess) {
+          stop();
+          return;
+        }
+
+        const runClaimLogic = async () => {
           const { awardClassementPoints } = await import("@/src/classement/services/awardClassementPoints");
           await awardClassementPoints(current.points);
 
-          // 🟢 mark points claimed in Firestore
           if (activeDefiRef) {
-            await updateDoc(activeDefiRef, {
-              pointsClaimed: true
-            });
+            await updateDoc(activeDefiRef, { pointsClaimed: true });
           }
 
-          // 🟢 update local state immediately
-          setCurrent(prev =>
-            prev ? { ...prev, pointsClaimed: true } : prev
-          );
-
+          setCurrent(prev => (prev ? { ...prev, pointsClaimed: true } : prev));
           setGoToClassement(true);
+        };
+
+        if (isPremium) {
+          await runClaimLogic();
         } else {
-          stop();
+          requestAd({
+            scenario: "claim_points",
+            onDone: () => {
+              void runClaimLogic();
+            },
+          });
         }
-      },
-      onSecondary: () => {
-        // Just close popup, user stays where they are
       },
     });
 
@@ -336,9 +342,14 @@ export function ChallengesProvider({
         ? `Le défi de ton club a progressé.`
         : "La preuve du club a été refusée.",
       // For club flows we don't award points or redirect to classement
-      primaryLabel: "Fermer",
+      primaryLabel: "OK",
       onPrimary: async () => {
-        // No-op for club success — simply close the popup
+        if (isPremium) return;
+
+        requestAd({
+          scenario: "claim_points",
+          // no onDone: we keep behavior identical (just closes)
+        });
       },
     });
 
