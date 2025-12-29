@@ -11,6 +11,22 @@ export function CouponCard({ coupon }: { coupon: Coupon }) {
   const isLight = mode === "light";
   const [open, setOpen] = useState(false);
 
+  // --- LOGIQUE D'EXPIRATION ---
+  // On compare la date actuelle avec la date d'expiration (YYYY-MM-DD)
+  const today = new Date().toISOString().split('T')[0];
+  const isExpired = coupon.expiresAt < today;
+
+  // Si expiré, on ne l'affiche pas du tout
+  if (isExpired) return null;
+
+  // --- FORMATAGE DE LA DATE (YYYY-MM-DD -> DD/MM/YYYY) ---
+  const formatDate = (isoDate: string) => {
+      if (!isoDate) return "";
+      const parts = isoDate.split("-");
+      if (parts.length !== 3) return isoDate;
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  };
+
   // --- THEME ---
   const cardBg = isLight 
     ? ["#FFFFFF", "rgba(255,255,255,0.7)"] 
@@ -19,7 +35,6 @@ export function CouponCard({ coupon }: { coupon: Coupon }) {
   const borderColor = isLight ? "rgba(255,255,255,0.8)" : "rgba(0, 151, 178, 0.3)";
   const textColor = isLight ? "#0A3F33" : "#FFF";
   
-  // ✅ MODIFIÉ : Vert Fluo (#00D68F) pour le Dark Mode
   const brandGreen = isLight ? "#008F6B" : "#00D68F";
 
   return (
@@ -39,7 +54,9 @@ export function CouponCard({ coupon }: { coupon: Coupon }) {
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <View style={{ flex: 1, marginRight: 8 }}>
                         <Text style={[styles.title, { color: textColor }]} numberOfLines={1}>{coupon.name}</Text>
-                        <Text style={[styles.expiry, { color: isLight ? colors.mutedText : "#A5C9BF" }]}>Valide jusqu'au {coupon.expiresAt}</Text>
+                        <Text style={[styles.expiry, { color: isLight ? colors.mutedText : "#A5C9BF" }]}>
+                            Valide jusqu'au {formatDate(coupon.expiresAt)}
+                        </Text>
                     </View>
                     <View style={[styles.amountBadge, { backgroundColor: isLight ? "#E0F7EF" : "rgba(0, 143, 107, 0.15)" }]}>
                         <Text style={[styles.amountText, { color: brandGreen }]}>{coupon.voucherAmountEuro}€</Text>
@@ -83,7 +100,7 @@ export function CouponCard({ coupon }: { coupon: Coupon }) {
                 <QRCode value={coupon.code} size={200} backgroundColor='white' />
             </View>
 
-            {/* CODE TEXTE REMONTÉ (Moins de marge) */}
+            {/* CODE TEXTE REMONTÉ */}
             <View style={[styles.codeContainerModal, { backgroundColor: isLight ? "#F3F4F6" : "rgba(255,255,255,0.1)" }]}>
                 <Text style={{ color: textColor, fontSize: 20, fontWeight: 'bold', letterSpacing: 2, textAlign: 'center' }}>{coupon.code}</Text>
             </View>
@@ -122,15 +139,14 @@ const styles = StyleSheet.create({
       borderWidth: 1, borderStyle: 'dashed', 
       alignSelf: 'flex-start' 
   },
-  // ✅ MODIFIÉ : Style spécifique pour le code dans la modale (centré, moins de marge)
   codeContainerModal: {
-      marginTop: 20, // Réduit de 24 à 20
+      marginTop: 20, 
       paddingVertical: 12, 
       paddingHorizontal: 24, 
       borderRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
-      width: '100%' // Prend toute la largeur pour bien centrer le texte
+      width: '100%' 
   },
   codeText: { fontFamily: 'Courier', fontWeight: '700', fontSize: 14, letterSpacing: 1 },
 

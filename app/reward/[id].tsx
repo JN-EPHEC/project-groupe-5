@@ -1,12 +1,12 @@
 import { FontFamilies } from "@/constants/fonts";
-import { db } from "@/firebaseConfig"; // ✅ On importe la DB
+import { db } from "@/firebaseConfig";
 import { useCoupons } from "@/hooks/coupons-context";
 import { usePoints } from "@/hooks/points-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { doc, getDoc } from "firebase/firestore"; // ✅ Pour lire un document unique
+import { doc, getDoc } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -43,7 +43,6 @@ export default function RewardDetailScreen() {
   const { points, spendPoints } = usePoints();
   const { addCoupon, hasCoupon } = useCoupons();
 
-  // ✅ NOUVEAU : État pour stocker la récompense chargée depuis Firebase
   const [reward, setReward] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeImg, setActiveImg] = useState(0);
@@ -72,6 +71,14 @@ export default function RewardDetailScreen() {
     fetchReward();
   }, [id]);
 
+  // Helper date display
+  const formatDate = (isoDate: string) => {
+      if (!isoDate) return "";
+      const parts = isoDate.split("-");
+      if (parts.length !== 3) return isoDate;
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  };
+
   // Écran de chargement
   if (loading) {
     return (
@@ -93,8 +100,13 @@ export default function RewardDetailScreen() {
     );
   }
 
+  // LOGIQUE EXPIRATION & ACHAT
+  const today = new Date().toISOString().split('T')[0];
+  const isExpired = reward.expiresAt < today;
+  
   const already = hasCoupon(reward.id);
-  const canAfford = points >= reward.pointsCost && !already;
+  // On ne peut acheter que si pas déjà possédé, assez de points ET pas expiré
+  const canAfford = points >= reward.pointsCost && !already && !isExpired;
   
   // Gestion des images (fallback si pas d'image)
   const images = reward.images && reward.images.length > 0 
@@ -102,6 +114,10 @@ export default function RewardDetailScreen() {
     : ["https://placehold.co/600x400/png?text=Pas+d'image"];
 
   const handleRedeem = () => {
+    if (isExpired) {
+        Alert.alert("Expiré", "Cette offre n'est plus disponible.");
+        return;
+    }
     if (already) {
         Alert.alert('Déjà échangé', 'Cette récompense est déjà dans tes coupons.');
         return;
@@ -113,11 +129,8 @@ export default function RewardDetailScreen() {
       [
         { text: "Annuler", style: "cancel" },
         { text: "Confirmer", onPress: async () => {
-            // 1. Transaction via Context (gestion stock Firebase)
             const successDb = await addCoupon(reward.id);
-            
             if (successDb) {
-                // 2. Débit des points
                 const pointsOk = spendPoints(reward.pointsCost, `Échange : ${reward.name}`);
                 if (pointsOk) {
                     Alert.alert("Félicitations !", "Ton coupon est disponible dans l'onglet 'Mes coupons'.");
@@ -235,7 +248,8 @@ export default function RewardDetailScreen() {
                         <Text style={[styles.sectionTitle, { color: titleColor }]}>Validité</Text>
                     </View>
                     <Text style={[styles.bodyText, { color: textColor }]}>
-                        Utilisable jusqu'au {reward.expiresAt}. Code unique à présenter en caisse.
+                        Utilisable jusqu'au <Text style={{ fontWeight: 'bold' }}>{formatDate(reward.expiresAt)}</Text>. Code unique à présenter en caisse.
+                        {isExpired && <Text style={{ color: "#EF4444", fontWeight: "bold" }}> (Expiré)</Text>}
                     </Text>
                 </View>
 
@@ -245,17 +259,28 @@ export default function RewardDetailScreen() {
             <View style={[styles.footer, { borderTopColor: isLight ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.1)" }]}>
                 <TouchableOpacity
                     onPress={handleRedeem}
-                    disabled={!canAfford && !already}
+                    disabled={(!canAfford && !already) || isExpired}
                     activeOpacity={0.9}
                     style={{ flex: 1 }}
                 >
                     <LinearGradient
-                        colors={already ? ["#E2E8F0", "#CBD5E0"] : (canAfford ? (isLight ? ["#008F6B", "#10B981"] : ["#0097B2", "#00B4D8"]) : ["#A0AEC0", "#718096"])}
+                        colors={
+                            isExpired ? ["#FEE2E2", "#FECACA"] :
+                            already ? ["#E2E8F0", "#CBD5E0"] : 
+                            (canAfford ? (isLight ? ["#008F6B", "#10B981"] : ["#0097B2", "#00B4D8"]) : ["#A0AEC0", "#718096"])
+                        }
                         start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                         style={styles.actionBtn}
                     >
-                        <Text style={[styles.actionBtnText, { color: already ? "#718096" : "#FFF" }]}>
-                            {already ? "Déjà obtenu" : canAfford ? "Échanger maintenant" : `Greenies insuffisants (${reward.pointsCost})`}
+                        <Text style={[styles.actionBtnText, { color: (already || isExpired) ? (isExpired ? "#B91C1C" : "#718096") : "#FFF" }]}>
+                            {isExpired 
+                                ? "Offre expirée" 
+                                : already 
+                                    ? "Déjà obtenu" 
+                                    : canAfford 
+                                        ? "Échanger maintenant" 
+                                        : `Greenies insuffisants (${reward.pointsCost})`
+                            }
                         </Text>
                     </LinearGradient>
                 </TouchableOpacity>
