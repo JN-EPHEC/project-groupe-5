@@ -1,18 +1,15 @@
 // hooks/user-context.tsx
-// Keep this context independent of routing
-
-// Optional dev-only premium bypass – safe for teammates without the file
 let DEV_FORCE_PREMIUM = false;
 let DEV_TEST_EMAIL: string | undefined = undefined;
 let DEV_TEST_UID: string | undefined = undefined;
 
 try {
-  const dev = require("../devAuth.env"); // path relative to this file
+  const dev = require("../devAuth.env"); 
   DEV_FORCE_PREMIUM = dev.DEV_FORCE_PREMIUM;
   DEV_TEST_EMAIL = dev.DEV_TEST_EMAIL;
   DEV_TEST_UID = dev.DEV_TEST_UID;
 } catch {
-  // File missing → ignore silently (normal users, production, teammates)
+  // Ignore
 }
 
 import { checkPremiumStatus } from "@/services/premiumService";
@@ -28,8 +25,6 @@ import React, {
 } from "react";
 import { auth, db } from "../firebaseConfig";
 
-
-// The core user profile from the 'users' collection
 export type UserProfile = {
   uid: string;
   email: string;
@@ -50,7 +45,7 @@ export type UserProfile = {
 type UserContextType = {
   user: UserProfile | null;
   isPremium: boolean;
-  loading: boolean; // Flag "BLOQUANT" pour l'initialisation seulement
+  loading: boolean;
   userClub: { id: string; name: string; isPrivate?: boolean } | null;
   refreshUser: () => Promise<void>;
 };
@@ -62,42 +57,35 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [userClub, setUserClub] = useState<{ id: string; name: string; isPrivate?: boolean } | null>(null);
   const [isPremium, setIsPremium] = useState(false);
+  
   const isDevPremiumUser =
     __DEV__ &&
     DEV_FORCE_PREMIUM &&
     firebaseUser?.email === DEV_TEST_EMAIL;
 
-    //debugger
-    useEffect(() => {
-  console.log("🧪 DEV PREMIUM CHECK", {
-    __DEV__,
-    DEV_FORCE_PREMIUM,
-    firebaseEmail: firebaseUser?.email,
-    firebaseUID: firebaseUser?.uid,
-    DEV_TEST_EMAIL,
-    DEV_TEST_UID,
-    isDevPremiumUser,
-    isPremiumState: isPremium,
-  });
-}, [firebaseUser, isDevPremiumUser, isPremium]);
+  useEffect(() => {
+    console.log("🧪 DEV PREMIUM CHECK", {
+      __DEV__,
+      DEV_FORCE_PREMIUM,
+      firebaseEmail: firebaseUser?.email,
+      isDevPremiumUser,
+      isPremiumState: isPremium,
+    });
+  }, [firebaseUser, isDevPremiumUser, isPremium]);
 
-  
-  // 🛡️ CORRECTION : On sépare le chargement initial du chargement d'arrière-plan
-  const [authLoading, setAuthLoading] = useState(true); // Chargement de Firebase Auth
-  const [profileLoading, setProfileLoading] = useState(true); // Chargement du profil Firestore
+  const [authLoading, setAuthLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(true);
 
-  // 1️⃣ Listen to Firebase Auth state
+  // 1️⃣ Auth state
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       setFirebaseUser(user);
       if (!user) {
-        // Logged out: clean everything and stop loading
         setUserProfile(null);
         setIsPremium(false);
         setProfileLoading(false);
-        setAuthLoading(false); // Auth is ready (result: no user)
+        setAuthLoading(false);
       } else {
-        // User found: auth is ready, but we start loading profile
         setAuthLoading(false);
         setProfileLoading(true); 
       }
@@ -105,16 +93,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     return unsub;
   }, []);
 
-  // 2️⃣ Listen to Firestore user profile
+  // 2️⃣ Firestore profile
   useEffect(() => {
     if (!firebaseUser) {
         setProfileLoading(false);
         return;
-    };
-
-    // Note: On ne met PAS setProfileLoading(true) ici, car onSnapshot gère ses mises à jour
-    // sans avoir besoin de bloquer l'UI à chaque petit changement.
-    
+    }
     const ref = doc(db, "users", firebaseUser.uid);
     const unsub = onSnapshot(
       ref,
@@ -139,7 +123,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         } else {
           setUserProfile(null);
         }
-        // Une fois qu'on a la première réponse de Firestore, on arrête le chargement bloquant
         setProfileLoading(false);
       },
       (err) => {
@@ -150,7 +133,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     return unsub;
   }, [firebaseUser]);
 
-  // 3️⃣ Listen to clubs
+  // 3️⃣ Clubs
   useEffect(() => {
     if (!firebaseUser) {
       setUserClub(null);
@@ -161,8 +144,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         if (snap.docs.length > 0) {
             const d = snap.docs[0];
             const data: any = d.data();
-            const club = { id: d.id, name: data.name ?? "Club", isPrivate: Boolean(data.isPrivate) };
-            setUserClub(club);
+            setUserClub({ id: d.id, name: data.name ?? "Club", isPrivate: Boolean(data.isPrivate) });
         } else {
             setUserClub(null);
         }
@@ -170,16 +152,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     return unsub;
   }, [firebaseUser]);
   
-  // 4️⃣ Check for premium status (BACKGROUND CHECK)
-  // 🛡️ CORRECTION : Cette fonction ne touche plus au state "loading" global
+  // 4️⃣ Premium check
   const refreshPremiumStatus = useCallback(async () => {
-    if (isDevPremiumUser) return; // ✅ DEV bypass, nothing else touched
+    if (isDevPremiumUser) return;
 
     if (!userProfile) {
         setIsPremium(false);
         return;
     }
-    // On ne met PAS de loading ici pour ne pas faire clignoter l'app
     try {
         const status = await checkPremiumStatus(userProfile);
         setIsPremium(status);
@@ -187,16 +167,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         console.error(e);
         setIsPremium(false);
     }
-  }, [userProfile]);
+  }, [userProfile, isDevPremiumUser]);
 
   useEffect(() => {
     refreshPremiumStatus();
   }, [refreshPremiumStatus]);
 
-  // 🛡️ CORRECTION : Le chargement global n'est vrai QUE pendant l'initialisation.
-  // Une fois l'utilisateur chargé, les mises à jour (edit profil, premium) se font en "live" sans spinner bloquant.
   const isLoading = authLoading || (!!firebaseUser && profileLoading);
-
   const effectiveIsPremium = isDevPremiumUser ? true : isPremium;
 
   const value = useMemo(
@@ -209,7 +186,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }),
     [userProfile, effectiveIsPremium, isLoading, userClub, refreshPremiumStatus]
   );
-
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 }

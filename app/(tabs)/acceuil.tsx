@@ -29,7 +29,6 @@ const THEME = {
   textMuted: "#4A665F",
   accentCoral: "#FF8C66",
   rankWatermark: "rgba(0, 143, 107, 0.10)",
-  // ✅ MODIFIÉ : Blanc plus visible (0.2) pour qu'il ressorte mieux sur le fond sombre
   darkRankWatermark: "rgba(255, 255, 255, 0.2)",
 };
 
@@ -162,8 +161,10 @@ export default function AcceuilScreen() {
                   
                   <View style={{ zIndex: 10, flex: 1, justifyContent: 'space-between' }}>
                     <Text style={[styles.rankCardLabel, { color: isLight ? THEME.textMuted : "#9FB9AE" }]}>Individuel</Text>
+                    {/* ✅ CORRECTION : Utilisation de {' '} pour l'espace explicite */}
                     <Text style={[styles.rankCardValue, { color: isLight ? THEME.textMain : "#fff" }]}>
-                      {positionLabel} <Text style={{ fontSize: 16, fontWeight: '400' }}>sur {totalUsers}</Text>
+                      {positionLabel}{' '}
+                      <Text style={{ fontSize: 16, fontWeight: '400' }}>sur {totalUsers}</Text>
                     </Text>
                   </View>
                 </LinearGradient>
@@ -182,8 +183,16 @@ export default function AcceuilScreen() {
                   
                   <View style={{ zIndex: 10, flex: 1, justifyContent: 'space-between' }}>
                     <Text style={[styles.rankCardLabel, { color: isLight ? THEME.textMuted : "#9FB9AE" }]}>Club</Text>
+                    {/* ✅ CORRECTION : Structure sécurisée sans fragments ni espaces nus */}
                     <Text style={[styles.rankCardValue, { color: isLight ? THEME.textMain : "#fff" }]}>
-                      {joinedClub ? <>{clubLabel} <Text style={{ fontSize: 16, fontWeight: '400' }}>sur {totalClubs}</Text></> : "—"}
+                      {joinedClub ? (
+                        <>
+                          <Text>{clubLabel}</Text>
+                          <Text style={{ fontSize: 16, fontWeight: '400' }}> sur {totalClubs}</Text>
+                        </>
+                      ) : (
+                        "—"
+                      )}
                     </Text>
                   </View>
                 </LinearGradient>
