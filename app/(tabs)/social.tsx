@@ -427,6 +427,8 @@ export default function SocialScreen() {
                 name: displayName,
                 avatar: avatarUri,
                 points: pointsValue,
+                // ✅ AJOUT : On récupère la couleur personnalisée
+                avatarColor: profile.avatarColor || "#19D07D", 
               } as ClubMember;
             } catch {
               return {
@@ -763,31 +765,30 @@ setIsLeaving(false);
         </View>
       )}
 
-    {/* ✅ POPUP GLOBAL (Mode Sombre compatible) */}
     {leaveConfirmVisible && (
       <View style={{
         position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
         zIndex: 9998,
-        backgroundColor: 'rgba(0,0,0,0.6)', // Fond un peu plus sombre
+        backgroundColor: 'rgba(0,0,0,0.6)',
         alignItems: 'center', justifyContent: 'center',
         padding: 20
       }}>
         <View style={{
-          // MODIF: Fond adapté au thème (Blanc ou Vert Sombre Profond)
-          backgroundColor: isLight ? '#fff' : '#0F3327', 
+          // ✅ MODIF : Fond sombre standard (#1F2937) au lieu du vert bizarre
+          backgroundColor: isLight ? '#fff' : '#1F2937', 
           borderRadius: 24,
           padding: 24,
           width: '100%',
           maxWidth: 320,
           borderWidth: 1,
-          borderColor: isLight ? 'transparent' : 'rgba(0, 143, 107, 0.3)',
+          borderColor: isLight ? 'transparent' : 'rgba(255, 255, 255, 0.1)',
           shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 10, elevation: 5
         }}>
           <Text style={{ 
               fontSize: 20, 
               fontFamily: FontFamilies.heading, 
               marginBottom: 12,
-              color: isLight ? '#0A3F33' : '#fff',
+              color: isLight ? '#0A3F33' : '#F9FAFB', // Blanc cassé
               textAlign: 'center'
           }}>
             Quitter le club ?
@@ -795,9 +796,10 @@ setIsLeaving(false);
           
           <Text style={{ 
               marginBottom: 24, 
-              color: isLight ? '#4A665F' : '#A5C9BF',
+              color: isLight ? '#4A665F' : '#9CA3AF', // Gris clair standard
               textAlign: 'center',
-              lineHeight: 20
+              lineHeight: 20,
+              fontFamily: FontFamilies.body
           }}>
             Êtes-vous sûr de vouloir quitter ce club ? Vous ne pourrez plus participer aux défis d'équipe.
           </Text>
@@ -807,7 +809,7 @@ setIsLeaving(false);
                 onPress={() => setLeaveConfirmVisible(false)}
                 style={{ flex: 1, paddingVertical: 12, borderRadius: 14, backgroundColor: isLight ? '#F0FDF4' : 'rgba(255,255,255,0.1)', alignItems: 'center' }}
             >
-              <Text style={{ color: isLight ? '#008F6B' : '#fff', fontFamily: FontFamilies.headingMedium }}>Rester</Text>
+              <Text style={{ color: isLight ? '#008F6B' : '#FFF', fontFamily: FontFamilies.headingMedium }}>Rester</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
@@ -1556,117 +1558,122 @@ setIsLeaving(false);
                 contentContainerStyle={{ paddingBottom: 100 }}
                 showsVerticalScrollIndicator={false}
                 renderItem={({ item, index }) => {
-  // --- 1. IDENTIFICATION DES RÔLES (Sans émojis) ---
-  const targetIsOwner = joinedClub?.ownerId === item.id;
-  const targetIsOfficer = (joinedClub?.officers || []).includes(item.id);
-  const targetIsMember = !targetIsOwner && !targetIsOfficer;
-  
-  const roleLabel = targetIsOwner ? 'Chef' : targetIsOfficer ? 'Adjoint' : 'Membre';
+                // --- ROLES & PERMISSIONS ---
+                const targetIsOwner = joinedClub?.ownerId === item.id;
+                const targetIsOfficer = (joinedClub?.officers || []).includes(item.id);
+                const targetIsMember = !targetIsOwner && !targetIsOfficer;
+                const roleLabel = targetIsOwner ? 'Chef' : targetIsOfficer ? 'Adjoint' : 'Membre';
 
-  // --- 2. IDENTIFICATION DE "MOI" ---
-  const myUid = auth.currentUser?.uid;
-  const iAmOwner = joinedClub?.ownerId === myUid;
-  const iAmOfficer = (joinedClub?.officers || []).includes(myUid ?? "");
-  const isMe = item.id === myUid;
+                const myUid = auth.currentUser?.uid;
+                const iAmOwner = joinedClub?.ownerId === myUid;
+                const iAmOfficer = (joinedClub?.officers || []).includes(myUid ?? "");
+                const isMe = item.id === myUid;
+                const canManageUser = !isMe && (iAmOwner || (iAmOfficer && targetIsMember));
 
-  // --- 3. PERMISSIONS ---
-  // "canManageUser" remplace ton ancien "canDelete" pour gérer aussi la promo/rétrogradation
-  const canManageUser = !isMe && (iAmOwner || (iAmOfficer && targetIsMember));
-  
-  // ✅ CORRECTION : On définit canDelete pour éviter l'erreur rouge
-  const canDelete = canManageUser; 
+                // --- STYLE HEADER ADAPTÉ ---
+                const borderColor = isLight ? "rgba(255, 255, 255, 0.6)" : "rgba(0, 151, 178, 0.3)";
+                const textColor = isLight ? "#0A3F33" : colors.text;
 
-  return (
-    <LinearGradient
-      // Couleurs Dark Mode "Liquide Glacé" (Bleu canard transparent)
-      colors={isLight 
-          ? (isMe ? ["#D1FAE5", "#E0F7EF"] : ["rgba(255,255,255,0.8)", "rgba(255,255,255,0.5)"]) 
-          : (isMe ? ["rgba(0, 143, 107, 0.2)", "rgba(0, 143, 107, 0.1)"] : ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"])
-      }
-      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-      style={{ 
-          flexDirection: 'row', alignItems: 'center', padding: 14, marginBottom: 10, borderRadius: 18,
-          borderWidth: 1, 
-          // Bordure Dark Mode ajustée
-          borderColor: isLight ? (isMe ? "#A7F3D0" : "rgba(255,255,255,0.6)") : (isMe ? "rgba(0, 143, 107, 0.4)" : "rgba(0, 151, 178, 0.3)"),
-          shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 6, elevation: 1
-      }}
-    >
-      {/* RANG */}
-      <Text style={{ width: 30, textAlign: 'center', color: isMe ? (isLight ? "#008F6B" : "#4ADE80") : (isLight ? "#4A665F" : colors.mutedText), fontFamily: FontFamilies.heading, fontSize: 16 }}>#{index + 1}</Text>
-      
-      {/* AVATAR */}
-      {item.avatar ? (
-        <Image source={{ uri: item.avatar }} style={{ width: 40, height: 40, borderRadius: 20, marginHorizontal: 12 }} />
-      ) : (
-        <View style={{ width: 40, height: 40, borderRadius: 20, marginHorizontal: 12, backgroundColor: isLight ? "#FFF" : "rgba(255,255,255,0.1)", alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ color: isLight ? "#008F6B" : "#fff", fontFamily: FontFamilies.heading }}>{(item.name || '?').charAt(0).toUpperCase()}</Text>
-        </View>
-      )}
-
-      {/* NOM ET ROLE */}
-      <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Text style={{ color: isMe ? (isLight ? "#008F6B" : "#4ADE80") : (isLight ? "#0A3F33" : "#fff"), fontFamily: FontFamilies.headingMedium, fontSize: 16 }} numberOfLines={1}>
-                {isMe ? "Moi" : item.name}
-            </Text>
-            {/* Badge rôle épuré */}
-            {roleLabel === 'Chef' && <View style={{backgroundColor: isLight ? '#FFEFD5' : 'rgba(183, 121, 31, 0.3)', paddingHorizontal: 6, borderRadius: 4}}><Text style={{fontSize: 10, color: isLight ? '#B7791F' : '#FCD34D', fontWeight:'bold'}}>CHEF</Text></View>}
-            {roleLabel === 'Adjoint' && <View style={{backgroundColor: isLight ? '#E0F2FE' : 'rgba(56, 189, 248, 0.2)', paddingHorizontal: 6, borderRadius: 4}}><Text style={{fontSize: 10, color: isLight ? '#0284C7' : '#38BDF8', fontWeight:'bold'}}>ADJOINT</Text></View>}
-          </View>
-          {/* On affiche le rôle en texte si ce n'est pas un membre simple */}
-          {!targetIsMember && <Text style={{ color: isLight ? "#6E8580" : colors.mutedText, fontSize: 12 }}>{roleLabel}</Text>}
-      </View>
-
-      {/* POINTS & ACTIONS */}
-      <View style={{ alignItems: 'flex-end' }}>
-          <Text style={{ color: isLight ? "#008F6B" : colors.accent, fontFamily: FontFamilies.heading, fontSize: 15, marginBottom: canManageUser ? 6 : 0 }}>
-              {rankingPointsMap.get(item.id) || 0} <Text style={{ fontSize: 11, fontWeight: 'normal' }}>pts</Text>
-          </Text>
-
-          {/* BOUTONS D'ACTION (Si j'ai la permission) */}
-          {canManageUser && (
-              <View style={{ flexDirection: 'row', gap: 12 }}>
-                  
-                  {/* CAS 1 : CIBLE EST MEMBRE (Je peux le promouvoir) */}
-                  {targetIsMember && (
-                      <TouchableOpacity 
-                          onPress={() => Alert.alert("Promouvoir", `Nommer ${item.name} Adjoint ?`, [
-                              { text: "Annuler", style: "cancel" },
-                              { text: "Oui", onPress: () => promoteToOfficer(item.id) }
-                          ])}
-                      >
-                          <Ionicons name="arrow-up-circle-outline" size={22} color="#008F6B" />
-                      </TouchableOpacity>
-                  )}
-
-                  {/* CAS 2 : CIBLE EST ADJOINT (Seul le CHEF peut rétrograder) */}
-                  {targetIsOfficer && iAmOwner && (
-                      <TouchableOpacity 
-                          onPress={() => Alert.alert("Rétrograder", `Retirer le grade d'adjoint à ${item.name} ?`, [
-                              { text: "Annuler", style: "cancel" },
-                              { text: "Oui", onPress: () => demoteOfficer(item.id) }
-                          ])}
-                      >
-                          <Ionicons name="arrow-down-circle-outline" size={22} color="#F59E0B" />
-                      </TouchableOpacity>
-                  )}
-
-                  {/* SUPPRIMER (Possible pour Chef ou Adjoint sur Membre) */}
-                  <TouchableOpacity 
-                      onPress={() => Alert.alert("Exclure", `Retirer ${item.name} du club ?`, [
-                          { text: "Annuler", style: "cancel" },
-                          { text: "Exclure", style: "destructive", onPress: () => handleRemoveMember(item.id) }
-                      ])}
+                return (
+                  <LinearGradient
+                    // Même dégradé "Glass" que le Header
+                    colors={isLight 
+                        ? (isMe ? ["#D1FAE5", "#E0F7EF"] : ["rgba(240, 253, 244, 0.9)", "rgba(255, 255, 255, 0.6)"]) 
+                        : (isMe ? ["rgba(0, 143, 107, 0.2)", "rgba(0, 143, 107, 0.1)"] : ["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"])
+                    }
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={{ 
+                        flexDirection: 'row', alignItems: 'center', padding: 16, marginBottom: 10, borderRadius: 24,
+                        borderWidth: 1, borderColor: isMe ? (isLight ? "#A7F3D0" : colors.accent) : borderColor,
+                    }}
                   >
-                      <Ionicons name="trash-outline" size={22} color="#F45B69" />
-                  </TouchableOpacity>
-              </View>
-          )}
-      </View>
-    </LinearGradient>
-  );
-}}
+                    {/* 1. RANG (Badge style Header) */}
+                    <View style={{ 
+                        width: 32, height: 32, borderRadius: 12, 
+                        backgroundColor: isMe ? (isLight ? "#FF8C66" : colors.accent) : (isLight ? "#FFF" : "rgba(255,255,255,0.1)"),
+                        alignItems: 'center', justifyContent: 'center', marginRight: 12
+                    }}>
+                        <Text style={{ 
+                            fontFamily: FontFamilies.heading, 
+                            fontSize: 14, 
+                            color: isMe ? (isLight ? "#FFF" : "#07321F") : textColor 
+                        }}>
+                            #{index + 1}
+                        </Text>
+                    </View>
+                    
+                    {/* 2. AVATAR (Connecté au style Header) */}
+                    {item.avatar ? (
+                      <Image 
+                        source={{ uri: item.avatar }} 
+                        style={{ width: 48, height: 48, borderRadius: 24, borderWidth: 2, borderColor: isLight ? "#FFF" : "rgba(255,255,255,0.1)" }} 
+                      />
+                    ) : (
+                      // ✅ LOGIQUE HEADER : Couleur dynamique et texte contrasté
+                      (() => {
+                        const avatarBg = (item as any).avatarColor || "#19D07D";
+                        const isWhiteBg = ["#FFFFFF", "#ffffff", "#fff", "#FFF"].includes(avatarBg);
+                        return (
+                          <View style={{ 
+                              width: 48, height: 48, borderRadius: 24, 
+                              backgroundColor: avatarBg, 
+                              alignItems: 'center', justifyContent: 'center', 
+                              borderWidth: 2, borderColor: isLight ? "#FFF" : "transparent" 
+                          }}>
+                            <Text style={{ 
+                                color: isWhiteBg ? "#1A1A1A" : "#FFFFFF", 
+                                fontFamily: FontFamilies.heading, fontSize: 18 
+                            }}>
+                                {(item.name || '?').charAt(0).toUpperCase()}
+                            </Text>
+                          </View>
+                        );
+                      })()
+                    )}
+
+                    {/* 3. NOM & ROLE (Typography Header) */}
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                        <Text style={{ color: textColor, fontFamily: FontFamilies.heading, fontSize: 17 }} numberOfLines={1}>
+                            {isMe ? "Moi" : item.name}
+                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                            {!targetIsMember && (
+                                <View style={{ backgroundColor: roleLabel === 'Chef' ? (isLight ? '#FFEFD5' : 'rgba(245, 158, 11, 0.2)') : (isLight ? '#E0F2FE' : 'rgba(56, 189, 248, 0.2)'), paddingHorizontal: 6, borderRadius: 6, marginRight: 6 }}>
+                                    <Text style={{ fontSize: 10, fontFamily: FontFamilies.bodyStrong, color: roleLabel === 'Chef' ? (isLight ? '#B7791F' : '#FCD34D') : (isLight ? '#0284C7' : '#38BDF8') }}>
+                                        {roleLabel.toUpperCase()}
+                                    </Text>
+                                </View>
+                            )}
+                            <Text style={{ color: isLight ? "#4A665F" : colors.mutedText, fontFamily: FontFamilies.body, fontSize: 13 }}>
+                                {rankingPointsMap.get(item.id) || 0} pts
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* 4. ACTIONS (Icones épurées) */}
+                    {canManageUser && (
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                            {targetIsMember && (
+                                <TouchableOpacity onPress={() => Alert.alert("Promouvoir", `Nommer ${item.name} Adjoint ?`, [{ text: "Annuler" }, { text: "Oui", onPress: () => promoteToOfficer(item.id) }])} 
+                                    style={{ padding: 8, backgroundColor: isLight ? "#F0FDF4" : "rgba(0,143,107,0.2)", borderRadius: 12 }}>
+                                    <Ionicons name="arrow-up" size={18} color="#008F6B" />
+                                </TouchableOpacity>
+                            )}
+                            {targetIsOfficer && iAmOwner && (
+                                <TouchableOpacity onPress={() => Alert.alert("Rétrograder", `Retirer le grade d'adjoint ?`, [{ text: "Annuler" }, { text: "Oui", onPress: () => demoteOfficer(item.id) }])} 
+                                    style={{ padding: 8, backgroundColor: isLight ? "#FFFBEB" : "rgba(245, 158, 11, 0.2)", borderRadius: 12 }}>
+                                    <Ionicons name="arrow-down" size={18} color="#F59E0B" />
+                                </TouchableOpacity>
+                            )}
+                            <TouchableOpacity onPress={() => Alert.alert("Exclure", `Retirer ${item.name} ?`, [{ text: "Annuler" }, { text: "Exclure", style: "destructive", onPress: () => handleRemoveMember(item.id) }])} 
+                                style={{ padding: 8, backgroundColor: isLight ? "#FEF2F2" : "rgba(239, 68, 68, 0.2)", borderRadius: 12 }}>
+                                <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                            </TouchableOpacity>
+                        </View>
+                    )}
+                  </LinearGradient>
+                );
+              }}
               />
             )}
           </SafeAreaView>

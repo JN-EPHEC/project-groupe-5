@@ -1,7 +1,7 @@
 // components/ui/defi/ValidationCard.tsx
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient"; // ✅ AJOUT
+import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { CATEGORY_CONFIG } from "./constants";
@@ -29,11 +29,16 @@ type Props = {
 
 // 🎨 THEME VALIDATION CARD
 const validationTheme = {
+    // Mode Clair
     glassBg: ["rgba(255, 255, 255, 0.95)", "rgba(240, 253, 244, 0.95)"] as const,
     borderColor: "rgba(255, 255, 255, 0.6)",
     textMain: "#0A3F33",
     textMuted: "#4A665F",
     accent: "#008F6B",
+
+    // Mode Sombre (Nouveau Bleu/Vert Glass Harmonisé)
+    darkGlassBg: ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"] as const,
+    darkBorderColor: "rgba(0, 151, 178, 0.3)",
 };
 
 export function ValidationCard({ item, onValidate, onReject, onReport }: Props) {
@@ -54,32 +59,36 @@ export function ValidationCard({ item, onValidate, onReject, onReport }: Props) 
   const hasValidComment =
     typeof item.comment === "string" && item.comment.trim().length > 0;
 
-  // Wrapper conditionnel (LinearGradient si Light, View si Dark)
-  const Wrapper = isLight ? LinearGradient : View;
-  const wrapperProps = isLight 
-    ? { 
-        colors: validationTheme.glassBg, 
-        start: { x: 0, y: 0 }, 
-        end: { x: 1, y: 1 }, 
-        style: [styles.card, styles.glassEffect] 
-      }
-    : { 
-        style: [styles.card, { backgroundColor: colors.surface || colors.card, borderColor: 'rgba(0,151,178,0.3)', borderWidth: 1 }] 
-      };
+  // Wrapper conditionnel (Toujours LinearGradient pour l'effet glass)
+  const Wrapper = LinearGradient;
+  
+  const wrapperProps = { 
+    colors: isLight ? validationTheme.glassBg : validationTheme.darkGlassBg, 
+    start: { x: 0, y: 0 }, 
+    end: { x: 1, y: 1 }, 
+    style: [
+        styles.card, 
+        styles.glassEffect, 
+        { 
+            borderColor: isLight ? validationTheme.borderColor : validationTheme.darkBorderColor,
+            borderWidth: 1 
+        }
+    ] 
+  };
 
   return (
-    <Wrapper {...(wrapperProps as any)}> 
+    <Wrapper {...wrapperProps}> 
       {/* HEADER */}
       <View style={styles.header}>
-        <View style={[styles.categoryPill, { backgroundColor: isLight ? "rgba(0,143,107,0.1)" : colors.surfaceAlt }]}> 
-          <Ionicons name={categoryConfig.icon as any} size={14} color="#008F6B" />
-          <Text style={[styles.categoryText, { color: "#008F6B" }]}>{categoryConfig.label}</Text>
+        <View style={[styles.categoryPill, { backgroundColor: isLight ? "rgba(0,143,107,0.1)" : "rgba(0, 151, 178, 0.2)" }]}> 
+          <Ionicons name={categoryConfig.icon as any} size={14} color={isLight ? "#008F6B" : colors.accent} />
+          <Text style={[styles.categoryText, { color: isLight ? "#008F6B" : colors.accent }]}>{categoryConfig.label}</Text>
         </View>
 
         {item.audience !== "Club" && (
-          <View style={[styles.pointsBadge, { backgroundColor: isLight ? "#D1FAE5" : "#1F3A33" }]}>
-            <Ionicons name="leaf" size={14} color={isLight ? "#0F3327" : "#52D192"} />
-            <Text style={[styles.pointsText, { color: isLight ? "#0F3327" : "#52D192" }]}>{item.points} pts</Text>
+          <View style={[styles.pointsBadge, { backgroundColor: isLight ? "#D1FAE5" : "rgba(0, 143, 107, 0.2)" }]}>
+            <Ionicons name="leaf" size={14} color={isLight ? "#0F3327" : "#4ADE80"} />
+            <Text style={[styles.pointsText, { color: isLight ? "#0F3327" : "#4ADE80" }]}>{item.points} pts</Text>
           </View>
         )}
       </View>
@@ -92,14 +101,14 @@ export function ValidationCard({ item, onValidate, onReject, onReport }: Props) 
 
       {/* PHOTO DE PREUVE */}
       {item.photoUrl && (
-        <View style={styles.photoContainer}>
+        <View style={[styles.photoContainer, { borderColor: isLight ? "#fff" : "rgba(255,255,255,0.1)" }]}>
             <Image source={{ uri: item.photoUrl }} style={styles.photo} />
         </View>
       )}
 
       {/* COMMENTAIRE */}
       {hasValidComment && (
-        <View style={styles.commentBox}>
+        <View style={[styles.commentBox, { borderColor: isLight ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.1)" }]}>
           <Text style={{ color: cardText, fontStyle: "italic", fontSize: 13, textAlign: "center" }}>
             "{item.comment}"
           </Text>
@@ -109,7 +118,7 @@ export function ValidationCard({ item, onValidate, onReject, onReport }: Props) 
       {/* ACTIONS */}
       <View style={styles.actions}>
         <TouchableOpacity 
-            style={[styles.actionBtn, { backgroundColor: isLight ? "#FEF2F2" : "#2A171A", borderColor: "#FCA5A5", borderWidth: 1 }]}
+            style={[styles.actionBtn, { backgroundColor: isLight ? "#FEF2F2" : "rgba(239, 68, 68, 0.15)", borderColor: isLight ? "#FCA5A5" : "rgba(239, 68, 68, 0.3)", borderWidth: 1 }]}
             onPress={onReject}
         > 
           <Ionicons name="close-circle" size={18} color="#EF4444" />
@@ -120,7 +129,7 @@ export function ValidationCard({ item, onValidate, onReject, onReport }: Props) 
         <TouchableOpacity 
             style={[
                 styles.actionBtn, 
-                { backgroundColor: isLight ? '#FFFBEB' : '#451a03', borderColor: '#FCD34D', borderWidth: 1 }
+                { backgroundColor: isLight ? '#FFFBEB' : 'rgba(245, 158, 11, 0.15)', borderColor: isLight ? '#FCD34D' : 'rgba(245, 158, 11, 0.3)', borderWidth: 1 }
             ]}
             onPress={onReport}
         >
@@ -128,11 +137,11 @@ export function ValidationCard({ item, onValidate, onReject, onReport }: Props) 
         </TouchableOpacity>
 
         <TouchableOpacity 
-            style={[styles.actionBtn, { backgroundColor: isLight ? "#D1FAE5" : validationTheme.accent, flex: 1.5 }]} 
+            style={[styles.actionBtn, { backgroundColor: isLight ? "#D1FAE5" : "rgba(16, 185, 129, 0.2)", flex: 1.5, borderColor: isLight ? "transparent" : "rgba(16, 185, 129, 0.3)", borderWidth: isLight ? 0 : 1 }]} 
             onPress={onValidate}
         >
-          <Ionicons name="checkmark-circle" size={18} color="#065F46" style={{ marginRight: 6 }} />
-          <Text style={[styles.actionText, { color: "#065F46" }]}>Valider</Text>
+          <Ionicons name="checkmark-circle" size={18} color={isLight ? "#065F46" : "#4ADE80"} style={{ marginRight: 6 }} />
+          <Text style={[styles.actionText, { color: isLight ? "#065F46" : "#4ADE80" }]}>Valider</Text>
         </TouchableOpacity>
       </View>
     </Wrapper>
@@ -146,8 +155,7 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   glassEffect: {
-    borderWidth: 1,
-    borderColor: validationTheme.borderColor,
+    // Shadow est géré ici mais le background vient du wrapperProps
     shadowColor: "#005c4b",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.05,
@@ -199,7 +207,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: 12,
     borderWidth: 4,
-    borderColor: "#fff", // Cadre photo blanc
     shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 4, elevation: 2
   },
   photo: {
@@ -212,7 +219,6 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.05)"
   },
   actions: {
     flexDirection: "row",
