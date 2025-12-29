@@ -1,6 +1,8 @@
+// components/ui/acceuil/StreakCalendar.tsx
 import { FontFamilies } from "@/constants/fonts";
-import { useChallenges } from "@/hooks/challenges-context";
 import { useThemeMode } from "@/hooks/theme-context";
+import { useStreaks } from "@/hooks/use-streaks";
+import { getBelgiumDateKey } from "@/utils/dateKey";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -22,8 +24,6 @@ function getWeekDates(): Date[] {
 }
 
 // Formatage clé date (YYYY-MM-DD)
-const formatDateKey = (date: Date) => date.toISOString().slice(0, 10);
-
 const THEME = {
     glassBg: ["rgba(240, 253, 244, 0.95)", "rgba(255, 255, 255, 0.85)"] as const,
     title: "#0A3F33",
@@ -32,49 +32,12 @@ const THEME = {
 
 export default function StreakCalendar() {
   const { colors, mode } = useThemeMode();
-  const { activities } = useChallenges();
+  const { days: activities, currentStreak } = useStreaks();
   const router = useRouter();
   
   const week = useMemo(() => getWeekDates(), []);
   const todayIndex = (new Date().getDay() + 6) % 7;
   const isLight = mode === "light";
-
-  // 🔥 CALCUL DU STREAK (SÉRIE)
-  const currentStreak = useMemo(() => {
-    let streak = 0;
-    const iterator = new Date();
-    
-    // 1. Vérification d'aujourd'hui
-    const todayKey = formatDateKey(new Date());
-    const todayActivity = activities[todayKey];
-    
-    // ✅ CORRECTION TS : On utilise (as any) pour accéder à .status
-    const todayValid = todayActivity && (todayActivity as any).status === 'validated';
-    
-    if (todayValid) {
-        streak++;
-    }
-
-    // 2. Remonter dans le passé (à partir d'hier)
-    iterator.setDate(iterator.getDate() - 1); 
-    
-    while (true) {
-        const key = formatDateKey(iterator);
-        const act = activities[key];
-        
-        // ✅ CORRECTION TS
-        const isValid = act && (act as any).status === 'validated';
-
-        if (isValid) {
-            streak++;
-            iterator.setDate(iterator.getDate() - 1); // Jour précédent
-        } else {
-            break; // Série brisée
-        }
-    }
-
-    return streak;
-  }, [activities]);
 
   if (isLight) {
       return (
@@ -127,12 +90,9 @@ export default function StreakCalendar() {
                 <View style={styles.circlesRow}>
                     {week.map((date, i) => {
                         const isToday = i === todayIndex;
-                        const key = formatDateKey(date);
-                        
-                        const activity = activities[key];
-                        // ✅ CORRECTION TS
-                        const isValidated = activity && (activity as any).status === 'validated';
-                        
+                        const key = getBelgiumDateKey(date);
+                        const isValidated = !!activities[key]; // since subscribeToStreakDays maps docs -> {status:"validated"}
+
                         const bg = isValidated ? (light ? "#008F6B" : colors.accent) : "transparent";
                         
                         return (

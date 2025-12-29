@@ -1,6 +1,8 @@
+// components/ui/acceuil/StreakCalendar.tsx
 import { FontFamilies } from "@/constants/fonts";
-import { useChallenges } from "@/hooks/challenges-context";
 import { useThemeMode } from "@/hooks/theme-context";
+import { useStreaks } from "@/hooks/use-streaks";
+import { getBelgiumDateKey } from "@/utils/dateKey";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -79,9 +81,8 @@ export default function CalendarScreen() {
   const activeDaysThisMonth = grid
     .filter((d) => d.getMonth() === monthIndex)
     .filter((d) => {
-        const key = d.toISOString().slice(0, 10);
-        const act = activities[key];
-        return act && (act as any).status === 'validated';
+        const key = getBelgiumDateKey(d);
+        return !!activities[key];
     })
     .length;
 
@@ -157,7 +158,7 @@ export default function CalendarScreen() {
             {weeks.map((week, wi) => (
                 <View key={wi} style={styles.weekRow}>
                     {week.map((d, di) => {
-                        const key = d.toISOString().slice(0,10);
+                        const key = getBelgiumDateKey(d);
                         const inMonth = d.getMonth() === monthIndex;
                         const isToday = d.toDateString() === today.toDateString();
                         
@@ -165,6 +166,7 @@ export default function CalendarScreen() {
                         // Validation stricte
                         const isValidated = activity && (activity as any).status === 'validated';
 
+                        const isValidated = !!activities[key];
                         return (
                             <View key={di} style={styles.dayCell}> 
                                 <View 
