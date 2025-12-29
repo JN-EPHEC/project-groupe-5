@@ -1,6 +1,8 @@
+// components/ui/acceuil/StreakCalendar.tsx
 import { FontFamilies } from "@/constants/fonts";
-import { useChallenges } from "@/hooks/challenges-context";
 import { useThemeMode } from "@/hooks/theme-context";
+import { useStreaks } from "@/hooks/use-streaks";
+import { getBelgiumDateKey } from "@/utils/dateKey";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -46,7 +48,7 @@ function formatMonthYear(date: Date) {
 
 export default function CalendarScreen() {
   const { colors, mode } = useThemeMode();
-  const { activities } = useChallenges();
+  const { days: activities } = useStreaks();
   const router = useRouter();
   const isLight = mode === "light";
 
@@ -65,11 +67,11 @@ export default function CalendarScreen() {
   const activeDaysThisMonth = grid
     .filter((d) => d.getMonth() === monthIndex)
     .filter((d) => {
-        const key = d.toISOString().slice(0, 10);
-        const act = activities[key];
-        return act && (act as any).status === 'validated';
+        const key = getBelgiumDateKey(d);
+        return !!activities[key];
     })
     .length;
+
 
   // Calcul Streak (Logique simplifiée pour l'affichage, à connecter au vrai calcul si besoin)
   // Ici on laisse 0 pour l'instant ou on peut reprendre la logique de StreakCalendar si on veut l'afficher ici
@@ -145,14 +147,11 @@ export default function CalendarScreen() {
             {weeks.map((week, wi) => (
                 <View key={wi} style={styles.weekRow}>
                     {week.map((d, di) => {
-                        const key = d.toISOString().slice(0,10);
+                        const key = getBelgiumDateKey(d);
                         const inMonth = d.getMonth() === monthIndex;
                         const isToday = d.toDateString() === today.toDateString();
-                        
-                        const activity = activities[key];
-                        // ✅ Validation stricte comme sur l'accueil
-                        const isValidated = activity && (activity as any).status === 'validated';
 
+                        const isValidated = !!activities[key];
                         return (
                             <View key={di} style={styles.dayCell}> 
                                 <View 
