@@ -1,7 +1,8 @@
+// app/login/register.tsx (Assure-toi que c'est le bon chemin)
 import { FontFamilies } from "@/constants/fonts";
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient"; // ✅ AJOUT
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { collection, doc, getDocs, query, serverTimestamp, setDoc, where } from "firebase/firestore";
@@ -315,12 +316,12 @@ export default function Register() {
                 </Text>
             </TouchableOpacity>
 
-            {/* REGISTER BUTTON */}
+            {/* REGISTER BUTTON (OMBRAGE RETIRÉ) */}
             <TouchableOpacity
               onPress={handleRegister}
               disabled={!canSubmit}
               activeOpacity={0.9}
-              style={{ shadowColor: authTheme.accent, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: {width: 0, height: 4}, elevation: 4, marginTop: 10 }}
+              style={{ marginTop: 10 }} // Shadow retiré
             >
                 <LinearGradient
                     colors={!canSubmit ? ["#A0AEC0", "#CBD5E0"] : ["#008F6B", "#10B981"]}

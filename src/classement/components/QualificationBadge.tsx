@@ -1,29 +1,16 @@
-// src/classement/components/QualificationBadge.tsx
 import React from "react";
 import { Text, View } from "react-native";
 
-type Props = {
-  qualified: boolean;
-};
-
-export function QualificationBadge({ qualified }: Props) {
+export function QualificationBadge({ qualified }: { qualified: boolean }) {
   return (
-    <View
-      style={{
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 12,
-        backgroundColor: qualified ? "#22c55e33" : "#ef444433",
-      }}
-    >
-      <Text
-        style={{
-          fontSize: 12,
-          fontWeight: "700",
-          color: qualified ? "#22c55e" : "#ef4444",
-        }}
-      >
-        {qualified ? "Qualifié" : "Non qualifié"}
+    <View style={{
+      paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8,
+      backgroundColor: qualified ? "rgba(34, 197, 94, 0.1)" : "rgba(239, 68, 68, 0.1)",
+      borderWidth: 1,
+      borderColor: qualified ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
+    }}>
+      <Text style={{ fontSize: 10, fontWeight: "700", color: qualified ? "#15803d" : "#b91c1c" }}>
+        {qualified ? "QUALIFIÉ" : "NON QUALIFIÉ"}
       </Text>
     </View>
   );

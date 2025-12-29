@@ -1,7 +1,8 @@
+// app/politique-de-confidentialite.tsx
 import { FontFamilies } from "@/constants/fonts";
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient"; // ✅ AJOUT
+import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useRouter } from "expo-router";
 import React from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -43,6 +44,10 @@ const sections = [
   {
     title: "8. Sécurité",
     body: "Nous mettons en œuvre des mesures de sécurité techniques (chiffrement TLS, règles de sécurité Firestore) et organisationnelles (journalisation des accès administrateurs) pour protéger vos données.",
+  },
+  {
+    title: "9. Retrait du Consentement",
+    body: "Vous avez la possibilité de retirer votre consentement au traitement de vos données personnelles à tout moment, une fois votre compte créé. Cette action peut être effectuée directement depuis les paramètres de votre compte dans l'application ou en nous contactant à l'adresse contact@greenup-app.com. Notez que le retrait du consentement peut entraîner la limitation ou l'impossibilité d'utiliser certaines fonctionnalités de l'application (comme la participation aux défis nécessitant une preuve photo).",
   },
 ];
 

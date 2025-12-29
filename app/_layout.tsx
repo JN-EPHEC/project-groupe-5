@@ -20,15 +20,15 @@ import { UserProvider, useUser } from "@/hooks/user-context";
 
 // FONTS
 import {
-    Baloo2_400Regular,
-    Baloo2_500Medium,
-    Baloo2_600SemiBold,
+  Baloo2_400Regular,
+  Baloo2_500Medium,
+  Baloo2_600SemiBold,
 } from "@expo-google-fonts/baloo-2";
 import { FredokaOne_400Regular } from "@expo-google-fonts/fredoka-one";
 import {
-    Quicksand_400Regular,
-    Quicksand_500Medium,
-    Quicksand_600SemiBold,
+  Quicksand_400Regular,
+  Quicksand_500Medium,
+  Quicksand_600SemiBold,
 } from "@expo-google-fonts/quicksand";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
