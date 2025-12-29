@@ -17,15 +17,20 @@ type Props = {
   onReport?: () => void;
 };
 
-// 🎨 THEME CHALLENGE CARD
+// 🎨 THEME CHALLENGE CARD (Inspiré du Header)
 const challengeTheme = {
+    // Mode Clair
     glassBg: ["rgba(240, 253, 244, 0.95)", "rgba(255, 255, 255, 0.85)"] as const,
-    // On rend le fond actif plus blanc pour le contraste avec le texte vert
     activeGlassBg: ["#FFFFFF", "#F0FDF4"] as const, 
     borderColor: "rgba(255, 255, 255, 0.6)",
     textMain: "#0A3F33",
     textMuted: "#4A665F",
     accent: "#008F6B",
+
+    // Mode Sombre (Nouveau Bleu/Vert Glass)
+    darkGlassBg: ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"] as const,
+    darkActiveGlassBg: ["rgba(0, 151, 178, 0.25)", "rgba(0, 151, 178, 0.1)"] as const,
+    darkBorderColor: "rgba(0, 151, 178, 0.3)",
 };
 
 export function ChallengeCard({
@@ -75,9 +80,9 @@ export function ChallengeCard({
 
   // Configuration de la difficulté (Couleurs)
   const diffColors = {
-      Facile: { bg: isLightMode ? "#E6FFFA" : "#142822", text: "#38A169" },
-      Moyen: { bg: isLightMode ? "#FFFBEB" : "#2A2617", text: "#D69E2E" },
-      Difficile: { bg: isLightMode ? "#FFF5F5" : "#2A171A", text: "#E53E3E" }
+      Facile: { bg: isLightMode ? "#E6FFFA" : "rgba(0, 143, 107, 0.15)", text: isLightMode ? "#38A169" : "#4ADE80" },
+      Moyen: { bg: isLightMode ? "#FFFBEB" : "rgba(214, 158, 46, 0.15)", text: isLightMode ? "#D69E2E" : "#FCD34D" },
+      Difficile: { bg: isLightMode ? "#FFF5F5" : "rgba(229, 62, 62, 0.15)", text: isLightMode ? "#E53E3E" : "#FC8181" }
   };
   const diffStyle = diffColors[challenge.difficulty as keyof typeof diffColors] || diffColors.Facile;
 
@@ -113,31 +118,34 @@ export function ChallengeCard({
 
   if (shouldHide) return null;
 
-  const Wrapper = isLightMode ? LinearGradient : View;
+  // On utilise LinearGradient dans les DEUX modes pour avoir le bel effet
+  const Wrapper = LinearGradient;
   
-  // Utilisation d'une bordure verte plus marquée quand c'est actif pour le contraste
-  const wrapperProps = isLightMode 
-    ? { 
-        colors: isOngoing ? challengeTheme.activeGlassBg : challengeTheme.glassBg, 
-        start: { x: 0, y: 0 }, 
-        end: { x: 1, y: 1 }, 
-        style: [
-            styles.card, 
-            styles.glassEffect, 
-            isOngoing && { borderColor: "#BBF7D0", borderWidth: 1.5 } // Bordure plus visible si actif
-        ] 
-      }
-    : { 
-        style: [styles.card, { backgroundColor: isOngoing ? "#1A2F28" : colors.surface, borderColor: 'rgba(0,151,178,0.3)', borderWidth: 1 }] 
-      };
+  const wrapperProps = { 
+    colors: isLightMode 
+        ? (isOngoing ? challengeTheme.activeGlassBg : challengeTheme.glassBg)
+        : (isOngoing ? challengeTheme.darkActiveGlassBg : challengeTheme.darkGlassBg), 
+    start: { x: 0, y: 0 }, 
+    end: { x: 1, y: 1 }, 
+    style: [
+        styles.card, 
+        styles.glassEffect, 
+        { 
+            borderColor: isLightMode ? challengeTheme.borderColor : challengeTheme.darkBorderColor,
+            borderWidth: 1 
+        },
+        // Bordure un peu plus marquée si actif
+        isOngoing && { borderColor: isLightMode ? "#BBF7D0" : "rgba(0, 151, 178, 0.6)", borderWidth: 1.5 } 
+    ] 
+  };
 
   return (
-    <Wrapper {...(wrapperProps as any)}>
+    <Wrapper {...wrapperProps}>
       {/* --- HEADER : CATEGORIE | DIFFICULTÉ | POINTS --- */}
       <View style={styles.header}>
         <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
             {/* 1. Catégorie */}
-            <View style={[styles.pill, { backgroundColor: isLightMode ? "rgba(0,143,107,0.1)" : colors.surfaceAlt }]}>
+            <View style={[styles.pill, { backgroundColor: isLightMode ? "rgba(0,143,107,0.1)" : "rgba(0, 151, 178, 0.2)" }]}>
               <Ionicons name={categoryIcon} size={13} color={accentColor} />
               <Text style={[styles.pillText, { color: accentColor }]}>{categoryLabel}</Text>
             </View>
@@ -152,9 +160,9 @@ export function ChallengeCard({
 
             {/* 3. Points (only for personal) */}
             {categorie === "personnel" && (
-              <View style={[styles.pill, { backgroundColor: isLightMode ? "#D1FAE5" : "#1F3A33" }]}>
-                <Ionicons name="leaf" size={13} color={isLightMode ? "#0F3327" : "#52D192"} />
-                <Text style={[styles.pillText, { color: isLightMode ? "#0F3327" : "#52D192" }]}>{challenge.points} pts</Text>
+              <View style={[styles.pill, { backgroundColor: isLightMode ? "#D1FAE5" : "rgba(0, 143, 107, 0.2)" }]}>
+                <Ionicons name="leaf" size={13} color={isLightMode ? "#0F3327" : "#4ADE80"} />
+                <Text style={[styles.pillText, { color: isLightMode ? "#0F3327" : "#4ADE80" }]}>{challenge.points} pts</Text>
               </View>
             )}
         </View>
@@ -180,7 +188,7 @@ export function ChallengeCard({
             // Club list item: show small progress bar under the description
             <>
               <View style={{ marginTop: 12 }}>
-                <View style={{ height: 8, backgroundColor: isLightMode ? "#E5E7EB" : colors.surfaceAlt, borderRadius: 6, overflow: "hidden" }}>
+                <View style={{ height: 8, backgroundColor: isLightMode ? "#E5E7EB" : "rgba(255,255,255,0.1)", borderRadius: 6, overflow: "hidden" }}>
                   <View style={{ width: `${Math.round((clubProgressValue / CLUB_DENOMINATOR) * 100)}%`, height: "100%", backgroundColor: accentColor }} />
                 </View>
                 <Text style={{ color: cardMuted, marginTop: 6, fontSize: 13 }}>{clubProgressValue}/{CLUB_DENOMINATOR} membres ont validé</Text>
@@ -212,8 +220,8 @@ export function ChallengeCard({
           {/* TIMER */}
           {(status === "active" || status === "pendingValidation") && (
               <LinearGradient
-                colors={isLightMode ? ["#FFFFFF", "#F7FDF9"] : ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"]}
-                style={[styles.timerPill, { borderColor: isLightMode ? "#A7F3D0" : "rgba(0, 151, 178, 0.4)" }]}
+                colors={isLightMode ? ["#FFFFFF", "#F7FDF9"] : ["rgba(255,255,255,0.1)", "rgba(255,255,255,0.05)"]}
+                style={[styles.timerPill, { borderColor: isLightMode ? "#A7F3D0" : "rgba(255,255,255,0.1)" }]}
               > 
               <Ionicons name="time-outline" size={18} color={accentColor} />
               <Text style={[styles.timerText, { color: cardText }]}>
@@ -230,7 +238,7 @@ export function ChallengeCard({
               activeOpacity={0.9}
             >
               <LinearGradient
-                  colors={isLightMode ? ["#34D399", "#059669"] : [colors.accent, colors.accent]}
+                  colors={isLightMode ? ["#34D399", "#059669"] : [colors.accent, "#006C51"]}
                   style={styles.photoBtn}
               >
                 <Ionicons name="camera" size={20} color="#FFF" style={{ marginRight: 8 }} />
@@ -242,7 +250,7 @@ export function ChallengeCard({
           {/* ANNULER (Rouge clair pour contraste) */}
           {status === "active" && (
             <TouchableOpacity 
-                style={[styles.cancelBtn, { backgroundColor: isLightMode ? "#FEF2F2" : "#2A171A", borderColor: "#FCA5A5" }]} 
+                style={[styles.cancelBtn, { backgroundColor: isLightMode ? "#FEF2F2" : "rgba(239, 68, 68, 0.15)", borderColor: isLightMode ? "#FCA5A5" : "rgba(239, 68, 68, 0.3)" }]} 
                 onPress={() => setConfirmVisible(true)}
             >
               <Ionicons name="close-circle" size={18} color="#EF4444" style={{ marginRight: 6 }} />
@@ -253,7 +261,7 @@ export function ChallengeCard({
           {/* --- AFFICHAGE PREUVE (EN ATTENTE) --- */}
           {status === "pendingValidation" && current?.id === challenge.id && current?.photoUri && (
             <View style={{ marginTop: 8 }}>
-              <View style={[styles.proofContainer, { borderColor: isLightMode ? "#fff" : "#333" }]}>
+              <View style={[styles.proofContainer, { borderColor: isLightMode ? "#fff" : "rgba(255,255,255,0.2)" }]}>
                   <Image source={{ uri: current.photoUri }} style={{ height: 180, width: '100%' }} resizeMode="cover" />
               </View>
               {current.photoComment ? (
@@ -264,7 +272,7 @@ export function ChallengeCard({
 
           {/* 🟠 WAITING FOR VALIDATION */}
           {status === "pendingValidation" && !isValidatedAndClaimed && (
-            <View style={[styles.statusPill, { backgroundColor: isLightMode ? "#FFFBEB" : "#2A2617", borderColor: "#FCD34D" }]}>
+            <View style={[styles.statusPill, { backgroundColor: isLightMode ? "#FFFBEB" : "rgba(245, 158, 11, 0.15)", borderColor: isLightMode ? "#FCD34D" : "rgba(245, 158, 11, 0.3)" }]}>
               <Ionicons name="hourglass" size={18} color="#D97706" style={{ marginRight: 6 }} />
               <Text style={{ color: "#D97706", fontWeight: "700" }}>En attente de validation</Text>
             </View>
@@ -272,7 +280,7 @@ export function ChallengeCard({
 
           {/* 🟢 FULLY VALIDATED & POINTS CREDITED */}
           {isValidatedAndClaimed && (
-            <View style={[styles.statusPill, { backgroundColor: isLightMode ? "#ECFDF5" : "#142822", borderColor: "#34D399" }]}>
+            <View style={[styles.statusPill, { backgroundColor: isLightMode ? "#ECFDF5" : "rgba(16, 185, 129, 0.15)", borderColor: isLightMode ? "#34D399" : "rgba(16, 185, 129, 0.3)" }]}>
               <Ionicons name="checkmark-circle" size={18} color="#059669" style={{ marginRight: 6 }} />
               <Text style={{ color: "#059669", fontWeight: "700" }}>Votre défi a été validé 🎉</Text>
             </View>
@@ -288,17 +296,17 @@ export function ChallengeCard({
         onRequestClose={() => setConfirmVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: isLightMode ? "#FFF" : colors.card }]}> 
+          <View style={[styles.modalCard, { backgroundColor: isLightMode ? "#FFF" : "#1F2937", borderColor: isLightMode ? "transparent" : "rgba(255,255,255,0.1)", borderWidth: 1 }]}> 
             <Text style={[styles.modalTitle, { color: cardText }]}>Annuler le défi</Text>
             <Text style={{ color: cardMuted, marginTop: 6 }}>
               Êtes-vous sûr d&apos;annuler ce défi ?
             </Text>
             <View style={styles.modalButtons}>
               <TouchableOpacity
-                style={[styles.modalBtn, { backgroundColor: isLightMode ? "#F3F4F6" : "#2A3431" }]}
+                style={[styles.modalBtn, { backgroundColor: isLightMode ? "#F3F4F6" : "rgba(255,255,255,0.1)" }]}
                 onPress={() => setConfirmVisible(false)}
               >
-                <Text style={{ color: isLightMode ? "#4B5563" : "#E6FFF5", fontWeight: "700" }}>Non</Text>
+                <Text style={{ color: isLightMode ? "#4B5563" : "#FFF", fontWeight: "700" }}>Non</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalBtn, { backgroundColor: "#EF4444" }]}
@@ -320,9 +328,8 @@ export function ChallengeCard({
 const styles = StyleSheet.create({
   card: { borderRadius: 24, padding: 18, marginBottom: 14 },
   glassEffect: {
-    borderWidth: 1,
-    borderColor: challengeTheme.borderColor,
-    shadowColor: "#005c4b",
+    // Shadow est géré ici mais le background vient du wrapperProps
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.05,
     shadowRadius: 10,
@@ -416,7 +423,7 @@ const styles = StyleSheet.create({
   // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
+    backgroundColor: "rgba(0,0,0,0.6)",
     alignItems: "center",
     justifyContent: "center",
     padding: 24,

@@ -1,6 +1,6 @@
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient"; // ✅ AJOUT
+import { LinearGradient } from "expo-linear-gradient";
 import React, { useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -29,12 +29,17 @@ const REPORT_REASONS = [
 
 // 🎨 THEME REPORT MODAL
 const reportTheme = {
+    // Mode Clair
     glassBg: ["rgba(255, 255, 255, 0.95)", "rgba(240, 253, 244, 0.95)"] as const,
     borderColor: "rgba(255, 255, 255, 0.6)",
     textMain: "#0A3F33", 
     textMuted: "#4A665F",
-    accent: "#008F6B", // Vert Marque
+    accent: "#008F6B", 
     danger: "#EF4444",
+
+    // Mode Sombre (Nouveau Bleu/Vert Glass Harmonisé)
+    darkGlassBg: ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"] as const,
+    darkBorderColor: "rgba(0, 151, 178, 0.3)",
 };
 
 export function ReportModal({ visible, onClose, onSubmit }: Props) {
@@ -62,18 +67,22 @@ export function ReportModal({ visible, onClose, onSubmit }: Props) {
   const titleColor = isLight ? reportTheme.textMain : colors.text;
   const textColor = isLight ? reportTheme.textMuted : colors.mutedText;
 
-  // Wrapper conditionnel (LinearGradient si Light, View si Dark)
-  const Wrapper = isLight ? LinearGradient : View;
-  const wrapperProps = isLight 
-    ? { 
-        colors: reportTheme.glassBg, 
-        start: { x: 0, y: 0 }, 
-        end: { x: 1, y: 1 }, 
-        style: [styles.card, styles.glassEffect] 
-      }
-    : { 
-        style: [styles.card, { backgroundColor: colors.surface || "#1A2F28", borderColor: 'rgba(0,151,178,0.3)', borderWidth: 1 }] 
-      };
+  // Wrapper conditionnel (Toujours LinearGradient pour l'effet glass)
+  const Wrapper = LinearGradient;
+  
+  const wrapperProps = { 
+    colors: isLight ? reportTheme.glassBg : reportTheme.darkGlassBg, 
+    start: { x: 0, y: 0 }, 
+    end: { x: 1, y: 1 }, 
+    style: [
+        styles.card, 
+        styles.glassEffect, 
+        { 
+            borderColor: isLight ? reportTheme.borderColor : reportTheme.darkBorderColor,
+            borderWidth: 1 
+        }
+    ] 
+  };
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -83,9 +92,9 @@ export function ReportModal({ visible, onClose, onSubmit }: Props) {
       >
         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
         
-        <Wrapper {...(wrapperProps as any)}>
+        <Wrapper {...wrapperProps}>
           <View style={styles.header}>
-              <View style={[styles.iconContainer, { backgroundColor: isLight ? "#FEF2F2" : "#2A171A" }]}>
+              <View style={[styles.iconContainer, { backgroundColor: isLight ? "#FEF2F2" : "rgba(239, 68, 68, 0.15)" }]}>
                 <Ionicons name="warning-outline" size={24} color={reportTheme.danger} />
               </View>
               <Text style={[styles.title, { color: titleColor }]}>
@@ -108,8 +117,8 @@ export function ReportModal({ visible, onClose, onSubmit }: Props) {
                   style={[
                     styles.chip,
                     { 
-                      borderColor: isSelected ? reportTheme.danger : (isLight ? "rgba(0,143,107,0.2)" : colors.mutedText),
-                      backgroundColor: isSelected ? reportTheme.danger : (isLight ? "rgba(255,255,255,0.5)" : "transparent")
+                      borderColor: isSelected ? reportTheme.danger : (isLight ? "rgba(0,143,107,0.2)" : "rgba(255,255,255,0.1)"),
+                      backgroundColor: isSelected ? reportTheme.danger : (isLight ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.05)")
                     }
                   ]}
                 >
@@ -131,8 +140,8 @@ export function ReportModal({ visible, onClose, onSubmit }: Props) {
               styles.input, 
               { 
                 color: isLight ? reportTheme.textMain : colors.text, 
-                borderColor: isLight ? "rgba(0,143,107,0.2)" : colors.mutedText,
-                backgroundColor: isLight ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.05)" 
+                borderColor: isLight ? "rgba(0,143,107,0.2)" : "rgba(255,255,255,0.1)",
+                backgroundColor: isLight ? "rgba(255,255,255,0.8)" : "rgba(0,0,0,0.2)" 
               }
             ]}
             placeholder="Détails supplémentaires (optionnel)..."
@@ -144,7 +153,7 @@ export function ReportModal({ visible, onClose, onSubmit }: Props) {
 
           {/* Boutons d'action */}
           <View style={styles.buttons}>
-            <TouchableOpacity onPress={onClose} style={[styles.btn, { backgroundColor: isLight ? "#F3F4F6" : "transparent" }]}>
+            <TouchableOpacity onPress={onClose} style={[styles.btn, { backgroundColor: isLight ? "#F3F4F6" : "rgba(255,255,255,0.1)" }]}>
               <Text style={{ color: isLight ? "#4B5563" : colors.mutedText, fontWeight: "600" }}>Annuler</Text>
             </TouchableOpacity>
             
@@ -185,8 +194,7 @@ const styles = StyleSheet.create({
     maxWidth: 340,
   },
   glassEffect: {
-    borderWidth: 1,
-    borderColor: reportTheme.borderColor,
+    // Shadow est géré ici mais le background vient du wrapperProps
     shadowColor: "#000",
     shadowOpacity: 0.15,
     shadowRadius: 20,

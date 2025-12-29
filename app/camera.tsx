@@ -1,18 +1,18 @@
-// app/camera.tsx
 import { Ionicons } from "@expo/vector-icons";
-import { CameraView, useCameraPermissions } from "expo-camera";
-import * as ImagePicker from 'expo-image-picker'; // ✅ AJOUT: Galerie
+import { CameraView, useCameraPermissions } from "expo-camera"; // ❌ Micro supprimé
+import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Image,
-  Linking, // ✅ AJOUT: Réglages
+  Linking,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -25,7 +25,9 @@ const cameraTheme = {
 };
 
 export default function CameraScreen() {
-  const [permission, requestPermission] = useCameraPermissions();
+  // Permissions Caméra uniquement
+  const [camPermission, requestCamPermission] = useCameraPermissions();
+  
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const cameraRef = useRef<CameraView>(null);
   const [facing, setFacing] = useState<"back" | "front">("back");
@@ -35,44 +37,61 @@ export default function CameraScreen() {
   const [navigating, setNavigating] = useState(false);
   const insets = useSafeAreaInsets();
 
-  // Gestion intelligente de la demande de permission
-  const handleRequestPermission = async () => {
-    if (!permission) return;
-
-    if (permission.status === 'denied' && !permission.canAskAgain) {
-      // Si refusé définitivement -> Ouvrir les réglages
-      Alert.alert(
-        "Caméra requise",
-        "L'accès à la caméra est bloqué. Veuillez l'activer dans les réglages de votre iPhone.",
-        [
-          { text: "Annuler", style: "cancel" },
-          { text: "Ouvrir les réglages", onPress: () => Linking.openSettings() }
-        ]
-      );
-    } else {
-      // Sinon, demander la permission normalement
-      await requestPermission();
+  // Gestion de la demande de permission Caméra
+  const handleRequestCamPermission = async () => {
+    const response = await requestCamPermission();
+    
+    // Si toujours refusé après la demande, on guide vers les réglages
+    if (!response.granted && !response.canAskAgain) {
+        Alert.alert(
+            "Caméra bloquée",
+            "L'accès à la caméra est nécessaire. Veuillez l'activer dans les réglages.",
+            [
+                { text: "Annuler", style: "cancel" },
+                { text: "Ouvrir les réglages", onPress: () => Linking.openSettings() }
+            ]
+        );
     }
   };
 
   // ✅ FONCTION: PRENDRE UNE PHOTO
   const takePicture = async () => {
     try {
-      const photo = await cameraRef.current?.takePictureAsync({ quality: 0.8 }); // Optimisation qualité
+      const photo = await cameraRef.current?.takePictureAsync({ quality: 0.8 }); 
       if (photo?.uri) checkImageSizeAndSet(photo.uri);
     } catch (e) {
       console.warn(e);
     }
   };
 
-  // ✅ FONCTION: CHOISIR DEPUIS LA GALERIE
+  // ✅ FONCTION: CHOISIR DEPUIS LA GALERIE (Avec redirection réglages si besoin)
   const pickImage = async () => {
     try {
+      // 1. Vérifier/Demander la permission Galerie
+      const { status, canAskAgain } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (status !== 'granted') {
+          if (!canAskAgain) {
+              // Si refusé définitivement -> Réglages
+              Alert.alert(
+                  "Photos bloquées",
+                  "L'accès à vos photos est nécessaire. Veuillez l'activer dans les réglages.",
+                  [
+                      { text: "Annuler", style: "cancel" },
+                      { text: "Ouvrir les réglages", onPress: () => Linking.openSettings() }
+                  ]
+              );
+          } else {
+              Alert.alert("Permission requise", "Nous avons besoin d'accéder à vos photos.");
+          }
+          return;
+      }
+
+      // 2. Ouvrir la galerie
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images, // Photos uniquement
-        allowsEditing: false, // On garde l'originale
+        mediaTypes: ImagePicker.MediaTypeOptions.Images, 
+        allowsEditing: false, 
         quality: 0.8,
-        // legacy: true, // Parfois utile sur Android
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -85,18 +104,24 @@ export default function CameraScreen() {
 
   // ✅ VALIDATION TAILLE (Max 10 Mo)
   const checkImageSizeAndSet = async (uri: string, fileSize?: number) => {
-    // Si fileSize n'est pas fourni (cas caméra), on pourrait vérifier le fichier, 
-    // mais ici on fait confiance à la compression quality: 0.8 qui dépasse rarement 10Mo.
-    
-    if (fileSize && fileSize > 10 * 1024 * 1024) { // 10 Mo en octets
+    if (fileSize && fileSize > 10 * 1024 * 1024) { 
         Alert.alert("Image trop lourde", "La photo doit faire moins de 10 Mo.");
         return;
     }
     setPhotoUri(uri);
   };
 
-  // ---- ECRAN PERMISSION (NON ACCORDÉE) ----
-  if (!permission || !permission.granted) {
+  // ---- CHARGEMENT INITIAL ----
+  if (!camPermission) {
+      return (
+          <View style={{flex: 1, backgroundColor: "#000", justifyContent: 'center', alignItems: 'center'}}>
+              <ActivityIndicator size="large" color="#008F6B" />
+          </View>
+      );
+  }
+
+  // ---- ECRAN PERMISSION CAMÉRA (SI NON ACCORDÉE) ----
+  if (!camPermission.granted) {
     return (
       <View style={{ flex: 1 }}>
         <LinearGradient colors={cameraTheme.bgGradient} style={styles.center}>
@@ -106,7 +131,7 @@ export default function CameraScreen() {
                 <Text style={styles.permDesc}>
                 Pour valider vos défis écologiques, nous avons besoin d'accéder à votre appareil photo.
                 </Text>
-                <TouchableOpacity onPress={handleRequestPermission} activeOpacity={0.8}>
+                <TouchableOpacity onPress={handleRequestCamPermission} activeOpacity={0.8}>
                     <LinearGradient
                         colors={["#008F6B", "#10B981"]}
                         style={styles.permBtn}
@@ -115,7 +140,6 @@ export default function CameraScreen() {
                     </LinearGradient>
                 </TouchableOpacity>
                 
-                {/* Bouton retour si on ne veut pas autoriser */}
                 <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 20 }}>
                     <Text style={{ color: "#AAA", textDecorationLine: "underline" }}>Annuler</Text>
                 </TouchableOpacity>
@@ -197,8 +221,6 @@ export default function CameraScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
             <Ionicons name="close" size={28} color="#FFF" />
         </TouchableOpacity>
-
-        {/* Flash ou autre option ici si besoin */}
       </View>
 
       {/* Bottom Controls */}
@@ -262,12 +284,12 @@ const styles = StyleSheet.create({
   controls: {
     position: "absolute", bottom: 0, width: "100%",
     flexDirection: 'row', 
-    justifyContent: "space-around", // Répartit les 3 boutons (Galerie, Shutter, Switch)
+    justifyContent: "space-around", 
     alignItems: "center",
     paddingHorizontal: 30
   },
   
-  // Side Buttons (Galerie & Switch)
+  // Side Buttons
   sideBtn: {
       width: 50, height: 50, borderRadius: 25,
       backgroundColor: "rgba(0,0,0,0.3)",
@@ -277,7 +299,6 @@ const styles = StyleSheet.create({
 
   // Shutter Button
   shutterContainer: {
-      // Un peu d'espace pour que le bouton central respire
   },
   shutterOuter: {
     width: 84, height: 84, borderRadius: 42,

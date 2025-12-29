@@ -2,7 +2,7 @@
 import { useChallenges } from "@/hooks/challenges-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient"; // ✅ Added LinearGradient
+import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useMemo, useState } from "react";
 import { Image, Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import type { ClubChallenge } from "./types";
@@ -16,14 +16,21 @@ type Props = {
   onValidatePhoto?: () => void;
 };
 
-// 🎨 THEME CLUB CHALLENGE CARD
+// 🎨 THEME CLUB CHALLENGE CARD (Harmonisé avec ChallengeCard)
 const clubChallengeTheme = {
-  glassBg: ["rgba(240, 253, 244, 0.95)", "rgba(255, 255, 255, 0.85)"] as const,
-  activeGlassBg: ["#E0F7EF", "#D1FAE5"] as const,
-  borderColor: "rgba(255, 255, 255, 0.6)",
-  textMain: "#0A3F33",
-  textMuted: "#4A665F",
-  accent: "#008F6B",
+    // Mode Clair
+    glassBg: ["rgba(240, 253, 244, 0.95)", "rgba(255, 255, 255, 0.85)"] as const,
+    // ✅ MODIF: Blanc cassé vert (comme ChallengeCard) au lieu du vert soutenu
+    activeGlassBg: ["#FFFFFF", "#F0FDF4"] as const, 
+    borderColor: "rgba(255, 255, 255, 0.6)",
+    textMain: "#0A3F33",
+    textMuted: "#4A665F",
+    accent: "#008F6B",
+
+    // Mode Sombre
+    darkGlassBg: ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"] as const,
+    darkActiveGlassBg: ["rgba(0, 151, 178, 0.25)", "rgba(0, 151, 178, 0.1)"] as const,
+    darkBorderColor: "rgba(0, 151, 178, 0.3)",
 };
 
 export function ClubChallengeCard({ challenge, participating, status, onParticipate, onCancel, onValidatePhoto }: Props) {
@@ -45,9 +52,7 @@ export function ClubChallengeCard({ challenge, participating, status, onParticip
   const [confirmVisible, setConfirmVisible] = useState(false);
   const { currentClub, reviewCompletedClub, reviewRequiredCountClub } = useChallenges();
 
-  // Hide logic — only hide when the club challenge is itself in pendingValidation
-  // and the club validation counters indicate the gate has been reached.
-
+  // Hide logic
   const shouldHide = useMemo(() => {
     if (!participating) return false;
 
@@ -69,14 +74,10 @@ export function ClubChallengeCard({ challenge, participating, status, onParticip
 
     const computeNextMondayNoon = () => {
       const now = new Date();
-
-      // Get next Monday (0=Sun .. 1=Mon .. 6=Sat)
       const day = now.getDay();
-      const daysUntilMonday = (8 - day) % 7; // if today is Monday and before noon -> 0
-
+      const daysUntilMonday = (8 - day) % 7; 
       const target = new Date(now);
 
-      // If today is Monday and before 12:00, target is today at 12:00
       if (day === 1 && now.getHours() < 12) {
         target.setHours(12, 0, 0, 0);
       } else {
@@ -104,51 +105,49 @@ export function ClubChallengeCard({ challenge, participating, status, onParticip
     if (days > 0) {
       return `${days}j ${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m`;
     }
-
     return `${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
   };
 
   // Wrapper Selection
-  const Wrapper = isLight ? LinearGradient : View;
-  const wrapperProps = isLight
-    ? {
-        colors: participating ? clubChallengeTheme.activeGlassBg : clubChallengeTheme.glassBg,
-        start: { x: 0, y: 0 },
-        end: { x: 1, y: 1 },
-        style: [styles.card, styles.glassEffect],
-      }
-    : {
-        style: [
-          styles.card,
-          {
-            backgroundColor: participating ? "#1A2F28" : colors.surface,
-            borderColor: "rgba(0,151,178,0.3)",
+  const Wrapper = LinearGradient;
+  
+  const wrapperProps = {
+    colors: isLight 
+        ? (participating ? clubChallengeTheme.activeGlassBg : clubChallengeTheme.glassBg)
+        : (participating ? clubChallengeTheme.darkActiveGlassBg : clubChallengeTheme.darkGlassBg),
+    start: { x: 0, y: 0 },
+    end: { x: 1, y: 1 },
+    style: [
+        styles.card, 
+        styles.glassEffect, 
+        {
+            borderColor: isLight ? clubChallengeTheme.borderColor : clubChallengeTheme.darkBorderColor,
             borderWidth: 1,
-          },
-        ],
-      };
+        },
+        // ✅ AJOUT: Bordure verte active comme sur ChallengeCard
+        participating && { borderColor: isLight ? "#BBF7D0" : "rgba(0, 151, 178, 0.6)", borderWidth: 1.5 }
+    ],
+  };
 
   return (
-    <Wrapper {...(wrapperProps as any)}>
+    <Wrapper {...wrapperProps}>
       <View style={styles.header}> 
-        <View style={[styles.categoryPill, { backgroundColor: isLight ? "rgba(0,143,107,0.1)" : colors.surfaceAlt }]}>
+        <View style={[styles.categoryPill, { backgroundColor: isLight ? "rgba(0,143,107,0.1)" : "rgba(0, 151, 178, 0.2)" }]}>
           <Ionicons name={categoryIcon} size={14} color={accentColor} />
           <Text style={[styles.categoryText, { color: accentColor }]}>{categoryLabel}</Text>
         </View>
       </View>
 
       <Text style={[styles.title, { color: cardText }]}>{challenge.title}</Text>
-      <Text style={[styles.description, { color: cardMuted }]}>{challenge.description}</Text>
-
-
+      <Text style={[styles.description, { color: cardMuted, marginBottom: participating ? 10 : 16 }]}>{challenge.description}</Text>
 
       {participating && (
         <LinearGradient
-            colors={isLight ? ["#FFFFFF", "#F0FDF4"] : ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"]}
-            style={[styles.timerPill, { borderColor: isLight ? "#BBF7D0" : "rgba(0, 151, 178, 0.4)" }]}
+            colors={isLight ? ["#FFFFFF", "#F7FDF9"] : ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"]}
+            style={[styles.timerPill, { borderColor: isLight ? "#A7F3D0" : "rgba(0, 151, 178, 0.4)" }]}
         >
           <Ionicons name="time-outline" size={18} color={accentColor} />
-          <Text style={[styles.timerText, { color: cardText }]}>Temps restant jusqu'à lundi 12:00 : {formatTime(remainingMs)}</Text>
+          <Text style={[styles.timerText, { color: cardText }]}>Fin : {formatTime(remainingMs)}</Text>
         </LinearGradient>
       )}
 
@@ -157,7 +156,7 @@ export function ClubChallengeCard({ challenge, participating, status, onParticip
         <View style={{ marginTop: 14 }}>
           <Text style={{ color: cardText, fontWeight: "700", marginBottom: 6 }}>Progression du club</Text>
 
-          <View style={{ height: 10, borderRadius: 8, backgroundColor: isLight ? "#E5E7EB" : "#0f1f1b", overflow: "hidden" }}>
+          <View style={{ height: 10, borderRadius: 8, backgroundColor: isLight ? "#E5E7EB" : "rgba(255,255,255,0.1)", overflow: "hidden" }}>
             <View style={{ width: `${Math.round((progressCount / CLUB_DENOMINATOR) * 100)}%`, height: "100%", backgroundColor: accentColor }} />
           </View>
 
@@ -168,7 +167,7 @@ export function ClubChallengeCard({ challenge, participating, status, onParticip
       <View style={{ marginTop: 20 }}>
         {participating ? (
           <>
-            {/* Photo validation button (mirror perso) */}
+            {/* Photo validation button */}
             {status === "active" && onValidatePhoto && (
               <TouchableOpacity
                 style={[styles.shadowBtn]}
@@ -176,7 +175,7 @@ export function ClubChallengeCard({ challenge, participating, status, onParticip
                 activeOpacity={0.9}
               >
                 <LinearGradient
-                    colors={isLight ? ["#34D399", "#059669"] : [colors.accent, colors.accent]}
+                    colors={isLight ? ["#34D399", "#059669"] : [colors.accent, "#006C51"]}
                     style={styles.photoBtn}
                 >
                     <Ionicons name="camera" size={20} color="#FFF" style={{ marginRight: 8 }} />
@@ -185,27 +184,26 @@ export function ClubChallengeCard({ challenge, participating, status, onParticip
               </TouchableOpacity>
             )}
 
-            {/* If proof submitted (pendingValidation), show the proof preview */}
+            {/* If proof submitted (pendingValidation) */}
             {status === "pendingValidation" && (
               <View style={{ marginTop: 8 }}>
-                <View style={[styles.proofContainer, { borderColor: isLight ? "#fff" : "#333" }]}>
+                <View style={[styles.proofContainer, { borderColor: isLight ? "#fff" : "rgba(255,255,255,0.1)" }]}>
                     <Image source={{ uri: (challenge as any).photoUri || "" }} style={{ height: 180, width: '100%' }} resizeMode="cover" />
                 </View>
 
-                {/* Pending status — mirror perso: user cannot cancel after proof submitted */}
-                <View style={{ marginTop: 10, borderRadius: 12, padding: 12, backgroundColor: isLight ? "#FFFBEB" : "#2A2617", borderWidth: 1, borderColor: "#FCD34D" }}>
-                  <Text style={{ color: "#D97706", fontWeight: "700" }}>Ta preuve est en cours de validation</Text>
+                <View style={{ marginTop: 10, borderRadius: 12, padding: 12, backgroundColor: isLight ? "#FFFBEB" : "rgba(245, 158, 11, 0.15)", borderWidth: 1, borderColor: isLight ? "#FCD34D" : "rgba(245, 158, 11, 0.3)" }}>
+                  <Text style={{ color: "#D97706", fontWeight: "700", textAlign: "center" }}>Ta preuve est en cours de validation</Text>
                 </View>
               </View>
             )}
 
             {status !== "pendingValidation" && (
               <TouchableOpacity
-                style={[styles.cancelBtn, { borderColor: "#FCA5A5", backgroundColor: isLight ? "#FEF2F2" : "#2A171A", marginTop: 12 }]}
+                style={[styles.cancelBtn, { borderColor: isLight ? "#FCA5A5" : "rgba(239, 68, 68, 0.3)", backgroundColor: isLight ? "#FEF2F2" : "rgba(239, 68, 68, 0.15)", marginTop: 12 }]}
                 onPress={() => setConfirmVisible(true)}
               >
+                <Ionicons name="close-circle" size={18} color="#EF4444" style={{ marginRight: 6 }} />
                 <Text style={[styles.cancelText, { color: "#EF4444" }]}>Annuler le défi</Text>
-                <Ionicons name="close-circle" size={18} color="#EF4444" style={{ marginLeft: 8 }} />
               </TouchableOpacity>
             )}
           </>
@@ -227,15 +225,15 @@ export function ClubChallengeCard({ challenge, participating, status, onParticip
         onRequestClose={() => setConfirmVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: isLight ? "#FFF" : colors.card }]}>
+          <View style={[styles.modalCard, { backgroundColor: isLight ? "#FFF" : "#1F2937", borderColor: isLight ? "transparent" : "rgba(255,255,255,0.1)", borderWidth: 1 }]}>
             <Text style={[styles.modalTitle, { color: cardText }]}>Annuler le défi</Text>
             <Text style={{ color: cardMuted, marginTop: 6 }}>Êtes-vous sûr d'annuler ce défi ?</Text>
             <View style={styles.modalButtons}>
               <TouchableOpacity
-                style={[styles.modalBtn, { backgroundColor: isLight ? "#F3F4F6" : "#2A3431" }]}
+                style={[styles.modalBtn, { backgroundColor: isLight ? "#F3F4F6" : "rgba(255,255,255,0.1)" }]}
                 onPress={() => setConfirmVisible(false)}
               >
-                <Text style={{ color: isLight ? "#4B5563" : "#E6FFF5", fontWeight: "700" }}>Non</Text>
+                <Text style={{ color: isLight ? "#4B5563" : "#FFF", fontWeight: "700" }}>Non</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalBtn, { backgroundColor: "#EF4444" }]}
@@ -257,8 +255,6 @@ export function ClubChallengeCard({ challenge, participating, status, onParticip
 const styles = StyleSheet.create({
   card: { borderRadius: 24, padding: 20, marginBottom: 18 },
   glassEffect: {
-    borderWidth: 1,
-    borderColor: clubChallengeTheme.borderColor,
     shadowColor: "#005c4b",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.05,
@@ -282,7 +278,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   pointsText: { fontWeight: "700", marginLeft: 6, fontSize: 12 },
-  title: { fontSize: 18, fontWeight: "700", marginTop: 16, fontFamily: "StylizedTitle" }, // Adapte la police
+  title: { fontSize: 18, fontWeight: "700", marginTop: 16, fontFamily: "StylizedTitle" },
   description: { marginTop: 8, lineHeight: 22, fontSize: 14 },
   counterRow: { flexDirection: "row", alignItems: "center", marginTop: 12, gap: 8 },
   counterText: { fontWeight: "600", fontSize: 13 },
@@ -322,6 +318,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 8,
   },
   timerText: { fontWeight: "600", fontSize: 14 },

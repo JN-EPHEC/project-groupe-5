@@ -9,7 +9,7 @@ export type Coupon = {
   name: string;
   voucherAmountEuro: number;
   code: string;
-  expiresAt: string; 
+  expiresAt: string; // Attendu: YYYY-MM-DD
   obtainedAt: number;
 };
 
@@ -38,15 +38,24 @@ export function CouponsProvider({ children }: { children: React.ReactNode }) {
 
     const unsubscribe = onSnapshot(collection(db, "users", user.uid, "coupons"), (snapshot) => {
       const list: Coupon[] = [];
-      const now = new Date();
+      // On compare des chaînes ISO (YYYY-MM-DD) car c'est plus fiable que new Date() sur mobile
+      const todayISO = new Date().toISOString().split('T')[0]; 
 
       snapshot.forEach((document) => {
         const data = document.data() as Coupon;
-        const expiryDate = new Date(data.expiresAt);
         
-        if (expiryDate < now) {
-          deleteDoc(doc(db, "users", user.uid, "coupons", document.id));
+        // Sécurité : si pas de date, on garde par défaut (ou on supprime, au choix)
+        if (!data.expiresAt) {
+            list.push(data);
+            return;
+        }
+
+        // Comparaison simple de chaînes : "2024-01-01" < "2025-01-01" est TRUE
+        if (data.expiresAt < todayISO) {
+          // Expiré : on supprime de Firebase
+          deleteDoc(doc(db, "users", user.uid, "coupons", document.id)).catch(err => console.log("Auto-delete error", err));
         } else {
+          // Valide : on garde dans la liste
           list.push(data);
         }
       });
@@ -81,6 +90,12 @@ export function CouponsProvider({ children }: { children: React.ReactNode }) {
 
             if (!rewardData.isActive) {
                 throw "Offre désactivée.";
+            }
+
+            // Vérifier expiration à l'achat aussi
+            const todayISO = new Date().toISOString().split('T')[0];
+            if (rewardData.expiresAt && rewardData.expiresAt < todayISO) {
+                 throw "Cette offre a expiré.";
             }
 
             // C. Vérifier si l'utilisateur l'a déjà (Double sécurité)

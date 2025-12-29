@@ -1,69 +1,37 @@
-import React, { useRef } from "react";
-import { Linking, Modal, Share, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import QRCode from "react-native-qrcode-svg";
-// NOTE: Avoid static imports for expo-file-system / expo-sharing to prevent web bundler errors
-// We'll dynamic import them only when needed inside share handlers.
 import { Ionicons } from "@expo/vector-icons";
+import React from "react";
+import { Modal, Share, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import QRCode from "react-native-qrcode-svg";
 
 export type ShareQRModalProps = {
   visible: boolean;
   onClose: () => void;
   title?: string;
   subtitle?: string;
-  qrValue: string; // data encoded in the QR
-  shareText?: string; // text for shares (WhatsApp / generic)
+  qrValue: string; // La donnée du QR (le lien)
+  shareText?: string; // Le texte à partager
   accentColor?: string;
 };
 
-export const ShareQRModal: React.FC<ShareQRModalProps> = ({ visible, onClose, title = "Partager", subtitle, qrValue, shareText, accentColor = "#34D399" }) => {
-  const qrRef = useRef<QRCode | null>(null);
+export const ShareQRModal: React.FC<ShareQRModalProps> = ({ 
+  visible, 
+  onClose, 
+  title = "Partager", 
+  subtitle, 
+  qrValue, 
+  shareText, 
+  accentColor = "#34D399" 
+}) => {
 
-  const shareQRImage = async () => {
+  // Fonction simple de partage natif (Lien / Texte)
+  const handleShare = async () => {
     try {
-      // Dynamically import native modules only when invoked
-      const FileSystem = await import("expo-file-system");
-      const Sharing = await import("expo-sharing");
-      const cacheDir = (FileSystem as any).cacheDirectory || (FileSystem as any).documentDirectory || "";
-      const filePath = cacheDir + `qr-${Date.now()}.png`;
-      const asText = await new Promise<string>((resolve) => {
-        // @ts-ignore - types don't expose toDataURL in defs
-        qrRef.current?.toDataURL((data: string) => resolve(data));
+      await Share.share({ 
+        message: shareText || qrValue,
+        // url: qrValue // Utile sur iOS pour que ça soit reconnu comme lien direct
       });
-      await (FileSystem as any).writeAsStringAsync(filePath, asText, { encoding: (FileSystem as any).EncodingType.Base64 });
-      if (await (Sharing as any).isAvailableAsync()) {
-        await (Sharing as any).shareAsync(filePath);
-      } else {
-        // Fallback to generic share of link/text if image sharing unavailable
-        await Share.share({ message: shareText || qrValue });
-      }
-    } catch (e) {
-      await Share.share({ message: shareText || qrValue });
-    }
-  };
-
-  const shareLinkGeneric = async () => {
-    await Share.share({ message: shareText || qrValue });
-  };
-
-  const shareWhatsApp = async () => {
-    const msg = encodeURIComponent(shareText || qrValue);
-    const url = `whatsapp://send?text=${msg}`;
-    const canOpen = await Linking.canOpenURL(url);
-    if (canOpen) {
-      await Linking.openURL(url);
-    } else {
-      await shareLinkGeneric();
-    }
-  };
-  const shareInstagram = async () => {
-    // Try opening Instagram, then fall back to generic share
-    const canOpen = await Linking.canOpenURL('instagram://app');
-    if (canOpen) {
-      await Linking.openURL('instagram://app');
-      // Also present OS share sheet with image for convenience
-      await shareQRImage();
-    } else {
-      await shareQRImage();
+    } catch (error) {
+      console.log("Erreur de partage", error);
     }
   };
 
@@ -71,34 +39,36 @@ export const ShareQRModal: React.FC<ShareQRModalProps> = ({ visible, onClose, ti
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.backdrop}>
         <View style={[styles.card, { borderColor: accentColor }]}> 
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          
+          {/* Header */}
+          <View style={styles.headerRow}>
             <Text style={styles.title}>{title}</Text>
-            <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" color="#fff" size={22} />
+            <TouchableOpacity onPress={onClose} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+              <Ionicons name="close" color="#fff" size={24} />
             </TouchableOpacity>
           </View>
+
           {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+
+          {/* Grand QR Code */}
           <View style={styles.qrContainer}>
-            <QRCode value={qrValue} size={220} backgroundColor="transparent" color="#fff" getRef={(c) => (qrRef.current = c)} />
+            <QRCode 
+              value={qrValue} 
+              size={280} // Agrandissement
+              backgroundColor="transparent" 
+              color="#fff" 
+            />
           </View>
-          <View style={styles.row}>
-            <TouchableOpacity onPress={shareQRImage} style={[styles.btn, { backgroundColor: accentColor }]}>
-              <Ionicons name="image-outline" size={18} color="#0F3327" />
-              <Text style={[styles.btnText, { color: "#0F3327" }]}>Partager l'image</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={shareLinkGeneric} style={styles.btnAlt}>
-              <Ionicons name="share-social-outline" size={18} color="#fff" />
-              <Text style={styles.btnText}>Partager le lien</Text>
-            </TouchableOpacity>
-          </View>
-          <TouchableOpacity onPress={shareWhatsApp} style={styles.btnAlt}>
-            <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
-            <Text style={[styles.btnText, { color: "#fff" }]}>WhatsApp</Text>
+
+          {/* Bouton Unique de Partage */}
+          <TouchableOpacity 
+            onPress={handleShare} 
+            style={[styles.btn, { backgroundColor: accentColor }]}
+          >
+            <Ionicons name="share-outline" size={20} color="#0F3327" />
+            <Text style={[styles.btnText, { color: "#0F3327" }]}>Partager le lien</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={shareInstagram} style={styles.btnAlt}>
-            <Ionicons name="logo-instagram" size={18} color="#fff" />
-            <Text style={[styles.btnText, { color: "#fff" }]}>Instagram</Text>
-          </TouchableOpacity>
+
         </View>
       </View>
     </Modal>
@@ -106,13 +76,60 @@ export const ShareQRModal: React.FC<ShareQRModalProps> = ({ visible, onClose, ti
 };
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center", padding: 24 },
-  card: { width: "100%", maxWidth: 420, backgroundColor: "#0B1220", borderRadius: 20, padding: 16, borderWidth: 1 },
-  title: { color: "#fff", fontSize: 18, fontWeight: "700" },
-  subtitle: { color: "#A1A1AA", marginBottom: 10 },
-  qrContainer: { alignItems: "center", justifyContent: "center", paddingVertical: 12 },
-  row: { flexDirection: "row", gap: 10, marginTop: 8 },
-  btn: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 6 },
-  btnAlt: { paddingVertical: 12, borderRadius: 12, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 6, borderWidth: 1, borderColor: "#232A3A", marginTop: 10 },
-  btnText: { color: "#fff", fontWeight: "700" },
+  backdrop: { 
+    flex: 1, 
+    backgroundColor: "rgba(0,0,0,0.7)", 
+    justifyContent: "center", 
+    alignItems: "center", 
+    padding: 24 
+  },
+  card: { 
+    width: "100%", 
+    maxWidth: 400, 
+    backgroundColor: "#0B1220", 
+    borderRadius: 24, 
+    padding: 24, 
+    borderWidth: 1,
+    alignItems: 'center' // Centre tout le contenu
+  },
+  headerRow: { 
+    width: '100%',
+    flexDirection: "row", 
+    justifyContent: "space-between", 
+    alignItems: "center", 
+    marginBottom: 8 
+  },
+  title: { 
+    color: "#fff", 
+    fontSize: 20, 
+    fontWeight: "700" 
+  },
+  subtitle: { 
+    color: "#A1A1AA", 
+    marginBottom: 20,
+    fontSize: 14,
+    textAlign: 'center',
+    alignSelf: 'flex-start'
+  },
+  qrContainer: { 
+    padding: 20,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 16,
+    marginBottom: 24,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  btn: { 
+    width: '100%',
+    paddingVertical: 16, 
+    borderRadius: 16, 
+    alignItems: "center", 
+    flexDirection: "row", 
+    justifyContent: "center", 
+    gap: 8 
+  },
+  btnText: { 
+    fontWeight: "700",
+    fontSize: 16
+  },
 });

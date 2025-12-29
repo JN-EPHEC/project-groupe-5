@@ -51,18 +51,20 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       setEnabledState(isGranted);
 
       if (isGranted) {
-        await scheduleDailyReminder();
+        await scheduleAllReminders(); // On lance la programmation globale
       }
     })();
   }, []);
 
-  // ✅ CORRECTION ICI : Ajout du type 'CALENDAR'
-  const scheduleDailyReminder = async () => {
+  // ✅ PLANIFICATION DE TOUTES LES NOTIFICATIONS LOCALES
+  const scheduleAllReminders = async () => {
     if (typeof Notifications?.scheduleNotificationAsync !== "function") return;
 
+    // 1. On nettoie TOUT avant de reprogrammer pour éviter les doublons
     await Notifications.cancelAllScheduledNotificationsAsync().catch(() => {});
 
     try {
+      // 🌅 7h00 : Rappel Matinal (Existant)
       await Notifications.scheduleNotificationAsync({
         content: {
           title: "🌱 Défi du jour",
@@ -76,8 +78,26 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           repeats: true,
         },
       });
-    } catch {
-      // ignore web
+
+      // ☀️ 12h00 : Nouveaux Défis (NOUVEAU)
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "🚀 Nouveaux défis dispo !",
+          body: "3 nouveaux défis sont disponibles, viens les découvrir !",
+          sound: true,
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+          hour: 12,
+          minute: 0,
+          repeats: true,
+        },
+      });
+
+      console.log("✅ Notifications programmées : 7h00 et 12h00");
+
+    } catch (e) {
+      console.warn("Erreur lors de la planification des notifications :", e);
     }
   };
 
@@ -87,7 +107,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       
       if (status === 'granted') {
         setEnabledState(true);
-        scheduleDailyReminder();
+        scheduleAllReminders();
       } else if (status === 'denied') {
         Alert.alert(
           "Notifications désactivées",
@@ -102,7 +122,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         const { status: newStatus } = await Notifications.requestPermissionsAsync();
         if (newStatus === 'granted') {
           setEnabledState(true);
-          scheduleDailyReminder();
+          scheduleAllReminders();
         }
       }
     } else {
@@ -117,6 +137,8 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     }
   };
 
+  // ... (Le reste du fichier reste inchangé : useEffect pour Firebase, markAllAsRead, etc.)
+  
   useEffect(() => {
     if (!user) {
       setNotifications([]);
@@ -189,7 +211,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       markAllAsRead, 
       deleteNotification, 
       enabled, 
-      setEnabled,
+      setEnabled, 
       resetUnread 
     }}>
       {children}

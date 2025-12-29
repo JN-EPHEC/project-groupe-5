@@ -30,6 +30,13 @@ export const RewardCard: React.FC<RewardCardProps> = ({ item, onRedeem, redeemed
   const router = useRouter();
   const [confirmVisible, setConfirmVisible] = useState(false);
 
+  // --- LOGIQUE EXPIRATION (NOUVEAU) ---
+  const today = new Date().toISOString().split('T')[0];
+  const isExpired = item.expiresAt < today;
+
+  // Si expiré, la carte disparaît
+  if (isExpired) return null;
+
   // --- THEME ---
   const cardBg = isLight 
     ? ["rgba(255,255,255,0.9)", "rgba(255,255,255,0.6)"] 
@@ -38,9 +45,6 @@ export const RewardCard: React.FC<RewardCardProps> = ({ item, onRedeem, redeemed
   const borderColor = isLight ? "rgba(255,255,255,0.6)" : "rgba(0, 151, 178, 0.3)";
   const titleColor = isLight ? "#0A3F33" : "#FFF";
   
-  // ✅ MODIFIÉ : Couleur dynamique inspirée de StreakCalendar
-  // Light: Vert Marque (#008F6B)
-  // Dark: colors.accent (pour matcher "Voir le calendrier")
   const actionColor = isLight ? "#008F6B" : colors.accent;
 
   return (

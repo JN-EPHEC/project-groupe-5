@@ -9,18 +9,18 @@ import { useRouter } from "expo-router";
 import { addDoc, collection, deleteDoc, doc, onSnapshot, updateDoc } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
-    Alert,
-    FlatList,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -33,8 +33,8 @@ type AdminReward = {
   voucherAmountEuro: string;
   pointsCost: string;
   promoCode: string;
-  expiresAt: string;
-  images: string[]; // ✅ Tableau d'images
+  expiresAt: string; // Format stocké: YYYY-MM-DD
+  images: string[];
   isActive: boolean;
   totalQuantity: string;
   remainingQuantity: number;
@@ -60,9 +60,23 @@ export default function AdminCouponsScreen() {
   // Form State
   const [form, setForm] = useState<AdminReward>({
     id: "", name: "", city: "", description: "", voucherAmountEuro: "",
-    pointsCost: "", promoCode: "", expiresAt: "2025-12-31", images: [],
+    pointsCost: "", promoCode: "", expiresAt: "", images: [],
     isActive: true, totalQuantity: "", remainingQuantity: 0
   });
+
+  // Helper pour formater la date YYYY-MM-DD -> DD/MM/YYYY pour l'affichage
+  const formatDateDisplay = (isoDate: string) => {
+      if (!isoDate) return "";
+      const [y, m, d] = isoDate.split("-");
+      return `${d}/${m}/${y}`;
+  };
+
+  // Helper pour vérifier si expiré
+  const isExpired = (dateString: string) => {
+      if (!dateString) return false;
+      const today = new Date().toISOString().split('T')[0];
+      return dateString < today;
+  };
 
   // 1. Lire Firestore
   useEffect(() => {
@@ -100,9 +114,16 @@ export default function AdminCouponsScreen() {
 
   // 3. Sauvegarde
   const handleSave = async () => {
-    if (!form.name || !form.pointsCost || !form.totalQuantity) {
-      Alert.alert("Erreur", "Remplissez au moins le nom, le coût et la quantité.");
+    if (!form.name || !form.pointsCost || !form.totalQuantity || !form.expiresAt) {
+      Alert.alert("Erreur", "Remplissez tous les champs obligatoires (dont la date).");
       return;
+    }
+
+    // Validation format date simple (YYYY-MM-DD)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(form.expiresAt)) {
+        Alert.alert("Erreur Date", "La date doit être au format YYYY-MM-DD (ex: 2025-12-31).");
+        return;
     }
 
     const payload = {
@@ -113,9 +134,10 @@ export default function AdminCouponsScreen() {
       pointsCost: Number(form.pointsCost),
       promoCode: form.promoCode,
       expiresAt: form.expiresAt,
-      images: form.images, // Array
+      images: form.images, 
       isActive: form.isActive,
       totalQuantity: Number(form.totalQuantity),
+      // Si on crée, on init le restant. Si on edit, on ne touche pas au restant sauf si on veut le reset (logique à affiner si besoin)
       ...(editingId ? {} : { remainingQuantity: Number(form.totalQuantity) }),
     };
 
@@ -143,7 +165,7 @@ export default function AdminCouponsScreen() {
     setEditingId(null);
     setForm({
       id: "", name: "", city: "", description: "", voucherAmountEuro: "",
-      pointsCost: "", promoCode: "", expiresAt: "2025-12-31", images: [],
+      pointsCost: "", promoCode: "", expiresAt: "", images: [],
       isActive: true, totalQuantity: "", remainingQuantity: 0
     });
   };
@@ -167,6 +189,8 @@ export default function AdminCouponsScreen() {
         filterStatus === "ALL" ? true :
         filterStatus === "ACTIVE" ? r.isActive :
         !r.isActive;
+      
+      // Optionnel: Masquer les expirés de la liste ADMIN si tu veux (ici je les laisse pour gestion)
       return matchesSearch && matchesFilter;
   });
 
@@ -226,6 +250,7 @@ export default function AdminCouponsScreen() {
 
                         <View style={styles.row}>
                             <Input label="Code Promo" value={form.promoCode} onChange={(t: string) => setForm({...form, promoCode: t})} flex />
+                            {/* NOTE : On garde le format YYYY-MM-DD pour l'input pour que ça reste triable/comparable facilement */}
                             <Input label="Expiration (YYYY-MM-DD)" value={form.expiresAt} onChange={(t: string) => setForm({...form, expiresAt: t})} flex />
                         </View>
 
@@ -310,44 +335,63 @@ export default function AdminCouponsScreen() {
             keyExtractor={(item) => item.id}
             contentContainerStyle={{ paddingBottom: 100 }}
             showsVerticalScrollIndicator={false}
-            renderItem={({ item }) => (
-                <View style={[styles.card, { backgroundColor: isDark ? "#1F2937" : "#FFF", borderColor: isDark ? "#374151" : "transparent" }]}>
-                    
-                    {/* Image (1ere du tableau) */}
-                    <Image 
-                        source={{ uri: item.images?.[0] }} 
-                        style={styles.cardThumb} 
-                    />
-
-                    {/* Infos */}
-                    <View style={{ flex: 1, paddingHorizontal: 12 }}>
-                        <Text style={[styles.cardName, { color: isDark ? "#FFF" : "#111827" }]} numberOfLines={1}>{item.name}</Text>
+            renderItem={({ item }) => {
+                const expired = isExpired(item.expiresAt);
+                return (
+                    <View style={[
+                        styles.card, 
+                        { 
+                            backgroundColor: isDark ? "#1F2937" : "#FFF", 
+                            borderColor: isDark ? "#374151" : "transparent",
+                            opacity: expired ? 0.6 : 1 // Grisé si expiré
+                        }
+                    ]}>
                         
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8 }}>
-                            <View style={[styles.statusBadge, { backgroundColor: item.isActive ? "rgba(0,143,107,0.2)" : "rgba(239,68,68,0.2)" }]}>
-                                <Text style={[styles.statusText, { color: item.isActive ? "#008F6B" : "#EF4444" }]}>
-                                    {item.isActive ? "ACTIF" : "OFF"}
-                                </Text>
+                        {/* Image (1ere du tableau) */}
+                        <Image 
+                            source={{ uri: item.images?.[0] }} 
+                            style={styles.cardThumb} 
+                        />
+
+                        {/* Infos */}
+                        <View style={{ flex: 1, paddingHorizontal: 12 }}>
+                            <Text style={[styles.cardName, { color: isDark ? "#FFF" : "#111827" }]} numberOfLines={1}>{item.name}</Text>
+                            
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8 }}>
+                                <View style={[
+                                    styles.statusBadge, 
+                                    { backgroundColor: expired ? "#FEE2E2" : (item.isActive ? "rgba(0,143,107,0.2)" : "rgba(239,68,68,0.2)") }
+                                ]}>
+                                    <Text style={[
+                                        styles.statusText, 
+                                        { color: expired ? "#EF4444" : (item.isActive ? "#008F6B" : "#EF4444") }
+                                    ]}>
+                                        {expired ? "EXPIRÉ" : (item.isActive ? "ACTIF" : "OFF")}
+                                    </Text>
+                                </View>
+                                <Text style={{ color: "#008F6B", fontWeight: '700', fontSize: 13 }}>{item.pointsCost} pts</Text>
                             </View>
-                            <Text style={{ color: "#008F6B", fontWeight: '700', fontSize: 13 }}>{item.pointsCost} pts</Text>
+
+                            <Text style={{ color: "#6B7280", fontSize: 11, marginTop: 4 }}>
+                                Fin: {formatDateDisplay(item.expiresAt)}
+                            </Text>
+                             <Text style={{ color: "#6B7280", fontSize: 11 }}>
+                                Stock: {item.remainingQuantity} / {item.totalQuantity}
+                            </Text>
                         </View>
 
-                        <Text style={{ color: "#6B7280", fontSize: 11, marginTop: 4 }}>
-                            Stock: {item.remainingQuantity} / {item.totalQuantity}
-                        </Text>
+                        {/* Actions */}
+                        <View style={{ gap: 8 }}>
+                            <TouchableOpacity onPress={() => handleEdit(item)} style={[styles.actionIcon, { backgroundColor: isDark ? "#374151" : "#F3F4F6" }]}>
+                                <Ionicons name="create-outline" size={18} color="#6B7280" />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => handleDelete(item.id)} style={[styles.actionIcon, { backgroundColor: "rgba(239,68,68,0.1)" }]}>
+                                <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                            </TouchableOpacity>
+                        </View>
                     </View>
-
-                    {/* Actions */}
-                    <View style={{ gap: 8 }}>
-                        <TouchableOpacity onPress={() => handleEdit(item)} style={[styles.actionIcon, { backgroundColor: isDark ? "#374151" : "#F3F4F6" }]}>
-                            <Ionicons name="chevron-down" size={18} color="#6B7280" />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => handleDelete(item.id)} style={[styles.actionIcon, { backgroundColor: "rgba(239,68,68,0.1)" }]}>
-                            <Ionicons name="trash-outline" size={18} color="#EF4444" />
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            )}
+                );
+            }}
         />
       </SafeAreaView>
       <AdminNav />
