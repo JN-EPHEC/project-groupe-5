@@ -674,13 +674,13 @@ export default function DefiScreen() {
                 style={{ padding: 20, borderRadius: 24, marginBottom: 18, borderWidth: 1, borderColor: isLight ? THEME.glassBorder : "transparent" }}
               >
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                  <Text style={{ color: isLight ? "#0A3F33" : colors.text, fontSize: 20, fontWeight: "800" }}>Top 50 — Perso</Text>
+                  <Text style={{ color: isLight ? "#0A3F33" : colors.text, fontSize: 20, fontWeight: "800" }}>Top 50 Perso</Text>
                   
                   <TouchableOpacity
                     onPress={handleOpenRewards}
                     style={{ backgroundColor: isLight ? "#E0F7EF" : "rgba(82, 209, 146, 0.14)", borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: isLight ? "#A7F3D0" : "rgba(82, 209, 146, 0.22)" }}
                   >
-                    <Text style={{ color: isLight ? "#008F6B" : colors.text, fontWeight: "800", fontSize: 13 }}>🎁 Récompenses</Text>
+                    <Text style={{ color: isLight ? "#008F6B" : colors.text, fontWeight: "800", fontSize: 13 }}> Récompenses</Text>
                   </TouchableOpacity>
                 </View>
                 {classementLoading ? (
@@ -702,7 +702,7 @@ export default function DefiScreen() {
                 style={{ padding: 20, borderRadius: 24, marginBottom: 18, borderWidth: 1, borderColor: isLight ? THEME.glassBorder : "transparent" }}
               >
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ color: colors.text, fontSize: 18, fontWeight: '800' }}>Top 50 — Clubs</Text>
+                  <Text style={{ color: colors.text, fontSize: 18, fontWeight: '800' }}>Top 50 Clubs</Text>
                   <View style={{ flexDirection: 'row', gap: 8 }}>
                     <View style={{ backgroundColor: '#F6D36533', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 6 }}>
                       <Text style={{ color: '#F6D365', fontWeight: '700' }}>Clubs</Text>

@@ -1,4 +1,5 @@
 import { useThemeMode } from "@/hooks/theme-context";
+import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
 import { Modal, Pressable, Text, View } from "react-native";
 import { REWARD_TABLE } from "../utils/rewardTable";
@@ -8,32 +9,28 @@ type Props = {
   onClose: () => void;
 };
 
-// 🎨 CONFIGURATION DES COULEURS (Style "Pilule" comme sur ta photo)
+// 🎨 CONFIGURATION DES COULEURS PILULES (Inchangé)
 const getRewardStyle = (rank: number) => {
-  // Par défaut (Vert standard)
   let color = "#10B981"; 
-  let textColor = "#FFFFFF"; // Texte blanc dans la pilule par défaut
+  let textColor = "#FFFFFF"; 
 
   if (rank === 1) {
-    color = "#FFD700"; // Or
-    textColor = "#000000"; // Texte noir pour contraste sur l'Or
+    color = "#FFD700"; 
+    textColor = "#000000"; 
   } else if (rank === 2) {
-    color = "#C0C0C0"; // Argent
-    textColor = "#000000"; // Texte noir
+    color = "#C0C0C0"; 
+    textColor = "#000000"; 
   } else if (rank === 3) {
-    color = "#CD7F32"; // Bronze
+    color = "#CD7F32"; 
     textColor = "#FFFFFF";
   } else if (rank <= 5) {
-    color = "#008F6B"; // Vert foncé/Teal (4-5)
+    color = "#008F6B"; 
     textColor = "#FFFFFF";
   } else if (rank <= 10) {
-    color = "#0ea5e9"; // Bleu Océan (6-10)
+    color = "#0ea5e9"; 
     textColor = "#FFFFFF";
   } else if (rank <= 25) {
-    color = "#64748B"; // Gris Bleu / Slate (11-25)
-    textColor = "#FFFFFF";
-  } else if (rank <= 50) {
-    color = "#10B981"; // Vert Émeraude (26-50)
+    color = "#64748B"; 
     textColor = "#FFFFFF";
   }
 
@@ -44,46 +41,69 @@ export function RewardDistributionModal({ visible, onClose }: Props) {
   const { mode } = useThemeMode();
   const isLight = mode === "light";
 
-  // Couleur du texte principal (Titre, bouton fermer)
-  const mainTextColor = isLight ? "#0A3F33" : "#FFFFFF";
-  // Couleur de fond de la modale
-  const modalBg = isLight ? "#FFFFFF" : "#0F172A";
-  // Couleur de fond des lignes (très subtile)
-  const rowBg = isLight ? "#F8FAFC" : "rgba(255, 255, 255, 0.03)";
-  const borderColor = isLight ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.05)";
+  // --- CONFIGURATION DES THEMES ---
+  
+  // ☀️ LIGHT MODE : Inspiré de PremiumCard.tsx (Menthe Givrée)
+  const lightGradient = ["rgba(240, 253, 244, 0.95)", "rgba(255, 255, 255, 0.95)"] as const;
+  const lightBorder = "rgba(255, 255, 255, 0.6)";
+  const lightText = "#0A3F33";
+  const lightRowBg = "rgba(255, 255, 255, 0.5)"; // Fond de ligne semi-transparent pour l'effet verre
+  const lightShadow = {
+      shadowColor: "#005c4b",
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.1,
+      shadowRadius: 16,
+      elevation: 5
+  };
+
+  // 🌙 DARK MODE : Inspiré de AcceuilScreen.tsx (Sombre & Flat)
+  // Fond sombre style "Acceuil" (#051F24 -> #031518)
+  const darkGradient = ["#051F24", "#031518"] as const; 
+  const darkBorder = "rgba(255, 255, 255, 0.1)";
+  const darkText = "#FFFFFF";
+  const darkRowBg = "rgba(255, 255, 255, 0.03)"; // Très subtil
+  // Pas d'ombre en dark mode (Flat design demandé)
+  const darkShadow = {
+      shadowOpacity: 0,
+      elevation: 0
+  };
+
+  // Sélection dynamique
+  const gradientColors = isLight ? lightGradient : darkGradient;
+  const borderColor = isLight ? lightBorder : darkBorder;
+  const mainTextColor = isLight ? lightText : darkText;
+  const rowBackgroundColor = isLight ? lightRowBg : darkRowBg;
+  const rowBorderColor = isLight ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.05)";
+  const containerShadow = isLight ? lightShadow : darkShadow;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      {/* Fond flouté sombre derrière */}
+      {/* Fond sombre derrière la modale */}
       <Pressable
         onPress={onClose}
         style={{
           flex: 1,
-          backgroundColor: "rgba(0,0,0,0.7)", // Plus sombre pour faire ressortir la modale
+          backgroundColor: "rgba(0,0,0,0.7)", 
           justifyContent: "center",
           padding: 18,
         }}
       >
-        {/* Carte Modale */}
-        <Pressable
-          onPress={() => {}}
+        {/* CARTE MODALE (Avec Gradient) */}
+        <LinearGradient
+          colors={gradientColors as any}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={{
-            backgroundColor: modalBg,
             borderRadius: 24,
             padding: 20,
             borderWidth: 1,
-            borderColor: isLight ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.1)",
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.3,
-            shadowRadius: 10,
-            elevation: 10,
+            borderColor: borderColor,
+            ...containerShadow
           }}
         >
           {/* En-tête */}
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
             <Text style={{ color: mainTextColor, fontSize: 20, fontWeight: "800" }}>
-              Récompenses (Greenies)
+              Récompenses 
             </Text>
 
             <Pressable
@@ -92,14 +112,14 @@ export function RewardDistributionModal({ visible, onClose }: Props) {
                 paddingHorizontal: 12,
                 paddingVertical: 6,
                 borderRadius: 8,
-                backgroundColor: isLight ? "#E2E8F0" : "rgba(255,255,255,0.1)",
+                backgroundColor: isLight ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.1)",
               }}
             >
               <Text style={{ color: mainTextColor, fontWeight: "700", fontSize: 13 }}>Fermer</Text>
             </Pressable>
           </View>
 
-          <Text style={{ color: isLight ? "#64748b" : "#94a3b8", marginBottom: 16, fontSize: 14 }}>
+          <Text style={{ color: isLight ? "#4A665F" : "#94a3b8", marginBottom: 16, fontSize: 14 }}>
             Répartition par classement (Top 50).
           </Text>
 
@@ -119,49 +139,49 @@ export function RewardDistributionModal({ visible, onClose }: Props) {
                     paddingVertical: 10,
                     paddingHorizontal: 14,
                     borderRadius: 14,
-                    backgroundColor: rowBg, // Fond de ligne léger
+                    backgroundColor: rowBackgroundColor,
                     borderWidth: 1,
-                    borderColor: borderColor,
+                    borderColor: rowBorderColor,
                   }}
                 >
-                  {/* GAUCHE : RANG (Texte coloré comme la pilule) */}
+                  {/* GAUCHE : RANG */}
                   <Text style={{ 
-                      color: isLight ? "#334155" : pillColor, // En dark mode, le texte prend la couleur du rang pour briller
+                      color: isLight ? "#0A3F33" : pillColor, // En dark, couleur du rang pour contraste
                       fontWeight: "800", 
                       fontSize: 16 
                     }}>
                     {label}
                   </Text>
 
-                  {/* DROITE : PILULE POINTS (Style bouton plein) */}
+                  {/* DROITE : PILULE POINTS */}
                   <View
                     style={{
                       flexDirection: 'row',
                       alignItems: 'center',
-                      backgroundColor: pillColor, // Fond coloré (Or, Argent...)
+                      backgroundColor: pillColor, 
                       paddingHorizontal: 12,
                       paddingVertical: 6,
                       borderRadius: 10,
-                      shadowColor: pillColor,
+                      minWidth: 110,
+                      justifyContent: 'center',
+                      // Ombres légères sur la pilule uniquement en Light
+                      shadowColor: isLight ? pillColor : "transparent",
                       shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: isLight ? 0.2 : 0.4,
-                      shadowRadius: 4,
-                      elevation: 3,
-                      minWidth: 110, // Largeur fixe pour aligner joliement
-                      justifyContent: 'center'
+                      shadowOpacity: isLight ? 0.3 : 0,
+                      shadowRadius: 3,
+                      elevation: isLight ? 2 : 0,
                     }}
                   >
                     <Text style={{ color: pillTextColor, fontWeight: "800", fontSize: 14, marginRight: 4 }}>
                       +{t.greenies}
                     </Text>
-                    {/* Le mot "greenies" ou juste l'icône si tu préfères court */}
                     <Text style={{ color: pillTextColor, fontWeight: "600", fontSize: 12 }}>greenies</Text>
                   </View>
                 </View>
               );
             })}
           </View>
-        </Pressable>
+        </LinearGradient>
       </Pressable>
     </Modal>
   );
