@@ -139,8 +139,10 @@ export default function CalendarScreen() {
             style={[styles.calendarCard, { borderColor: isLight ? calendarTheme.glassBorder : "rgba(255,255,255,0.1)" }]}
         >
             <View style={styles.weekHeader}>
-                {['L','M','M','J','V','S','D'].map((d) => (
-                    <Text key={d} style={[styles.weekDay, { color: textColor }]}>{d}</Text>
+                {['L','M','M','J','V','S','D'].map((d, i) => (
+                    <Text key={`${d}-${i}`} style={[styles.weekDay, { color: textColor }]}>
+                        {d}
+                    </Text>
                 ))}
             </View>
 

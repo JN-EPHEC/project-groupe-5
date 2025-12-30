@@ -18,17 +18,24 @@ export function useStreaks() {
 
   // 🔥 compute current streak length
   const currentStreak = useMemo(() => {
+    if (!days || Object.keys(days).length === 0) return 0;
+
+    // Start from "today if done", otherwise "yesterday"
+    const cursor = new Date();
+    const todayKey = getBelgiumDateKey(cursor);
+
+    if (!days[todayKey]) {
+      cursor.setDate(cursor.getDate() - 1);
+    }
+
     let streak = 0;
 
-    const iterator = new Date();
-
-    // walk backwards day by day
     while (true) {
-      const key = getBelgiumDateKey(iterator);
+      const key = getBelgiumDateKey(cursor);
 
       if (days[key]) {
         streak++;
-        iterator.setDate(iterator.getDate() - 1);
+        cursor.setDate(cursor.getDate() - 1);
       } else {
         break;
       }
