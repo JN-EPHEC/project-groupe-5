@@ -2,8 +2,8 @@
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import React from "react";
-import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useState } from "react"; // ✅ AJOUT useState
+import { Image, Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { CATEGORY_CONFIG } from "./constants";
 
 export type ValidationItem = {
@@ -29,37 +29,38 @@ type Props = {
 
 // 🎨 THEME VALIDATION CARD
 const validationTheme = {
-    // Mode Clair
-    glassBg: ["rgba(255, 255, 255, 0.95)", "rgba(240, 253, 244, 0.95)"] as const,
-    borderColor: "rgba(255, 255, 255, 0.6)",
-    textMain: "#0A3F33",
-    textMuted: "#4A665F",
-    accent: "#008F6B",
+  // Mode Clair
+  glassBg: ["rgba(255, 255, 255, 0.95)", "rgba(240, 253, 244, 0.95)"] as const,
+  borderColor: "rgba(255, 255, 255, 0.6)",
+  textMain: "#0A3F33",
+  textMuted: "#4A665F",
+  accent: "#008F6B",
 
-    // Mode Sombre (Nouveau Bleu/Vert Glass Harmonisé)
-    darkGlassBg: ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"] as const,
-    darkBorderColor: "rgba(0, 151, 178, 0.3)",
+  // Mode Sombre
+  darkGlassBg: ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"] as const,
+  darkBorderColor: "rgba(0, 151, 178, 0.3)",
 };
 
 export function ValidationCard({ item, onValidate, onReject, onReport }: Props) {
   const { colors, mode } = useThemeMode();
   const isLight = mode === "light";
   
+  // ✅ STATE pour la modal Plein Écran
+  const [isFullImageVisible, setIsFullImageVisible] = useState(false);
+
   // Couleurs dynamiques
   const cardText = isLight ? validationTheme.textMain : colors.text;
   const cardMuted = isLight ? validationTheme.textMuted : colors.mutedText;
 
-  // Gestion sécurisée de la catégorie
+  // Gestion catégorie
   const categoryConfig = CATEGORY_CONFIG[item.category as keyof typeof CATEGORY_CONFIG] || { 
       label: item.category, 
       icon: "leaf-outline" 
   };
 
-  //validation de commentaire => éviter l'affichage de commentaires vides
   const hasValidComment =
     typeof item.comment === "string" && item.comment.trim().length > 0;
 
-  // Wrapper conditionnel (Toujours LinearGradient pour l'effet glass)
   const Wrapper = LinearGradient;
   
   const wrapperProps = { 
@@ -99,11 +100,26 @@ export function ValidationCard({ item, onValidate, onReject, onReport }: Props) 
         Par {item.userName || "Utilisateur"}
       </Text>
 
-      {/* PHOTO DE PREUVE */}
+      {/* PHOTO DE PREUVE (Cliquable & Corrigée) */}
       {item.photoUrl && (
-        <View style={[styles.photoContainer, { borderColor: isLight ? "#fff" : "rgba(255,255,255,0.1)" }]}>
+        <TouchableOpacity 
+          activeOpacity={0.9} 
+          onPress={() => setIsFullImageVisible(true)}
+          style={[
+            styles.photoContainer, 
+            { 
+              borderColor: isLight ? "#fff" : "rgba(255,255,255,0.1)",
+              backgroundColor: isLight ? "#F0F0F0" : "#000" // Fond de sécurité pour éviter le noir transparent
+            }
+          ]}
+        >
             <Image source={{ uri: item.photoUrl }} style={styles.photo} />
-        </View>
+            
+            {/* Icône agrandir discrète */}
+            <View style={styles.expandIcon}>
+              <Ionicons name="expand" size={16} color="#FFF" />
+            </View>
+        </TouchableOpacity>
       )}
 
       {/* COMMENTAIRE */}
@@ -125,7 +141,6 @@ export function ValidationCard({ item, onValidate, onReject, onReport }: Props) 
           <Text style={[styles.actionText, { color: "#EF4444" }]}>Refuser</Text>
         </TouchableOpacity>
 
-        {/* BOUTON SIGNALER */}
         <TouchableOpacity 
             style={[
                 styles.actionBtn, 
@@ -144,6 +159,29 @@ export function ValidationCard({ item, onValidate, onReject, onReport }: Props) 
           <Text style={[styles.actionText, { color: isLight ? "#065F46" : "#4ADE80" }]}>Valider</Text>
         </TouchableOpacity>
       </View>
+
+      {/* ✅ MODAL PLEIN ÉCRAN */}
+      <Modal 
+          visible={isFullImageVisible} 
+          transparent={true} 
+          animationType="fade"
+          onRequestClose={() => setIsFullImageVisible(false)}
+        >
+          <View style={styles.modalContainer}>
+            <TouchableOpacity 
+              style={styles.closeModalBtn} 
+              onPress={() => setIsFullImageVisible(false)}
+            >
+              <Ionicons name="close-circle" size={40} color="#FFF" />
+            </TouchableOpacity>
+            
+            <Image 
+              source={{ uri: item.photoUrl }} 
+              style={styles.fullScreenPhoto} 
+              resizeMode="contain" 
+            />
+          </View>
+        </Modal>
     </Wrapper>
   );
 }
@@ -155,7 +193,6 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   glassEffect: {
-    // Shadow est géré ici mais le background vient du wrapperProps
     shadowColor: "#005c4b",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.05,
@@ -195,7 +232,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     marginTop: 12,
-    fontFamily: "StylizedTitle" // Adapte si besoin
+    fontFamily: "StylizedTitle"
   },
   subtitle: {
     marginTop: 2,
@@ -204,15 +241,26 @@ const styles = StyleSheet.create({
   },
   photoContainer: {
     borderRadius: 16,
-    overflow: 'hidden',
+    overflow: 'hidden', // ✅ C'est ça qui coupe l'image proprement
     marginBottom: 12,
-    borderWidth: 4,
-    shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 4, elevation: 2
+    borderWidth: 3, // Réduit légèrement de 4 à 3 pour moins d'artefacts
+    // On enlève les ombres ici pour éviter le "noir transparent" qui dépasse
+    position: 'relative',
+    height: 200, 
+    width: "100%",
   },
   photo: {
-    height: 200,
+    height: "100%", // Remplit 100% du container
     width: "100%",
     resizeMode: "cover",
+  },
+  expandIcon: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 12,
+    padding: 6,
   },
   commentBox: {
     borderRadius: 12,
@@ -239,4 +287,21 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 13,
   },
+  // Styles Modal
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullScreenPhoto: {
+    width: '100%',
+    height: '80%',
+  },
+  closeModalBtn: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+  }
 });

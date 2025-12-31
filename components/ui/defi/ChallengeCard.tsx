@@ -17,20 +17,20 @@ type Props = {
   onReport?: () => void;
 };
 
-// 🎨 THEME CHALLENGE CARD (Inspiré du Header)
+// 🎨 THEME CHALLENGE CARD
 const challengeTheme = {
-    // Mode Clair
-    glassBg: ["rgba(240, 253, 244, 0.95)", "rgba(255, 255, 255, 0.85)"] as const,
-    activeGlassBg: ["#FFFFFF", "#F0FDF4"] as const, 
-    borderColor: "rgba(255, 255, 255, 0.6)",
-    textMain: "#0A3F33",
-    textMuted: "#4A665F",
-    accent: "#008F6B",
+  // Mode Clair
+  glassBg: ["rgba(240, 253, 244, 0.95)", "rgba(255, 255, 255, 0.85)"] as const,
+  activeGlassBg: ["#FFFFFF", "#F0FDF4"] as const, 
+  borderColor: "rgba(255, 255, 255, 0.6)",
+  textMain: "#0A3F33",
+  textMuted: "#4A665F",
+  accent: "#008F6B",
 
-    // Mode Sombre (Nouveau Bleu/Vert Glass)
-    darkGlassBg: ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"] as const,
-    darkActiveGlassBg: ["rgba(0, 151, 178, 0.25)", "rgba(0, 151, 178, 0.1)"] as const,
-    darkBorderColor: "rgba(0, 151, 178, 0.3)",
+  // Mode Sombre
+  darkGlassBg: ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"] as const,
+  darkActiveGlassBg: ["rgba(0, 151, 178, 0.25)", "rgba(0, 151, 178, 0.1)"] as const,
+  darkBorderColor: "rgba(0, 151, 178, 0.3)",
 };
 
 export function ChallengeCard({
@@ -46,6 +46,9 @@ export function ChallengeCard({
   const [confirmVisible, setConfirmVisible] = useState(false);
   const { current, reviewCompleted, reviewRequiredCount } = useChallenges();
 
+  // État pour la modal Plein Écran de la photo de preuve
+  const [isFullProofVisible, setIsFullProofVisible] = useState(false);
+
   const isValidatedAndClaimed =
     current?.id === challenge.id &&
     current?.finalStatus === "validated" &&
@@ -56,10 +59,6 @@ export function ChallengeCard({
 
   const shouldHide = useMemo(() => {
     if (!isOngoing) return false;
-
-    // Only hide other ongoing challenges when the user's own personal
-    // challenge is in the pendingValidation state and the validation
-    // gate has been reached.
     if (!current || current.status !== "pendingValidation") return false;
 
     if (reviewRequiredCount > 0 && reviewCompleted >= reviewRequiredCount) {
@@ -68,9 +67,8 @@ export function ChallengeCard({
     return false;
   }, [isOngoing, reviewCompleted, reviewRequiredCount, current, challenge.id]);
 
-  // For club list items, display a small progress bar (0 / 50)
   const CLUB_DENOMINATOR = 50;
-  const clubProgressValue = 0; // list items show zero until a club cycle is active
+  const clubProgressValue = 0;
 
   const isLightMode = mode === "light";
   
@@ -78,7 +76,6 @@ export function ChallengeCard({
   const cardMuted = isLightMode ? challengeTheme.textMuted : colors.mutedText;
   const accentColor = isLightMode ? challengeTheme.accent : colors.accent;
 
-  // Configuration de la difficulté (Couleurs)
   const diffColors = {
       Facile: { bg: isLightMode ? "#E6FFFA" : "rgba(0, 143, 107, 0.15)", text: isLightMode ? "#38A169" : "#4ADE80" },
       Moyen: { bg: isLightMode ? "#FFFBEB" : "rgba(214, 158, 46, 0.15)", text: isLightMode ? "#D69E2E" : "#FCD34D" },
@@ -118,7 +115,6 @@ export function ChallengeCard({
 
   if (shouldHide) return null;
 
-  // On utilise LinearGradient dans les DEUX modes pour avoir le bel effet
   const Wrapper = LinearGradient;
   
   const wrapperProps = { 
@@ -134,23 +130,22 @@ export function ChallengeCard({
             borderColor: isLightMode ? challengeTheme.borderColor : challengeTheme.darkBorderColor,
             borderWidth: 1 
         },
-        // Bordure un peu plus marquée si actif
         isOngoing && { borderColor: isLightMode ? "#BBF7D0" : "rgba(0, 151, 178, 0.6)", borderWidth: 1.5 } 
     ] 
   };
 
   return (
     <Wrapper {...wrapperProps}>
-      {/* --- HEADER : CATEGORIE | DIFFICULTÉ | POINTS --- */}
+      {/* --- HEADER --- */}
       <View style={styles.header}>
         <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-            {/* 1. Catégorie */}
+            {/* Catégorie */}
             <View style={[styles.pill, { backgroundColor: isLightMode ? "rgba(0,143,107,0.1)" : "rgba(0, 151, 178, 0.2)" }]}>
               <Ionicons name={categoryIcon} size={13} color={accentColor} />
               <Text style={[styles.pillText, { color: accentColor }]}>{categoryLabel}</Text>
             </View>
 
-            {/* 2. Difficulté (only for personal) */}
+            {/* Difficulté */}
             {categorie === "personnel" && (
               <View style={[styles.pill, { backgroundColor: diffStyle.bg }]}>
                   <Ionicons name="speedometer-outline" size={13} color={diffStyle.text} />
@@ -158,7 +153,7 @@ export function ChallengeCard({
               </View>
             )}
 
-            {/* 3. Points (only for personal) */}
+            {/* Points */}
             {categorie === "personnel" && (
               <View style={[styles.pill, { backgroundColor: isLightMode ? "#D1FAE5" : "rgba(0, 143, 107, 0.2)" }]}>
                 <Ionicons name="leaf" size={13} color={isLightMode ? "#0F3327" : "#4ADE80"} />
@@ -176,7 +171,6 @@ export function ChallengeCard({
 
       <Text style={[styles.title, { color: cardText }]}>{challenge.title}</Text>
       
-      {/* Description avec moins de marge si actif pour remonter les boutons */}
       <Text style={[styles.description, { color: cardMuted, marginBottom: isOngoing ? 10 : 16 }]}>
         {challenge.description}
       </Text>
@@ -185,7 +179,6 @@ export function ChallengeCard({
       {!isOngoing && (
         <>
           {categorie === "club" ? (
-            // Club list item: show small progress bar under the description
             <>
               <View style={{ marginTop: 12 }}>
                 <View style={{ height: 8, backgroundColor: isLightMode ? "#E5E7EB" : "rgba(255,255,255,0.1)", borderRadius: 6, overflow: "hidden" }}>
@@ -247,7 +240,7 @@ export function ChallengeCard({
             </TouchableOpacity>
           )}
 
-          {/* ANNULER (Rouge clair pour contraste) */}
+          {/* ANNULER */}
           {status === "active" && (
             <TouchableOpacity 
                 style={[styles.cancelBtn, { backgroundColor: isLightMode ? "#FEF2F2" : "rgba(239, 68, 68, 0.15)", borderColor: isLightMode ? "#FCA5A5" : "rgba(239, 68, 68, 0.3)" }]} 
@@ -261,9 +254,25 @@ export function ChallengeCard({
           {/* --- AFFICHAGE PREUVE (EN ATTENTE) --- */}
           {status === "pendingValidation" && current?.id === challenge.id && current?.photoUri && (
             <View style={{ marginTop: 8 }}>
-              <View style={[styles.proofContainer, { borderColor: isLightMode ? "#fff" : "rgba(255,255,255,0.2)" }]}>
+              {/* ✅ PHOTO CLIQUABLE + CORRECTION BORDS */}
+              <TouchableOpacity 
+                activeOpacity={0.9}
+                onPress={() => setIsFullProofVisible(true)}
+                style={[
+                    styles.proofContainer, 
+                    { 
+                        borderColor: isLightMode ? "#fff" : "rgba(255,255,255,0.2)",
+                        backgroundColor: isLightMode ? "#F0F0F0" : "#000" // Sécurité contre le noir transparent
+                    }
+                ]}
+              >
                   <Image source={{ uri: current.photoUri }} style={{ height: 180, width: '100%' }} resizeMode="cover" />
-              </View>
+                  {/* Icône agrandir */}
+                  <View style={styles.expandIcon}>
+                    <Ionicons name="expand" size={16} color="#FFF" />
+                  </View>
+              </TouchableOpacity>
+
               {current.photoComment ? (
                 <Text style={{ color: cardMuted, marginTop: 8, fontStyle: 'italic', textAlign: 'center' }}>"{current.photoComment}"</Text>
               ) : null}
@@ -278,7 +287,7 @@ export function ChallengeCard({
             </View>
           )}
 
-          {/* 🟢 FULLY VALIDATED & POINTS CREDITED */}
+          {/* 🟢 FULLY VALIDATED */}
           {isValidatedAndClaimed && (
             <View style={[styles.statusPill, { backgroundColor: isLightMode ? "#ECFDF5" : "rgba(16, 185, 129, 0.15)", borderColor: isLightMode ? "#34D399" : "rgba(16, 185, 129, 0.3)" }]}>
               <Ionicons name="checkmark-circle" size={18} color="#059669" style={{ marginRight: 6 }} />
@@ -321,6 +330,31 @@ export function ChallengeCard({
           </View>
         </View>
       </Modal>
+
+      {/* ✅ MODAL PREUVE PLEIN ÉCRAN */}
+      <Modal 
+          visible={isFullProofVisible} 
+          transparent={true} 
+          animationType="fade"
+          onRequestClose={() => setIsFullProofVisible(false)}
+        >
+          <View style={styles.fullscreenModal}>
+            <TouchableOpacity 
+              style={styles.closeModalBtn} 
+              onPress={() => setIsFullProofVisible(false)}
+            >
+              <Ionicons name="close-circle" size={40} color="#FFF" />
+            </TouchableOpacity>
+            {current?.photoUri && (
+                <Image 
+                  source={{ uri: current.photoUri }} 
+                  style={styles.fullScreenPhoto} 
+                  resizeMode="contain" 
+                />
+            )}
+          </View>
+        </Modal>
+
     </Wrapper>
   );
 }
@@ -328,7 +362,6 @@ export function ChallengeCard({
 const styles = StyleSheet.create({
   card: { borderRadius: 24, padding: 18, marginBottom: 14 },
   glassEffect: {
-    // Shadow est géré ici mais le background vient du wrapperProps
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.05,
@@ -364,7 +397,7 @@ const styles = StyleSheet.create({
 
   // Actions Container
   actionsContainer: {
-    gap: 10, // Espace réduit entre les boutons
+    gap: 10,
     alignItems: "stretch",
   },
   timerPill: {
@@ -402,14 +435,24 @@ const styles = StyleSheet.create({
   // Styles Preuve
   proofContainer: {
       borderRadius: 16,
-      overflow: 'hidden',
-      borderWidth: 4,
+      overflow: 'hidden', // IMPORTANT pour couper l'image proprement
+      borderWidth: 3, // Réduit légèrement pour éviter artefacts
       shadowColor: "#000",
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.1,
       shadowRadius: 4,
       elevation: 2,
+      position: 'relative'
   },
+  expandIcon: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 12,
+    padding: 6,
+  },
+
   statusPill: {
     borderWidth: 1,
     borderRadius: 16,
@@ -420,7 +463,7 @@ const styles = StyleSheet.create({
     marginTop: 4
   },
   
-  // Modal
+  // Modal Confirm
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.6)",
@@ -432,4 +475,22 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 18, fontWeight: "700", marginBottom: 8 },
   modalButtons: { flexDirection: "row", justifyContent: "flex-end", marginTop: 20, gap: 12 },
   modalBtn: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: 12 },
+
+  // Modal Fullscreen
+  fullscreenModal: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullScreenPhoto: {
+    width: '100%',
+    height: '80%',
+  },
+  closeModalBtn: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+  }
 });
