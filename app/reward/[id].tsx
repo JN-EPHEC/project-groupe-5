@@ -29,7 +29,8 @@ const detailsTheme = {
   glassSheet: ["rgba(255, 255, 255, 0.95)", "rgba(255, 255, 255, 0.85)"] as const,
   darkGlassSheet: ["rgba(2, 17, 20, 0.95)", "rgba(2, 17, 20, 0.9)"] as const,
   accent: "#008F6B", 
-  darkAccent: "#0097B2",
+  // ✅ MODIFICATION ICI : Le bleu devient le VERT (#008F6B) pour le mode sombre
+  darkAccent: "#008F6B", 
   textMain: "#0A3F33",
   textMuted: "#4A665F",
 };
@@ -83,7 +84,8 @@ export default function RewardDetailScreen() {
   if (loading) {
     return (
       <View style={[styles.center, { backgroundColor: isLight ? "#F4FDF9" : "#021114" }]}>
-        <ActivityIndicator size="large" color={isLight ? "#008F6B" : "#0097B2"} />
+        {/* ✅ MODIFICATION : Loader Vert en sombre aussi */}
+        <ActivityIndicator size="large" color="#008F6B" />
       </View>
     );
   }
@@ -105,10 +107,8 @@ export default function RewardDetailScreen() {
   const isExpired = reward.expiresAt < today;
   
   const already = hasCoupon(reward.id);
-  // On ne peut acheter que si pas déjà possédé, assez de points ET pas expiré
   const canAfford = points >= reward.pointsCost && !already && !isExpired;
   
-  // Gestion des images (fallback si pas d'image)
   const images = reward.images && reward.images.length > 0 
     ? reward.images 
     : ["https://placehold.co/600x400/png?text=Pas+d'image"];
@@ -201,7 +201,7 @@ export default function RewardDetailScreen() {
       <View style={{ flex: 1 }}>
         <LinearGradient
             colors={isLight ? detailsTheme.glassSheet : detailsTheme.darkGlassSheet}
-            style={[styles.sheet, !isLight && { borderColor: "rgba(0, 151, 178, 0.3)", borderWidth: 1, borderBottomWidth: 0 }]}
+            style={[styles.sheet, !isLight && { borderColor: "rgba(0, 143, 107, 0.3)", borderWidth: 1, borderBottomWidth: 0 }]} // Bordure verte subtile en dark
         >
             <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
                 {/* EN-TÊTE */}
@@ -213,7 +213,8 @@ export default function RewardDetailScreen() {
                             <Text style={{ fontSize: 14, fontFamily: FontFamilies.body, color: textColor, marginLeft: 4 }}> {reward.city}</Text>
                         </View>
                     </View>
-                    <View style={[styles.priceTag, { backgroundColor: isLight ? "#E0F7EF" : "rgba(0, 151, 178, 0.15)" }]}>
+                    {/* ✅ MODIFICATION : Fond du tag Greenies en vert transparent en mode sombre */}
+                    <View style={[styles.priceTag, { backgroundColor: isLight ? "#E0F7EF" : "rgba(0, 143, 107, 0.15)" }]}>
                         <Text style={{ color: accentColor, fontWeight: "800", fontSize: 16 }}>{reward.pointsCost}</Text>
                         <Text style={{ color: accentColor, fontSize: 10, fontWeight: "600" }}>Greenies</Text>
                     </View>
@@ -221,7 +222,7 @@ export default function RewardDetailScreen() {
 
                 <View style={[styles.divider, { backgroundColor: isLight ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.1)" }]} />
 
-                {/* INFO BLOCKS */}
+                {/* INFO BLOCKS - Les icônes prennent automatiquement le vert grâce à accentColor */}
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
                         <Ionicons name="business-outline" size={20} color={accentColor} />
@@ -267,7 +268,8 @@ export default function RewardDetailScreen() {
                         colors={
                             isExpired ? ["#FEE2E2", "#FECACA"] :
                             already ? ["#E2E8F0", "#CBD5E0"] : 
-                            (canAfford ? (isLight ? ["#008F6B", "#10B981"] : ["#0097B2", "#00B4D8"]) : ["#A0AEC0", "#718096"])
+                            // ✅ MODIFICATION : Dégradé VERT pour le bouton en mode sombre (comme le light)
+                            (canAfford ? ["#008F6B", "#10B981"] : ["#A0AEC0", "#718096"])
                         }
                         start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                         style={styles.actionBtn}

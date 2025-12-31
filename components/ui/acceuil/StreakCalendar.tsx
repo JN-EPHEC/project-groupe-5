@@ -28,6 +28,7 @@ const THEME = {
     glassBg: ["rgba(240, 253, 244, 0.95)", "rgba(255, 255, 255, 0.85)"] as const,
     title: "#0A3F33",
     border: "rgba(255, 255, 255, 0.6)",
+    activeGreen: "#008F6B", // Vert pour les liens et bordures actives
 };
 
 export default function StreakCalendar() {
@@ -63,11 +64,14 @@ export default function StreakCalendar() {
   );
 
   function renderInner(light: boolean) {
+      // Couleur Accent (Vert) pour bordure Today et liens
+      const activeColor = light ? THEME.activeGreen : colors.accent;
+
       return (
         <>
         <View style={styles.headerRow}>
             <Text style={[styles.title, { color: light ? THEME.title : colors.text }]}>Votre série d'activités</Text>
-            <Text onPress={() => router.push("/calendar")} style={[styles.link, { color: light ? "#008F6B" : colors.accent }]}>Voir le calendrier</Text>
+            <Text onPress={() => router.push("/calendar")} style={[styles.link, { color: activeColor }]}>Voir le calendrier</Text>
         </View>
         
         <View style={styles.contentRow}>
@@ -91,16 +95,17 @@ export default function StreakCalendar() {
                     {week.map((date, i) => {
                         const isToday = i === todayIndex;
                         const key = getBelgiumDateKey(date);
-                        const isValidated = !!activities[key]; // since subscribeToStreakDays maps docs -> {status:"validated"}
+                        const isValidated = !!activities[key]; 
 
-                        const bg = isValidated ? (light ? "#008F6B" : colors.accent) : "transparent";
+                        const bg = isValidated ? activeColor : "transparent";
                         
                         return (
                             <View key={i} style={styles.col}>
                                 <View style={[
                                     styles.circle, 
                                     { 
-                                        borderColor: light ? (isToday ? "#0A3F33" : "#E2E8F0") : "rgba(0, 151, 178, 0.3)", 
+                                        // ✅ BORDURE TODAY : Utilisation de activeColor (Vert) au lieu du gris/orange
+                                        borderColor: isToday ? activeColor : (light ? "#E2E8F0" : "rgba(0, 151, 178, 0.3)"), 
                                         backgroundColor: bg, 
                                         borderWidth: isToday ? 2 : (light && !isValidated ? 1 : 2) 
                                     }
