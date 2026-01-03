@@ -7,7 +7,8 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useRouter } from "expo-router";
-import { doc, setDoc } from "firebase/firestore";
+// On ajoute getDocs, query, where, collection pour la vérification
+import { collection, doc, getDocs, query, setDoc, where } from "firebase/firestore";
 import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -126,12 +127,61 @@ export default function EditProfileScreen() {
     setPhotoURL(null);
   };
 
+  // ✅ FONCTION D'UNICITÉ DU USERNAME
+  async function generateUniqueUsername(baseName: string): Promise<string> {
+    const cleanName = baseName.trim();
+    if (!cleanName) return "";
+
+    // Si le nom n'a pas changé, on le garde
+    if (user?.username === cleanName) return cleanName;
+
+    let candidate = cleanName;
+    let counter = 1;
+    let isUnique = false;
+
+    while (!isUnique) {
+      // On cherche si un autre utilisateur a déjà ce pseudo exact
+      // (On utilise usernameLowercase pour être insensible à la casse si tu as ce champ, sinon username simple)
+      const q = query(
+        collection(db, "users"), 
+        where("username", "==", candidate)
+      );
+      
+      const snapshot = await getDocs(q);
+      
+      // On vérifie si on a trouvé quelqu'un d'autre que soi-même
+      // (Théoriquement inutile si on a déjà checké user.username === cleanName au début, mais sécurité)
+      const conflict = snapshot.docs.some(d => d.id !== auth.currentUser?.uid);
+
+      if (!conflict) {
+        isUnique = true;
+      } else {
+        // Conflit trouvé, on incrémente
+        candidate = `${cleanName}${counter}`;
+        counter++;
+      }
+    }
+    
+    return candidate;
+  }
+
   // --- SAUVEGARDE ---
   async function save() {
     if (!canSave || !auth.currentUser) return;
     setSaving(true);
 
     try {
+      // 1. Gestion du Username Unique
+      let finalUsername = username.trim();
+      if (finalUsername) {
+        finalUsername = await generateUniqueUsername(finalUsername);
+        // Si le nom a changé (ajout d'un chiffre), on met à jour l'état local pour l'affichage
+        if (finalUsername !== username.trim()) {
+            setUsername(finalUsername);
+            Alert.alert("Info", `Le pseudo "${username}" était pris. Tu as été renommé "${finalUsername}".`);
+        }
+      }
+
       const userDocRef = doc(db, "users", auth.currentUser.uid);
       let nextPhotoURL = photoURL;
 
@@ -144,10 +194,12 @@ export default function EditProfileScreen() {
       const finalColor = avatarColor.startsWith("#") ? avatarColor : `#${avatarColor}`;
 
       const payload = {
-        username: username || null,
+        username: finalUsername || null,
+        // On sauvegarde aussi une version minuscule pour les recherches insensibles à la casse
+        usernameLowercase: finalUsername ? finalUsername.toLowerCase() : null,
         bio: bio || null,
         photoURL: nextPhotoURL,
-        avatarColor: finalColor, // On force la sauvegarde de la couleur
+        avatarColor: finalColor,
       };
 
       await setDoc(userDocRef, payload, { merge: true });
