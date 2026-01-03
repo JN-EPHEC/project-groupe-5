@@ -3,11 +3,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
+// ✅ CORRECTION DE L'IMPORT ICI (un seul "../")
 import { ClassementUser } from "../types/classement";
 
 type Props = {
   user: ClassementUser;
-  isDarkMode?: boolean;
+  isDarkMode: boolean;
 };
 
 // 🎨 CONFIGURATION DES RANGS (Couleurs & Fonds)
@@ -69,39 +70,41 @@ const getRankConfig = (rank: number) => {
   };
 };
 
-export function ClassementRow({ user, isDarkMode = true }: Props) {
+export function ClassementRow({ user, isDarkMode }: Props) {
   const rank = user.rank ?? 999;
   const isCurrentUser = user.isCurrentUser;
   const isQualified = user.qualified === true;
   const config = getRankConfig(rank);
   
   const displayName = user.displayName || "Utilisateur";
-  const avatarColor = (user as any).avatarColor || "#008F6B"; 
+  const avatarColor = (user as any).avatarColor || "#19D07D"; 
   const initials = displayName.substring(0, 2).toUpperCase();
 
-  // 🎨 GESTION DES COULEURS DE TEXTE
-  // Le vert foncé demandé (#0A3F33) est appliqué ici pour le mode clair
+  // COULEURS DU TEXTE
   const textColorPrimary = isDarkMode ? "#FFFFFF" : "#0A3F33"; 
   const textColorSecondary = isDarkMode ? "#94a3b8" : "#4A665F"; 
-  
   const rankTextColor = rank <= 25 ? config.main : (isDarkMode ? "#FFFFFF" : "#0A3F33");
 
-  // 🎨 FOND DE CARTE
+  // --- LOGIQUE D'AFFICHAGE "C'EST MOI" ---
   let backgroundGradient = isDarkMode ? config.bgDark : config.bgLight;
+  let borderColor = config.main; 
+  let borderWidth = isCurrentUser ? 2 : 1; 
   
   if (isCurrentUser) {
      backgroundGradient = isDarkMode 
-        ? [`${config.main}25`, `${config.main}10`] 
-        : [`${config.main}30`, "#FFFFFF"]; 
+        ? [`${config.main}40`, `${config.main}15`] 
+        : [`${config.main}40`, "#FFFFFF"]; 
+  } else if (isDarkMode) {
+     borderColor = "rgba(255,255,255,0.1)";
+     borderWidth = 0.5;
   }
 
-  // 🎨 BORDURE DE CARTE
-  const borderColor = config.main; 
-  const borderWidth = isCurrentUser ? 2 : 1; 
+  // COULEUR INITIALES (Contraste sur fond Avatar)
+  const isWhiteBg = ["#FFFFFF", "#fff", "#FFF"].includes(avatarColor);
+  const initialsColor = isWhiteBg ? "#1A1A1A" : "#FFFFFF";
 
   return (
     <LinearGradient
-      // 🛠 CORRECTION TYPE SCRIPT : on force le type à être un tuple de strings
       colors={backgroundGradient as [string, string]} 
       start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
       style={[
@@ -109,7 +112,11 @@ export function ClassementRow({ user, isDarkMode = true }: Props) {
         { 
           borderColor: borderColor,
           borderWidth: borderWidth,
-          opacity: isQualified ? 1 : 0.6,
+          opacity: isQualified || isCurrentUser ? 1 : 0.6,
+          shadowColor: isCurrentUser ? config.main : "transparent",
+          shadowOpacity: isCurrentUser ? 0.3 : 0,
+          shadowRadius: 8,
+          elevation: isCurrentUser ? 4 : 0,
         }
       ]}
     >
@@ -138,15 +145,14 @@ export function ClassementRow({ user, isDarkMode = true }: Props) {
             {user.avatarUrl ? (
                 <Image source={{ uri: user.avatarUrl }} style={styles.avatarImage} />
             ) : (
-                <View style={[styles.avatarPlaceholder, { backgroundColor: isDarkMode ? "#333" : avatarColor }]}>
-                    <Text style={styles.avatarInitials}>{initials}</Text>
+                <View style={[styles.avatarPlaceholder, { backgroundColor: avatarColor }]}>
+                    <Text style={[styles.avatarInitials, { color: initialsColor }]}>{initials}</Text>
                 </View>
             )}
         </View>
         
-        {/* Badge Trophée (Top 3) */}
         {config.badge && (
-            <View style={[styles.miniBadge, { backgroundColor: config.main, borderColor: isDarkMode ? "#000" : "#fff" }]}>
+            <View style={[styles.miniBadge, { backgroundColor: config.main, borderColor: isDarkMode ? "#1F2937" : "#fff" }]}>
                 <Ionicons name={config.icon as any} size={10} color={isDarkMode ? "#000" : "#fff"} />
             </View>
         )}
@@ -157,10 +163,12 @@ export function ClassementRow({ user, isDarkMode = true }: Props) {
         <Text 
             numberOfLines={1} 
             ellipsizeMode="tail"
-            style={[styles.name, { color: textColorPrimary }]}
+            style={[
+                styles.name, 
+                { color: textColorPrimary, fontWeight: isCurrentUser ? "800" : "700" } 
+            ]}
         >
           {displayName}
-          {isCurrentUser && <Text style={{fontSize: 12, color: config.main, fontWeight: '800'}}> (Moi)</Text>}
         </Text>
         
         {!isQualified ? (
@@ -235,9 +243,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   avatarInitials: {
-    color: "#FFF",
     fontWeight: "bold",
     fontSize: 14,
+    fontFamily: FontFamilies.heading
   },
   miniBadge: {
     position: "absolute",
@@ -257,7 +265,6 @@ const styles = StyleSheet.create({
   },
   name: {
     fontSize: 15,
-    fontWeight: "700",
     fontFamily: FontFamilies.body,
     marginBottom: 2,
     letterSpacing: 0.2,

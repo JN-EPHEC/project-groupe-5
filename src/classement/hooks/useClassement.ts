@@ -1,4 +1,3 @@
-// src/classement/hooks/useClassement.ts
 import { useUser } from "@/hooks/user-context";
 import { useMemo } from "react";
 import { generateFakeUsers } from "../services/populateClassement";
@@ -16,6 +15,7 @@ export function useClassement() {
   const { users: realUsers, loading: usersLoading } =
     useLeagueUsers(cycleId, classementId);
 
+  // ✅ 1. On récupère tes infos LIVE du contexte
   const { user } = useUser();
 
   const users = useMemo(() => {
@@ -24,14 +24,42 @@ export function useClassement() {
     // 1. Rank real users
     let ranked: ClassementUser[] = realUsers.map((u, idx) => {
       const rank = idx + 1;
+      const isMe = u.uid === user?.uid;
+
+      // ✅ 2. FUSION MAGIQUE : Si c'est toi, on écrase avec les données du contexte
+      if (isMe && user) {
+        // Construction robuste du nom (comme dans Social/Header)
+        const liveDisplayName = 
+            user.username || 
+            [user.firstName, user.lastName].filter(Boolean).join(" ").trim() || 
+            u.displayName || 
+            "Moi";
+
+        return {
+          ...u,
+          rank,
+          qualified: u.qualified ?? false,
+          isCurrentUser: true,
+          greeniesEarned: cycle.status === "locked" ? getGreeniesForRank(rank) : undefined,
+          
+          // 👇 DONNÉES LIVE DU CONTEXTE
+          displayName: liveDisplayName,
+          avatarUrl: user.photoURL || null, 
+          // On force la couleur du contexte, ou le vert par défaut
+          avatarColor: user.avatarColor || "#19D07D", 
+        } as ClassementUser;
+      }
+
+      // POUR LES AUTRES UTILISATEURS
       return {
         ...u,
         rank,
         qualified: u.qualified ?? false,
-        isCurrentUser: u.uid === user?.uid,
-        greeniesEarned:
-          cycle.status === "locked" ? getGreeniesForRank(rank) : undefined,
-      };
+        isCurrentUser: false,
+        greeniesEarned: cycle.status === "locked" ? getGreeniesForRank(rank) : undefined,
+        // On récupère la couleur si elle a été chargée par useLeagueUsers, sinon vert
+        avatarColor: (u as any).avatarColor || "#19D07D", 
+      } as ClassementUser;
     });
 
     // 2. Add fake users to reach 50 total
@@ -42,7 +70,7 @@ export function useClassement() {
     }
 
     return ranked;
-  }, [realUsers, user?.uid, cycle]);
+  }, [realUsers, user, cycle]); 
 
   return {
     users,
