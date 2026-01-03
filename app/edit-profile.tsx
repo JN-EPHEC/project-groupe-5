@@ -1,11 +1,11 @@
-import { FontFamilies } from "@/constants/fonts"; // Import recommandé si dispo
+import { FontFamilies } from "@/constants/fonts";
 import { auth, db } from "@/firebaseConfig";
 import { useThemeMode } from "@/hooks/theme-context";
 import { useUser } from "@/hooks/user-context";
 import { uploadProfilePhoto } from "@/services/profile";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import { LinearGradient } from "expo-linear-gradient"; // ✅ AJOUT
+import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useRouter } from "expo-router";
 import { doc, setDoc } from "firebase/firestore";
 import React, { useMemo, useState } from "react";
@@ -25,7 +25,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-// Palette de couleurs (inchangée)
+// Palette de couleurs
 const PRESET_COLORS = [
   "#19D07D", "#3B82F6", "#6366F1", "#EC4899", "#EF4444", "#F59E0B",
   "#1A1A1A", "#FFFFFF", "#8B5CF6", "#10B981", "#06B6D4", "#F97316",
@@ -36,7 +36,7 @@ const editTheme = {
     bgGradient: ["#DDF7E8", "#F4FDF9"] as const,
     glassInput: "rgba(255, 255, 255, 0.6)",
     borderColor: "rgba(0, 143, 107, 0.15)",
-    textMain: "#0A3F33", 
+    textMain: "#0A3F33",
     textMuted: "#4A665F",
     accent: "#008F6B",
 };
@@ -48,23 +48,22 @@ export default function EditProfileScreen() {
   const isLight = mode === "light";
 
   // --- ÉTATS ---
-  // Suppression de firstName et lastName
   const [username, setUsername] = useState(user?.username ?? "");
   const [bio, setBio] = useState(user?.bio ?? "");
   const [photoURL, setPhotoURL] = useState<string | null>(user?.photoURL ?? null);
-  
+
+  // Utilisation de la couleur du user context ou fallback vert
   const [avatarColor, setAvatarColor] = useState<string>(
-    (user as any)?.avatarColor ?? "#19D07D"
+    user?.avatarColor ?? "#19D07D"
   );
-  
+
   const [saving, setSaving] = useState(false);
 
   const canSave = useMemo(() => !saving && !!auth.currentUser, [saving]);
 
-  // Initiales dynamiques - Adapté pour n'utiliser que le username
+  // Initiales dynamiques
   const getInitials = () => {
     const name = (username || "Inconnu").trim();
-    // On peut garder la logique de split si le username a des espaces, sinon slice(0,2)
     const parts = name.split(" ");
     if (parts.length > 1) {
       return (parts[0][0] + parts[1][0]).toUpperCase();
@@ -141,15 +140,14 @@ export default function EditProfileScreen() {
         setPhotoURL(nextPhotoURL);
       }
 
+      // S'assurer que le format est bon
       const finalColor = avatarColor.startsWith("#") ? avatarColor : `#${avatarColor}`;
 
       const payload = {
-        // firstName: firstName || null, // Supprimé
-        // lastName: lastName || null,   // Supprimé
         username: username || null,
         bio: bio || null,
         photoURL: nextPhotoURL,
-        avatarColor: finalColor,
+        avatarColor: finalColor, // On force la sauvegarde de la couleur
       };
 
       await setDoc(userDocRef, payload, { merge: true });
@@ -180,16 +178,14 @@ export default function EditProfileScreen() {
   const initialsColor = isWhiteBg ? "#1A1A1A" : "#FFFFFF";
   const borderColor = isWhiteBg ? "#E5E5E5" : "transparent";
 
-  // Couleurs dynamiques
   const titleColor = isLight ? editTheme.textMain : colors.text;
   const mutedColor = isLight ? editTheme.textMuted : colors.mutedText;
   const inputBg = isLight ? editTheme.glassInput : colors.surfaceAlt;
   const inputBorder = isLight ? editTheme.borderColor : "transparent";
 
-  // Wrapper Fond
   const BackgroundComponent = isLight ? LinearGradient : View;
-  const bgProps = isLight 
-    ? { colors: editTheme.bgGradient, style: StyleSheet.absoluteFill } 
+  const bgProps = isLight
+    ? { colors: editTheme.bgGradient, style: StyleSheet.absoluteFill }
     : { style: [StyleSheet.absoluteFill, { backgroundColor: "#021114" }] };
 
   return (
@@ -310,7 +306,7 @@ export default function EditProfileScreen() {
               )}
             </View>
 
-            {/* FORMULAIRE - Modifié pour ne garder que Username */}
+            {/* FORMULAIRE */}
             <View style={styles.formGroup}>
               <Text style={[styles.label, { color: mutedColor }]}>
                 Nom d'utilisateur
@@ -421,7 +417,6 @@ const styles = StyleSheet.create({
   removeBtn: { position: "absolute", top: 0, right: 0 },
   removeBtnBg: { backgroundColor: "#fff", borderRadius: 15 },
 
-  // --- STYLE GLACE / LIQUIDE ---
   colorPickerContainer: {
     width: "100%",
     marginTop: 20,
@@ -476,4 +471,4 @@ const styles = StyleSheet.create({
 
   saveBtn: { paddingVertical: 16, borderRadius: 16, alignItems: "center" },
   cancelBtn: { paddingVertical: 16, borderRadius: 16, alignItems: "center", marginTop: 12, borderWidth: 1 },
-}); 
+});

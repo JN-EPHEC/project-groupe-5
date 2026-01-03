@@ -1,7 +1,8 @@
+import { useThemeMode } from "@/hooks/theme-context"; // ✅ IMPORT CORRECT
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
-import { Text, View, useColorScheme } from "react-native"; // Ajout de useColorScheme
+import { Text, View } from "react-native";
 import { ClassementUser } from "../types/classement";
 import { ClassementRow } from "./ClassementRow";
 import { FakeUserRow } from "./FakeUserRow";
@@ -12,9 +13,9 @@ type Props = {
 };
 
 export function ClassementList({ users, totalSlots = 50 }: Props) {
-  // 1. DÉTECTION AUTOMATIQUE DU THÈME
-  const colorScheme = useColorScheme();
-  const isDarkMode = colorScheme === "dark";
+  // ✅ CORRECTION : Utilisation du hook de thème de l'app, pas celui du système
+  const { mode } = useThemeMode();
+  const isDarkMode = mode === "dark";
 
   const qualifiedUsers = users.filter((u) => u.qualified === true);
   const nonQualifiedUsers = users.filter((u) => !u.qualified);
@@ -25,7 +26,6 @@ export function ClassementList({ users, totalSlots = 50 }: Props) {
       {qualifiedUsers.length > 0 && (
         <>
           <LinearGradient
-            // Ajuste les couleurs de fond de section selon le mode si tu veux
             colors={isDarkMode 
                 ? ["rgba(34, 197, 94, 0.25)", "rgba(34, 197, 94, 0.05)"]
                 : ["rgba(34, 197, 94, 0.15)", "rgba(34, 197, 94, 0.02)"]
@@ -51,7 +51,6 @@ export function ClassementList({ users, totalSlots = 50 }: Props) {
           </LinearGradient>
 
           {qualifiedUsers.map((u) => (
-            // 2. TRANSMISSION DU MODE SOMBRE ICI 👇
             <ClassementRow key={u.uid} user={u} isDarkMode={isDarkMode} />
           ))}
         </>
@@ -87,7 +86,6 @@ export function ClassementList({ users, totalSlots = 50 }: Props) {
           </LinearGradient>
 
           {nonQualifiedUsers.map((u) => (
-            // TRANSMISSION DU MODE SOMBRE ICI AUSSI 👇
             <ClassementRow key={u.uid} user={u} isDarkMode={isDarkMode} />
           ))}
         </>

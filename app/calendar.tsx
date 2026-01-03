@@ -12,21 +12,30 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 // 🎨 THEME CALENDAR
 const calendarTheme = {
-    bgGradient: ["#DDF7E8", "#F4FDF9"] as const,
-    glassCardBg: ["rgba(255, 255, 255, 0.9)", "rgba(255, 255, 255, 0.6)"] as const,
-    glassBorder: "rgba(255, 255, 255, 0.8)",
-    accent: "#008F6B", // Vert Marque
-    textMain: "#0A3F33", 
-    textMuted: "#4A665F",
-    bubbleActive: "#008F6B",
-    bubbleTodayBorder: "#FF8C66" // Corail pour aujourd'hui
+  // Mode Clair
+  bgGradient: ["#DDF7E8", "#F4FDF9"] as const,
+  glassCardBg: ["rgba(255, 255, 255, 0.9)", "rgba(255, 255, 255, 0.6)"] as const,
+  glassBorder: "rgba(255, 255, 255, 0.8)",
+  accent: "#008F6B", // Vert Marque
+  textMain: "#0A3F33", 
+  textMuted: "#4A665F",
+  
+  // Couleurs bulles
+  bubbleActive: "#008F6B",
+  // ✅ MODIFICATION : La bordure du jour actuel devient verte comme le lien
+  bubbleTodayBorder: "#008F6B", 
+
+  // Mode Sombre
+  darkBg: "#021114",
+  darkCardBg: ["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"] as const,
+  darkBorder: "rgba(0, 151, 178, 0.3)",
 };
 
 function getMonthMatrix(date = new Date()) {
   const year = date.getFullYear();
   const month = date.getMonth();
   const firstOfMonth = new Date(year, month, 1);
-  const startDay = (firstOfMonth.getDay() + 6) % 7; // Monday first
+  const startDay = (firstOfMonth.getDay() + 6) % 7; 
   const startDate = new Date(year, month, 1 - startDay);
   const matrix: Date[] = [];
   for (let i = 0; i < 42; i++) {
@@ -63,7 +72,6 @@ export default function CalendarScreen() {
   const monthName = formatMonthYear(displayDate);
   const monthIndex = displayDate.getMonth();
 
-  // Calcul du nombre de jours validés ce mois-ci
   const activeDaysThisMonth = grid
     .filter((d) => d.getMonth() === monthIndex)
     .filter((d) => {
@@ -72,12 +80,6 @@ export default function CalendarScreen() {
     })
     .length;
 
-
-  // Calcul Streak (Logique simplifiée pour l'affichage, à connecter au vrai calcul si besoin)
-  // Ici on laisse 0 pour l'instant ou on peut reprendre la logique de StreakCalendar si on veut l'afficher ici
-  let streakWeeks = 0; 
-
-  // Découpage en semaines pour l'affichage
   const weeks = [] as Date[][];
   for (let i = 0; i < grid.length; i += 7) weeks.push(grid.slice(i, i + 7));
   
@@ -86,11 +88,16 @@ export default function CalendarScreen() {
   const textColor = isLight ? calendarTheme.textMuted : colors.mutedText;
   const accentColor = isLight ? calendarTheme.accent : colors.accent;
 
-  // Wrapper Fond
+  // Couleur bordure Today unifiée (Vert Marque ou Accent Sombre)
+  const todayBorderColor = isLight ? calendarTheme.bubbleTodayBorder : colors.accent;
+
   const BackgroundComponent = isLight ? LinearGradient : View;
   const bgProps = isLight 
     ? { colors: calendarTheme.bgGradient, style: StyleSheet.absoluteFill } 
-    : { style: [StyleSheet.absoluteFill, { backgroundColor: "#021114" }] };
+    : { style: [StyleSheet.absoluteFill, { backgroundColor: calendarTheme.darkBg }] };
+
+  const cardGradient = isLight ? calendarTheme.glassCardBg : calendarTheme.darkCardBg;
+  const cardBorder = isLight ? calendarTheme.glassBorder : calendarTheme.darkBorder;
 
   return (
     <View style={{ flex: 1 }}>
@@ -102,7 +109,7 @@ export default function CalendarScreen() {
             <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                 <Ionicons name="arrow-back" size={24} color={titleColor} />
             </TouchableOpacity>
-            <View style={styles.monthSwitcher}>
+            <View style={[styles.monthSwitcher, { backgroundColor: isLight ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.1)" }]}>
                 <TouchableOpacity onPress={() => setDisplayDate(d => { const n = new Date(d); n.setMonth(d.getMonth()-1); return n; })} style={styles.arrowBtn}>
                     <Ionicons name="chevron-back" size={20} color={titleColor} />
                 </TouchableOpacity>
@@ -117,16 +124,15 @@ export default function CalendarScreen() {
         {/* STATS */}
         <View style={styles.statsContainer}>
             <LinearGradient
-                colors={isLight ? ["rgba(255,255,255,0.8)", "rgba(255,255,255,0.4)"] : ["rgba(255,255,255,0.1)", "rgba(255,255,255,0.05)"]}
-                style={[styles.statBox, { borderColor: isLight ? calendarTheme.glassBorder : "rgba(255,255,255,0.1)" }]}
+                colors={isLight ? ["rgba(255,255,255,0.8)", "rgba(255,255,255,0.4)"] : calendarTheme.darkCardBg}
+                style={[styles.statBox, { borderColor: cardBorder }]}
             >
                 <Text style={[styles.statLabel, { color: textColor }]}>Série actuelle</Text>
-                {/* On pourra connecter le vrai streak ici plus tard */}
                 <Text style={[styles.statValue, { color: accentColor }]}>-- <Text style={{ fontSize: 14 }}>jours</Text></Text>
             </LinearGradient>
             <LinearGradient
-                colors={isLight ? ["rgba(255,255,255,0.8)", "rgba(255,255,255,0.4)"] : ["rgba(255,255,255,0.1)", "rgba(255,255,255,0.05)"]}
-                style={[styles.statBox, { borderColor: isLight ? calendarTheme.glassBorder : "rgba(255,255,255,0.1)" }]}
+                colors={isLight ? ["rgba(255,255,255,0.8)", "rgba(255,255,255,0.4)"] : calendarTheme.darkCardBg}
+                style={[styles.statBox, { borderColor: cardBorder }]}
             >
                 <Text style={[styles.statLabel, { color: textColor }]}>Activités ce mois</Text>
                 <Text style={[styles.statValue, { color: titleColor }]}>{activeDaysThisMonth}</Text>
@@ -135,8 +141,8 @@ export default function CalendarScreen() {
 
         {/* CALENDRIER */}
         <LinearGradient
-            colors={isLight ? calendarTheme.glassCardBg : ["rgba(255,255,255,0.05)", "rgba(255,255,255,0.02)"]}
-            style={[styles.calendarCard, { borderColor: isLight ? calendarTheme.glassBorder : "rgba(255,255,255,0.1)" }]}
+            colors={cardGradient}
+            style={[styles.calendarCard, { borderColor: cardBorder }]}
         >
             <View style={styles.weekHeader}>
                 {['L','M','M','J','V','S','D'].map((d, i) => (
@@ -160,14 +166,15 @@ export default function CalendarScreen() {
                                     style={[
                                         styles.dayBubble, 
                                         { 
-                                            backgroundColor: isValidated ? (isLight ? calendarTheme.bubbleActive : accentColor) : 'transparent',
-                                            borderColor: isToday ? calendarTheme.bubbleTodayBorder : 'transparent',
+                                            // Fond vert si validé
+                                            backgroundColor: isValidated ? (isLight ? calendarTheme.bubbleActive : colors.accent) : 'transparent',
+                                            // Bordure verte pour "Aujourd'hui"
+                                            borderColor: isToday ? todayBorderColor : 'transparent',
                                             borderWidth: isToday ? 2 : 0,
                                             opacity: inMonth ? 1 : 0.3
                                         }
                                     ]}
                                 > 
-                                    {/* ✅ Icône Checkmark si validé */}
                                     {isValidated ? (
                                         <Ionicons 
                                             name="checkmark" 
@@ -201,7 +208,7 @@ const styles = StyleSheet.create({
   },
   backBtn: { padding: 8, borderRadius: 12 },
   
-  monthSwitcher: { flexDirection: 'row', alignItems: 'center', backgroundColor: "rgba(255,255,255,0.5)", borderRadius: 20, padding: 4 },
+  monthSwitcher: { flexDirection: 'row', alignItems: 'center', borderRadius: 20, padding: 4 },
   arrowBtn: { padding: 8 },
   monthTitle: { fontSize: 16, fontWeight: '700', textTransform: 'capitalize', marginHorizontal: 10, fontFamily: FontFamilies.heading },
 

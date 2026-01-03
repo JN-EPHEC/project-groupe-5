@@ -408,27 +408,28 @@ export default function SocialScreen() {
               }
 
               const profile: any = snap.data();
-              const displayName =
-                [profile.firstName, profile.lastName].filter(Boolean).join(" ").trim() ||
-                profile.username ||
-                profile.usernameLowercase ||
+
+              // ✅ MODIF 1 : Prioriser le username, sinon prénom/nom
+              const displayName = 
+                profile.username || 
+                [profile.firstName, profile.lastName].filter(Boolean).join(" ").trim() || 
+                profile.usernameLowercase || 
                 uid;
+
               const avatarUri =
                 (typeof profile.photoURL === "string" && profile.photoURL.length > 0
                   ? profile.photoURL
-                  : null) ||
-                (typeof profile.avatar === "string" && profile.avatar.length > 0
-                  ? profile.avatar
                   : null);
+
               const pointsValue = rankingPointsMap.get(uid) ?? 0;
 
+              // ✅ MODIF 2 : Récupérer la couleur personnalisée
               return {
                 id: uid,
                 name: displayName,
                 avatar: avatarUri,
                 points: pointsValue,
-                // ✅ AJOUT : On récupère la couleur personnalisée
-                avatarColor: profile.avatarColor || "#19D07D", 
+                avatarColor: profile.avatarColor || "#19D07D", // Récupère la couleur ou vert par défaut
               } as ClubMember;
             } catch {
               return {
@@ -749,79 +750,7 @@ setIsLeaving(false);
       {/* Le Fond d'écran global */}
       <BackgroundComponent {...(bgProps as any)} />
 
-      {/* 👇 BLOC CORRIGÉ : FOND OPAQUE 👇 */}
-      {isLeaving && (
-        <View style={{ 
-          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, 
-          zIndex: 9999, 
-          alignItems: 'center', justifyContent: 'center',
-          // ICI : On utilise une couleur SOLIDE (pas de transparence) pour cacher le changement de page
-          backgroundColor: isLight ? "#F0FDF4" : "#021114" 
-        }}>
-           <ActivityIndicator size="large" color={colors.accent} />
-           <Text style={{ marginTop: 20, fontFamily: FontFamilies.heading, color: colors.text }}>
-             Mise à jour en cours...
-           </Text>
-        </View>
-      )}
 
-    {leaveConfirmVisible && (
-      <View style={{
-        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-        zIndex: 9998,
-        backgroundColor: 'rgba(0,0,0,0.6)',
-        alignItems: 'center', justifyContent: 'center',
-        padding: 20
-      }}>
-        <View style={{
-          // ✅ MODIF : Fond sombre standard (#1F2937) au lieu du vert bizarre
-          backgroundColor: isLight ? '#fff' : '#1F2937', 
-          borderRadius: 24,
-          padding: 24,
-          width: '100%',
-          maxWidth: 320,
-          borderWidth: 1,
-          borderColor: isLight ? 'transparent' : 'rgba(255, 255, 255, 0.1)',
-          shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 10, elevation: 5
-        }}>
-          <Text style={{ 
-              fontSize: 20, 
-              fontFamily: FontFamilies.heading, 
-              marginBottom: 12,
-              color: isLight ? '#0A3F33' : '#F9FAFB', // Blanc cassé
-              textAlign: 'center'
-          }}>
-            Quitter le club ?
-          </Text>
-          
-          <Text style={{ 
-              marginBottom: 24, 
-              color: isLight ? '#4A665F' : '#9CA3AF', // Gris clair standard
-              textAlign: 'center',
-              lineHeight: 20,
-              fontFamily: FontFamilies.body
-          }}>
-            Êtes-vous sûr de vouloir quitter ce club ? Vous ne pourrez plus participer aux défis d'équipe.
-          </Text>
-
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <TouchableOpacity 
-                onPress={() => setLeaveConfirmVisible(false)}
-                style={{ flex: 1, paddingVertical: 12, borderRadius: 14, backgroundColor: isLight ? '#F0FDF4' : 'rgba(255,255,255,0.1)', alignItems: 'center' }}
-            >
-              <Text style={{ color: isLight ? '#008F6B' : '#FFF', fontFamily: FontFamilies.headingMedium }}>Rester</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-                onPress={handleLeaveClub}
-                style={{ flex: 1, paddingVertical: 12, borderRadius: 14, backgroundColor: '#FF8C66', alignItems: 'center' }}
-            >
-              <Text style={{ color: '#fff', fontFamily: FontFamilies.headingMedium }}>Quitter</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    )}
    
 
    
@@ -1150,15 +1079,37 @@ setIsLeaving(false);
                     {avatarUri ? (
                       <Image source={{ uri: avatarUri }} style={styles.searchAvatar} />
                     ) : (
-                      <View style={[styles.searchAvatar, styles.searchAvatarFallback]}>
-                        <Text style={styles.searchInitial}>{initial}</Text>
-                      </View>
+                      // ✅ MODIF 6 : Avatar recherche dynamique
+                      (() => {
+                        const avatarBg = u.avatarColor || "#19D07D"; // Couleur de la recherche
+                        const isWhiteBg = ["#FFFFFF", "#ffffff", "#fff", "#FFF"].includes(avatarBg);
+                        // Utilisation du username ou nom pour l'initiale
+                        const nameForInitial = u.username || u.firstName || "?"; 
+                        const initial = nameForInitial.charAt(0).toUpperCase();
+
+                        return (
+                          <View style={{ 
+                            width: 42, height: 42, borderRadius: 21, marginRight: 12, 
+                            backgroundColor: avatarBg, 
+                            alignItems: "center", justifyContent: "center", overflow: "hidden",
+                            borderWidth: 1, borderColor: isLight ? "rgba(0,0,0,0.1)" : "transparent"
+                          }}>
+                            <Text style={{ 
+                              color: isWhiteBg ? "#1A1A1A" : "#fff", 
+                              fontFamily: FontFamilies.heading, fontSize: 16 
+                            }}>
+                              {initial}
+                            </Text>
+                          </View>
+                        )
+                      })()
                     )}
+                    {/* ✅ MODIF 7 : Afficher le Username en gros s'il existe */}
                     <View style={styles.searchNames}>
-                      <Text style={{ color: isLight ? "#0A3F33" : colors.text, fontFamily: FontFamilies.heading }}>{profileName}</Text>
-                      {usernameTag ? (
-                        <Text style={[styles.searchUsername, { color: colors.mutedText }]}>@{usernameTag}</Text>
-                      ) : null}
+                      <Text style={{ color: isLight ? "#0A3F33" : colors.text, fontFamily: FontFamilies.heading }}>
+                        {u.username || [u.firstName, u.lastName].filter(Boolean).join(" ") || "Inconnu"}
+                      </Text>
+                      {/* Affiche le prénom en petit si on a affiché le username en gros, ou inversement, selon ta préférence */}
                     </View>
                     {actionNode}
                   </LinearGradient>
@@ -1194,11 +1145,14 @@ setIsLeaving(false);
                 {};
 
               const displayName =
-                profile?.firstName ||
                 profile?.username ||
+                [profile?.firstName, profile?.lastName].filter(Boolean).join(" ") ||
                 profile?.usernameLowercase ||
                 fallback?.name ||
                 id;
+
+              // ✅ MODIF 5 : Récupérer la couleur
+              const avatarColor = profile?.avatarColor || fallback?.avatarColor || "#19D07D";
 
               const pointsValue = rankingPointsMap.get(id) ?? 0;
 
@@ -1220,6 +1174,7 @@ setIsLeaving(false);
                 name: String(displayName),
                 points: pointsValue,
                 avatar: photoURL || null,
+                avatarColor: avatarColor, // Ajoute ça pour le passer à FriendCard
                 online: isOnline,
               };
             });
@@ -1506,6 +1461,80 @@ setIsLeaving(false);
           </TouchableWithoutFeedback>
         </View>
       )}
+      {/* 👇 BLOC FOND OPAQUE (LOADER) 👇 */}
+      {isLeaving && (
+        <View style={{ 
+          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, 
+          zIndex: 9999, 
+          alignItems: 'center', justifyContent: 'center',
+          backgroundColor: isLight ? "#F0FDF4" : "#021114" 
+        }}>
+           <ActivityIndicator size="large" color={colors.accent} />
+           <Text style={{ marginTop: 20, fontFamily: FontFamilies.heading, color: colors.text }}>
+             Mise à jour en cours...
+           </Text>
+        </View>
+      )}
+
+      {/* 👇 MODALE CONFIRMATION QUITTER 👇 */}
+      {leaveConfirmVisible && (
+        <View style={{
+          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+          zIndex: 9998,
+          backgroundColor: 'rgba(0,0,0,0.6)',
+          alignItems: 'center', justifyContent: 'center',
+          padding: 20
+        }}>
+          <View style={{
+            backgroundColor: isLight ? '#fff' : '#1F2937', 
+            borderRadius: 24,
+            padding: 24,
+            width: '100%',
+            maxWidth: 320,
+            borderWidth: 1,
+            borderColor: isLight ? 'transparent' : 'rgba(255, 255, 255, 0.1)',
+            shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 10, elevation: 5
+          }}>
+            <Text style={{ 
+                fontSize: 20, 
+                fontFamily: FontFamilies.heading, 
+                marginBottom: 12,
+                color: isLight ? '#0A3F33' : '#F9FAFB', 
+                textAlign: 'center'
+            }}>
+              Quitter le club ?
+            </Text>
+            
+            <Text style={{ 
+                marginBottom: 24, 
+                color: isLight ? '#4A665F' : '#9CA3AF', 
+                textAlign: 'center',
+                lineHeight: 20,
+                fontFamily: FontFamilies.body
+            }}>
+              Êtes-vous sûr de vouloir quitter ce club ? Vous ne pourrez plus participer aux défis d'équipe.
+            </Text>
+
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity 
+                  onPress={() => setLeaveConfirmVisible(false)}
+                  style={{ flex: 1, paddingVertical: 12, borderRadius: 14, backgroundColor: isLight ? '#F0FDF4' : 'rgba(255,255,255,0.1)', alignItems: 'center' }}
+              >
+                <Text style={{ color: isLight ? '#008F6B' : '#FFF', fontFamily: FontFamilies.headingMedium }}>Rester</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                  onPress={handleLeaveClub}
+                  style={{ flex: 1, paddingVertical: 12, borderRadius: 14, backgroundColor: '#FF8C66', alignItems: 'center' }}
+              >
+                <Text style={{ color: '#fff', fontFamily: FontFamilies.headingMedium }}>Quitter</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* MODALE QR CODE (Déjà en bas normalement) */}
       {joinedClub && (
         <ShareQRModal
           visible={showClubQR}
@@ -1609,22 +1638,24 @@ setIsLeaving(false);
                         style={{ width: 48, height: 48, borderRadius: 24, borderWidth: 2, borderColor: isLight ? "#FFF" : "rgba(255,255,255,0.1)" }} 
                       />
                     ) : (
-                      // ✅ LOGIQUE HEADER : Couleur dynamique et texte contrasté
+                      // ✅ MODIF 3 : Affichage Avatar dynamique (Style Header)
                       (() => {
                         const avatarBg = (item as any).avatarColor || "#19D07D";
                         const isWhiteBg = ["#FFFFFF", "#ffffff", "#fff", "#FFF"].includes(avatarBg);
+                        const initial = (item.name || "?").trim().charAt(0).toUpperCase(); // Prend la 1ère lettre du username
+                      
                         return (
                           <View style={{ 
-                              width: 48, height: 48, borderRadius: 24, 
-                              backgroundColor: avatarBg, 
-                              alignItems: 'center', justifyContent: 'center', 
-                              borderWidth: 2, borderColor: isLight ? "#FFF" : "transparent" 
+                            width: 40, height: 40, borderRadius: 20, marginHorizontal: 12, 
+                            backgroundColor: avatarBg, // Couleur persos
+                            alignItems: 'center', justifyContent: 'center',
+                            borderWidth: 1, borderColor: isLight ? "rgba(0,0,0,0.1)" : "transparent"
                           }}>
                             <Text style={{ 
-                                color: isWhiteBg ? "#1A1A1A" : "#FFFFFF", 
-                                fontFamily: FontFamilies.heading, fontSize: 18 
+                              color: isWhiteBg ? "#1A1A1A" : "#FFFFFF", // Texte noir si fond blanc
+                              fontFamily: FontFamilies.heading, fontSize: 16 
                             }}>
-                                {(item.name || '?').charAt(0).toUpperCase()}
+                              {initial}
                             </Text>
                           </View>
                         );
@@ -1708,55 +1739,53 @@ setIsLeaving(false);
 
             {/* BOUTONS ACTIONS (Logique Chef/Membre) */}
             <View style={{ flexDirection: 'row', marginBottom: 20, gap: 10 }}>
-               {joinedClub?.ownerId === auth.currentUser?.uid ? (
-                   // MODE CHEF : Bouton MODIFIER
-                   <TouchableOpacity 
-                     onPress={() => {
-                       if (!joinedClub) return;
-                       setEditingClub(true);
-                       setNewClubName(joinedClub.name || '');
-                       setNewClubDesc(joinedClub.desc || '');
-                       setNewClubVisibility((joinedClub.visibility as any) || 'public');
-                       setNewClubPhoto(joinedClub.photoUri || '');
-                       setNewClubCity(joinedClub.city || '');
-                       setView('createClub');
-                     }} 
-                     // MODIF: Style sombre ajusté
-                     style={{ flex: 1, backgroundColor: isLight ? "rgba(255,255,255,0.6)" : "rgba(0, 151, 178, 0.15)", paddingVertical: 12, borderRadius: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: isLight ? "rgba(255,255,255,0.8)" : "rgba(0, 151, 178, 0.3)" }}
-                   >
-                      <Ionicons name="create-outline" size={20} color={isLight ? "#0A3F33" : "#fff"} />
-                      <Text style={{ color: isLight ? "#0A3F33" : "#fff", fontFamily: FontFamilies.headingMedium }}>Modifier</Text>
-                   </TouchableOpacity>
-               ) : (
-                   // 👤 MODE MEMBRE : Bouton PARTAGER
-                   <TouchableOpacity 
-                     onPress={() => setShowClubQR(true)} 
-                     // MODIF: Style sombre ajusté
-                     style={{ flex: 1, backgroundColor: isLight ? "rgba(255,255,255,0.6)" : "rgba(0, 151, 178, 0.15)", paddingVertical: 12, borderRadius: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: isLight ? "rgba(255,255,255,0.8)" : "rgba(0, 151, 178, 0.3)" }}
-                   >
-                     <Ionicons name="share-social-outline" size={20} color={isLight ? "#0A3F33" : "#fff"} />
-                     <Text style={{ color: isLight ? "#0A3F33" : "#fff", fontFamily: FontFamilies.headingMedium }}>Partager</Text>
-                   </TouchableOpacity>
-               )}
+    {/* CHEF : MODIFIER */}
+    {joinedClub?.ownerId === auth.currentUser?.uid ? (
+        <TouchableOpacity 
+            onPress={() => {
+                if (!joinedClub) return;
+                setEditingClub(true);
+                setNewClubName(joinedClub.name || '');
+                setNewClubDesc(joinedClub.desc || '');
+                setNewClubVisibility((joinedClub.visibility as any) || 'public');
+                setNewClubPhoto(joinedClub.photoUri || '');
+                setNewClubCity(joinedClub.city || '');
+                setView('createClub');
+            }} 
+            style={{ flex: 1, backgroundColor: isLight ? "rgba(255,255,255,0.6)" : "rgba(0, 151, 178, 0.15)", paddingVertical: 12, borderRadius: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: isLight ? "rgba(255,255,255,0.8)" : "rgba(0, 151, 178, 0.3)" }}
+        >
+            <Ionicons name="create-outline" size={20} color={isLight ? "#0A3F33" : "#fff"} />
+            <Text style={{ color: isLight ? "#0A3F33" : "#fff", fontFamily: FontFamilies.headingMedium }}>Modifier</Text>
+        </TouchableOpacity>
+    ) : (
+        // MEMBRE : PARTAGER
+        <TouchableOpacity 
+            onPress={() => setShowClubQR(true)} 
+            style={{ flex: 1, backgroundColor: isLight ? "rgba(255,255,255,0.6)" : "rgba(0, 151, 178, 0.15)", paddingVertical: 12, borderRadius: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: isLight ? "rgba(255,255,255,0.8)" : "rgba(0, 151, 178, 0.3)" }}
+        >
+            <Ionicons name="share-social-outline" size={20} color={isLight ? "#0A3F33" : "#fff"} />
+            <Text style={{ color: isLight ? "#0A3F33" : "#fff", fontFamily: FontFamilies.headingMedium }}>Partager</Text>
+        </TouchableOpacity>
+    )}
 
-               {/* Bouton QUITTER (Style Bleu Liquide Glacé) */}
-               <TouchableOpacity
-                 onPress={() => promptLeaveClub(joinedClub ?? undefined)}
-                 style={{ 
-                    flex: 1, 
-                    // MODIF: On utilise le même style bleu/vert que les autres boutons
-                    backgroundColor: isLight ? "rgba(255,255,255,0.6)" : "rgba(0, 151, 178, 0.15)", 
-                    paddingVertical: 12, 
-                    borderRadius: 16, 
-                    alignItems: 'center', 
-                    borderWidth: 1, 
-                    borderColor: isLight ? "rgba(255,255,255,0.8)" : "rgba(0, 151, 178, 0.3)"
-                 }}
-               >
-                 {/* Texte en couleur thème (ou légèrement différent si tu veux, ici je mets la couleur texte standard pour être soft) */}
-                 <Text style={{ color: isLight ? "#0A3F33" : "#fff", fontFamily: FontFamilies.headingMedium }}>Quitter</Text>
-               </TouchableOpacity>
-            </View>
+    {/* TOUT LE MONDE : QUITTER */}
+    <TouchableOpacity
+        onPress={() => {
+            if (joinedClub) promptLeaveClub(joinedClub);
+        }}
+        style={{ 
+            flex: 1, 
+            backgroundColor: isLight ? "rgba(255,255,255,0.6)" : "rgba(0, 151, 178, 0.15)", 
+            paddingVertical: 12, 
+            borderRadius: 16, 
+            alignItems: 'center', 
+            borderWidth: 1, 
+            borderColor: isLight ? "rgba(255,255,255,0.8)" : "rgba(0, 151, 178, 0.3)"
+        }}
+    >
+        <Text style={{ color: isLight ? "#0A3F33" : "#fff", fontFamily: FontFamilies.headingMedium }}>Quitter</Text>
+    </TouchableOpacity>
+</View>
 
             {/* LISTE DES MEMBRES AVEC GESTION HIERARCHIQUE */}
             <FlatList

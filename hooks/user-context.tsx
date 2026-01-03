@@ -39,6 +39,7 @@ export type UserProfile = {
   username?: string | null;
   bio?: string | null;
   photoURL?: string | null;
+  avatarColor?: string | null; // ✅ AJOUT ICI
   isPremium?: boolean;
 };
 
@@ -64,13 +65,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     firebaseUser?.email === DEV_TEST_EMAIL;
 
   useEffect(() => {
-    console.log("🧪 DEV PREMIUM CHECK", {
-      __DEV__,
-      DEV_FORCE_PREMIUM,
-      firebaseEmail: firebaseUser?.email,
-      isDevPremiumUser,
-      isPremiumState: isPremium,
-    });
+    // Console log removed for cleaner code
   }, [firebaseUser, isDevPremiumUser, isPremium]);
 
   const [authLoading, setAuthLoading] = useState(true);
@@ -119,6 +114,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             username: data.username ?? null,
             bio: data.bio ?? null,
             photoURL: data.photoURL ?? null,
+            avatarColor: data.avatarColor ?? "#19D07D", // ✅ AJOUT ICI : Récupération de la couleur
           });
         } else {
           setUserProfile(null);
