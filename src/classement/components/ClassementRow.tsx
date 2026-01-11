@@ -74,27 +74,39 @@ export function ClassementRow({ user, isDarkMode }: Props) {
   const isCurrentUser = user.isCurrentUser;
   const isQualified = user.qualified === true;
   const config = getRankConfig(rank);
-  
   const displayName = user.displayName || "Utilisateur";
-  const avatarColor = (user as any).avatarColor || "#19D07D"; 
-  
-  // ✅ FIX INITIALES : Utilise la 1ère lettre de chaque mot (Ex: "Vincent Goffinet" -> "VG")
-  const initials = displayName
-    .trim()
-    .split(/\s+/) // Sépare par les espaces
-    .map((n) => n[0]) // Prend la 1ère lettre
-    .join("")
-    .toUpperCase()
-    .slice(0, 2); // Garde max 2 lettres
 
+  // --- LOGIQUE HARMONISÉE ET CORRIGÉE ---
+  
+  // 1. Récupération de la couleur (avec fallback sûr)
+  // On cast en 'any' si 'avatarColor' n'est pas officiellement dans le type ClassementUser
+  const rawColor = (user as any).avatarColor || "#19D07D";
+  const avatarColor = typeof rawColor === 'string' ? rawColor : "#19D07D";
+  
+  // 2. Détection fond blanc
   const isWhiteBg = ["#FFFFFF", "#ffffff", "#fff", "#FFF"].includes(avatarColor);
 
-  // Couleurs adaptatives
+  // 3. Calcul Initiales (Priorité: explicite > calculé)
+  let initials = "";
+  if (!user.avatarUrl && (user as any).initials) {
+    initials = (user as any).initials;
+  } else {
+    initials = displayName
+      .trim()
+      .split(/\s+/)
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  }
+
+  // 4. Couleurs Textes
   const textColorPrimary = isDarkMode ? "#FFFFFF" : "#0A3F33"; 
   const textColorSecondary = isDarkMode ? "#94a3b8" : "#4A665F"; 
   const rankTextColor = rank <= 25 ? config.main : (isDarkMode ? "#FFFFFF" : "#0A3F33");
+  const initialsColor = isWhiteBg ? "#1A1A1A" : "#FFFFFF";
 
-  // Fond de carte
+  // 5. Configuration Fond
   let backgroundGradient = isDarkMode ? config.bgDark : config.bgLight;
   let borderColor = config.main; 
   let borderWidth = isCurrentUser ? 2 : 1; 
@@ -102,15 +114,12 @@ export function ClassementRow({ user, isDarkMode }: Props) {
   // Distinction "C'est moi"
   if (isCurrentUser) {
      backgroundGradient = isDarkMode 
-        ? [`${config.main}40`, `${config.main}15`] // Plus visible
-        : [`${config.main}40`, "#FFFFFF"]; 
+       ? [`${config.main}40`, `${config.main}15`] 
+       : [`${config.main}40`, "#FFFFFF"]; 
   } else if (isDarkMode) {
-     borderColor = "rgba(255,255,255,0.1)"; // Bordure subtile pour les autres
+     borderColor = "rgba(255,255,255,0.1)"; 
      borderWidth = 0.5;
   }
-
-  // Couleur du texte des initiales
-  const initialsColor = isWhiteBg ? "#1A1A1A" : "#FFFFFF";
 
   return (
     <LinearGradient

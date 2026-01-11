@@ -20,6 +20,33 @@ export function ClassementList({ users, totalSlots = 50 }: Props) {
   const qualifiedUsers = users.filter((u) => u.qualified === true);
   const nonQualifiedUsers = users.filter((u) => !u.qualified);
 
+  // Chrono jusqu'à demain midi (reset imminent)
+  const [timer, setTimer] = React.useState<string>("");
+  React.useEffect(() => {
+    function getTomorrowNoon() {
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(now.getDate() + 1);
+      tomorrow.setHours(12, 0, 0, 0);
+      return tomorrow;
+    }
+    function updateTimer() {
+      const now = new Date();
+      const end = getTomorrowNoon();
+      const diff = end.getTime() - now.getTime();
+      if (diff <= 0) {
+        setTimer("00:00:00");
+        return;
+      }
+      const hours = Math.floor((diff / (1000 * 60 * 60)));
+      const minutes = Math.floor((diff / (1000 * 60)) % 60);
+      setTimer(`${hours}h ${minutes}m`);
+    }
+    updateTimer();
+    const interval = setInterval(updateTimer, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <View style={{ paddingBottom: 40 }}>
       {/* ✅ SECTION QUALIFIÉS */}
@@ -48,6 +75,10 @@ export function ClassementList({ users, totalSlots = 50 }: Props) {
             <Text style={{ color: "#4ade80", fontWeight: "800", fontSize: 13, letterSpacing: 0.5 }}>
               QUALIFIÉS
             </Text>
+            {/* Chrono à droite */}
+            <View style={{ marginLeft: 12, backgroundColor: isDarkMode ? "#222" : "#E0F7EF", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 }}>
+              <Text style={{ color: isDarkMode ? "#4ade80" : "#008F6B", fontWeight: "700", fontSize: 13 }}>{timer}</Text>
+            </View>
           </LinearGradient>
 
           {qualifiedUsers.map((u) => (

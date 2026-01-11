@@ -3,7 +3,6 @@ import { useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, Image, Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 // Trouve cette ligne (vers la ligne 3) et ajoute Modal
-import { Modal } from "react-native";
 // Composants UI
 import { GradientButton } from "@/components/ui/common/GradientButton";
 import { ChatView } from "@/components/ui/social/ChatView";
@@ -23,8 +22,7 @@ import { useUser } from "@/hooks/user-context";
 import { acceptJoinRequest, rejectJoinRequest, removeMember, requestJoinClub } from "@/services/clubs";
 import { acceptFriendRequest, rejectFriendRequest, removeFriend, searchUsers, sendFriendRequest } from "@/services/friends";
 import { notifyFriendRequest, sendClubRequestToAdminsList } from "@/services/notifications";
-import { useCurrentCycle } from "@/src/classement/hooks/useCurrentCycle";
-import { useLeagueUsers } from "@/src/classement/hooks/useLeagueUsers";
+import { useClassement } from "@/src/classement/hooks/useClassement";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
@@ -257,20 +255,16 @@ export default function SocialScreen() {
   };
   const { user } = useUser();
 
-  const { cycle: currentCycle } = useCurrentCycle();
-  const { users: allRankedUsers } = useLeagueUsers(currentCycle?.id ?? null, 'individuel') || { users: [] };
-
-
-  // 2. Le useMemo ne doit servir qu'à calculer les points
-  const rankingPointsMap = useMemo(() => {
+  // Utilise le classement global (défis validés)
+  const { users: classementUsers } = useClassement();
+  // Map pour accès rapide par id
+  const classementPointsMap = useMemo(() => {
     const map = new Map<string, number>();
-    if (allRankedUsers) {
-      for (const user of allRankedUsers) {
-        map.set(user.uid, user.rankingPoints);
-      }
+    for (const user of classementUsers) {
+      map.set(user.uid, user.rankingPoints);
     }
     return map;
-  }, [allRankedUsers]);
+  }, [classementUsers]);
   const params = useLocalSearchParams();
   const router = useRouter();
   const { follow } = useSubscriptions();
@@ -421,7 +415,7 @@ export default function SocialScreen() {
                   ? profile.photoURL
                   : null);
 
-              const pointsValue = rankingPointsMap.get(uid) ?? 0;
+              const pointsValue = classementPointsMap.get(uid) ?? 0;
 
               // ✅ MODIF 2 : Récupérer la couleur personnalisée
               return {
@@ -466,7 +460,7 @@ export default function SocialScreen() {
     return () => {
       active = false;
     };
-  }, [view, selectedChat?.id, joinedClub, members, rankingPointsMap]);
+  }, [view, selectedChat?.id, joinedClub, members, classementPointsMap]);
 
   useEffect(() => {
     if (view !== "members") {
@@ -559,31 +553,66 @@ export default function SocialScreen() {
   };
 
   const clubRankingData = useMemo(() => {
-    const roster = (members || []).map((member) => ({
-      ...member,
-      isMe: member.id === currentUid,
-      points: rankingPointsMap.get(member.id) ?? 0,
-    }));
+    const roster = (members || []).map((member) => {
+      const isMe = member.id === currentUid;
+      let name = member.name || '';
+      let avatar = member.avatar || null;
+      let avatarColor = '#19D07D';
+      let username = '';
+      let initials = '';
+      let profile = isMe ? user : friendProfiles[member.id];
+      if (profile) {
+        username = profile.username || profile.firstName || profile.lastName || name || member.id;
+        avatarColor = profile.avatarColor || '#19D07D';
+        avatar = profile.photoURL || avatar;
+        name = profile.username || [profile.firstName, profile.lastName].filter(Boolean).join(' ') || name || member.id;
+        initials = (profile.username || profile.firstName || profile.lastName || name || member.id)
+          .split(' ')
+          .map((n: string) => typeof n === 'string' ? n[0] : '')
+          .join('').toUpperCase().slice(0, 2) || (isMe ? 'M' : '?');
+      } else {
+        initials = (name || member.id)
+          .split(' ')
+          .map((n: string) => typeof n === 'string' ? n[0] : '')
+          .join('').toUpperCase().slice(0, 2) || (isMe ? 'M' : '?');
+      }
+      return {
+        ...member,
+        isMe,
+        points: classementPointsMap.get(member.id) ?? 0,
+        avatarColor,
+        username,
+        initials,
+        name,
+        avatar,
+      };
+    });
 
     if (currentUid && !roster.some((m) => m.id === currentUid)) {
       roster.push({
         id: currentUid,
-        name: user?.firstName ?? "Utilisateur",
-        avatar: user?.photoURL ?? null,
-        points: rankingPointsMap.get(currentUid) ?? 0,
+        name: user?.username || user?.firstName || user?.lastName || 'Moi',
+        avatar: user?.photoURL || null,
+        avatarColor: user?.avatarColor || '#19D07D',
+        username: user?.username || user?.firstName || user?.lastName || 'Moi',
+        initials: (user?.username || user?.firstName || user?.lastName || 'Moi')
+          .split(' ')
+          .map((n: string) => n && typeof n === 'string' ? n[0] : '')
+          .join('').toUpperCase().slice(0, 2) || 'M',
+        points: classementPointsMap.get(currentUid) ?? 0,
         isMe: true,
-      } as any);
+      });
     }
 
     return roster
       .sort((a, b) => (b.points || 0) - (a.points || 0))
       .map((m, idx) => ({ ...m, rank: idx + 1 }));
-  }, [members, user, currentUid, rankingPointsMap]);
+  }, [members, user, currentUid, classementPointsMap]);
 
 const clanTotalPoints = useMemo(() => {
     // ✅ NOUVEAU CODE SÉCURISÉ (Ajout de || [])
-    return (members || []).reduce((sum, member) => sum + (rankingPointsMap.get(member.id) ?? 0), 0);
-  }, [members, rankingPointsMap]);
+    return (members || []).reduce((sum, member) => sum + (classementPointsMap.get(member.id) ?? 0), 0);
+  }, [members, classementPointsMap]);
 
   const handleLeaveClub = async () => {
     if (requireOwnerTransfer && !newOwnerId) {
@@ -863,7 +892,14 @@ setIsLeaving(false);
               >
                 <View style={{ flex: 1, paddingBottom: 100 }}>
                   <ChatView
-                    selectedChat={{ ...joinedClub, type: 'club' }}
+                    selectedChat={{
+                      ...joinedClub,
+                      type: 'club',
+                      name: joinedClub.ownerId === auth.currentUser?.uid ? 'Moi' : joinedClub.name,
+                      username: joinedClub.ownerId === auth.currentUser?.uid ? 'Moi' : joinedClub.name,
+                      avatarColor: joinedClub.ownerId === auth.currentUser?.uid ? (user?.avatarColor || '#19D07D') : '#19D07D',
+                      initials: joinedClub.ownerId === auth.currentUser?.uid ? 'M' : (joinedClub.name ? joinedClub.name.charAt(0).toUpperCase() : 'C'),
+                    }}
                     input={input}
                     setInput={setInput}
                     onBack={() => {}}
@@ -1125,37 +1161,54 @@ setIsLeaving(false);
 
           {(() => {
             const primaryList = (friendsLive.length ? friendsLive : friends) as any[];
-            
-            // ✅ CORRECTION : On ne prend QUE les IDs présents dans la liste d'amis officielle
-            // On ne fusionne plus avec "friendProfiles" qui contient aussi les demandes en attente
             const idSet = new Set<string>();
             primaryList.forEach((entry) => {
               if (entry?.id) idSet.add(entry.id);
             });
-            // ❌ LIGNE SUPPRIMÉE : Object.keys(friendProfiles).forEach((id) => idSet.add(id));
 
             const items = Array.from(idSet).map((id) => {
-              // On récupère les infos du profil s'il a été chargé
               const profile = friendProfiles[id] as any;
-              
-              // Fallback sur les données brutes de la liste d'amis
               const fallback =
                 primaryList.find((item: any) => item?.id === id) ||
                 (friends as any[]).find((item: any) => item?.id === id) ||
                 {};
 
-              const displayName =
-                profile?.username ||
-                [profile?.firstName, profile?.lastName].filter(Boolean).join(" ") ||
-                profile?.usernameLowercase ||
-                fallback?.name ||
-                id;
+              // Username harmonisé
+              const username = profile?.username || fallback?.username || "";
+              // Prénom/Nom harmonisé
+              const firstName = profile?.firstName || fallback?.firstName || "";
+              const lastName = profile?.lastName || fallback?.lastName || "";
 
-              // ✅ MODIF 5 : Récupérer la couleur
+              // Initiales harmonisées
+              let initials = "";
+              if (username) {
+                initials = username
+                  .split(" ")
+                  .map((n: string) => n[0])
+                  .join("")
+                  .toUpperCase()
+                  .slice(0, 2);
+              } else if (firstName || lastName) {
+                initials = [firstName, lastName]
+                  .filter(Boolean)
+                  .map((n: string) => n[0])
+                  .join("")
+                  .toUpperCase()
+                  .slice(0, 2);
+              } else if (profile?.usernameLowercase) {
+                initials = profile.usernameLowercase.substring(0, 2).toUpperCase();
+              } else {
+                initials = id.substring(0, 2).toUpperCase();
+              }
+
+              // Couleur avatar harmonisée
               const avatarColor = profile?.avatarColor || fallback?.avatarColor || "#19D07D";
+              const isWhiteBg = ["#FFFFFF", "#ffffff", "#fff", "#FFF"].includes(avatarColor);
 
-              const pointsValue = rankingPointsMap.get(id) ?? 0;
+              // Nom affiché harmonisé
+              const displayName = username || `${firstName} ${lastName}`.trim() || profile?.usernameLowercase || fallback?.name || id;
 
+              const pointsValue = classementPointsMap.get(id) ?? 0;
               const photoURL =
                 typeof profile?.photoURL === 'string' && profile.photoURL.length > 0
                   ? profile.photoURL
@@ -1164,7 +1217,6 @@ setIsLeaving(false);
                   : typeof fallback?.avatar === 'string' && fallback.avatar.length > 0
                   ? fallback.avatar
                   : '';
-
               const isOnline = Boolean(
                 profile?.online !== undefined ? profile.online : fallback?.online
               );
@@ -1174,7 +1226,10 @@ setIsLeaving(false);
                 name: String(displayName),
                 points: pointsValue,
                 avatar: photoURL || null,
-                avatarColor: avatarColor, // Ajoute ça pour le passer à FriendCard
+                avatarColor,
+                initials,
+                isWhiteBg,
+                username,
                 online: isOnline,
               };
             });
@@ -1184,13 +1239,21 @@ setIsLeaving(false);
               friend.name.toLowerCase().includes(friendSearchText.trim().toLowerCase())
             );
 
-            // Tri par points
-            const sorted = filtered.sort((a, b) => (rankingPointsMap.get(b.id) || 0) - (rankingPointsMap.get(a.id) || 0));
+            // Tri par points du classement
+            const sorted = filtered.sort((a, b) => (classementPointsMap.get(b.id) || 0) - (classementPointsMap.get(a.id) || 0));
 
             return sorted.map((friend, index) => (
               <FriendCard
                 key={`${friend.id}-${index}`}
-                friend={{...friend, points: rankingPointsMap.get(friend.id) || 0}}
+                friend={{
+                  ...friend,
+                  points: classementPointsMap.get(friend.id) || 0,
+                  avatarColor: friend.avatarColor,
+                  initials: friend.initials,
+                  username: friend.id === currentUid ? "Moi" : friend.username,
+                  name: friend.id === currentUid ? "Moi" : friend.name,
+                  isWhiteBg: friend.isWhiteBg,
+                }}
                 rank={index + 1}
                 isMe={friend.id === currentUid}
                 onChat={() => {
@@ -1222,35 +1285,53 @@ setIsLeaving(false);
                 ) : (
                     friendRequests.map((r) => {
                         const senderProfile = r.from ? friendProfiles[r.from] : undefined;
-                        const displayName = r.fromName || [senderProfile?.firstName, senderProfile?.lastName].filter(Boolean).join(" ") || senderProfile?.username || r.from;
+                        const isMe = r.from === currentUid;
+                        let username = '';
+                        let avatarColor = '';
+                        let initials = '';
+                        let displayName = '';
+                        if (isMe) {
+                          username = user?.username || '';
+                          avatarColor = user?.avatarColor || '#19D07D';
+                          initials = (user?.username || user?.firstName || user?.lastName || 'Moi').split(' ').map((n) => n && typeof n === 'string' ? n[0] : '').join('').toUpperCase().slice(0, 2) || 'M';
+                          displayName = 'Moi';
+                        } else {
+                          username = senderProfile?.username || senderProfile?.firstName || senderProfile?.lastName || r.fromName || r.from;
+                          avatarColor = senderProfile?.avatarColor || '#19D07D';
+                          initials = (senderProfile?.username || senderProfile?.firstName || senderProfile?.lastName || r.fromName || r.from)
+                            .split(' ')
+                            .map((n: string) => typeof n === 'string' ? n[0] : '')
+                            .join('').toUpperCase().slice(0, 2) || '?';
+                          displayName = senderProfile?.username || [senderProfile?.firstName, senderProfile?.lastName].filter(Boolean).join(' ') || r.fromName || r.from;
+                        }
                         const avatarUri = r.fromAvatar || senderProfile?.photoURL || null;
 
                         return (
-                            <LinearGradient
-                                key={r.id}
-                                colors={isLight ? ["rgba(255,255,255,0.9)", "rgba(255,255,255,0.6)"] : ["rgba(255,255,255,0.05)", "rgba(255,255,255,0.02)"]}
-                                style={{ padding: 16, borderRadius: 20, marginBottom: 12, borderWidth: 1, borderColor: isLight ? "rgba(255,255,255,0.6)" : "transparent" }}
-                            >
-                                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 16 }}>
-                                    {avatarUri ? (
-                                        <Image source={{ uri: avatarUri }} style={{ width: 50, height: 50, borderRadius: 25, marginRight: 12 }} />
-                                    ) : (
-                                        <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: isLight ? "#E0F7EF" : colors.pill, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                                            <Text style={{ color: isLight ? "#008F6B" : colors.text, fontSize: 20, fontWeight: 'bold' }}>{(displayName || '?').charAt(0).toUpperCase()}</Text>
-                                        </View>
-                                    )}
-                                    <View>
-                                        <Text style={{ color: isLight ? "#0A3F33" : colors.text, fontSize: 17, fontFamily: FontFamilies.heading }}>{displayName}</Text>
-                                        <Text style={{ color: isLight ? "#4A665F" : colors.mutedText }}>veut être ton ami</Text>
-                                    </View>
+                          <LinearGradient
+                            key={r.id}
+                            colors={isLight ? ["rgba(255,255,255,0.9)", "rgba(255,255,255,0.6)"] : ["rgba(255,255,255,0.05)", "rgba(255,255,255,0.02)"]}
+                            style={{ padding: 16, borderRadius: 20, marginBottom: 12, borderWidth: 1, borderColor: isLight ? "rgba(255,255,255,0.6)" : "transparent" }}
+                          >
+                            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 16 }}>
+                              {avatarUri ? (
+                                <Image source={{ uri: avatarUri }} style={{ width: 50, height: 50, borderRadius: 25, marginRight: 12 }} />
+                              ) : (
+                                <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: avatarColor, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                                  <Text style={{ color: ["#FFFFFF", "#fff", "#ffffff", "#FFF"].includes(avatarColor) ? "#1A1A1A" : "#fff", fontSize: 20, fontWeight: 'bold' }}>{initials}</Text>
                                 </View>
-                                <View style={{ flexDirection: "row", gap: 10 }}>
-                                    <GradientButton label="Accepter" onPress={() => handleAcceptRequest(r)} style={{ flex: 1, height: 44, borderRadius: 14 }} />
-                                    <TouchableOpacity onPress={() => handleRejectRequest(r)} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: "#F45B69", borderRadius: 14, height: 44 }}>
-                                        <Text style={{ color: "#F45B69", fontWeight: "bold" }}>Refuser</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </LinearGradient>
+                              )}
+                              <View>
+                                <Text style={{ color: isLight ? "#0A3F33" : colors.text, fontSize: 17, fontFamily: FontFamilies.heading }}>{displayName}</Text>
+                                <Text style={{ color: isLight ? "#4A665F" : colors.mutedText }}>veut être ton ami</Text>
+                              </View>
+                            </View>
+                            <View style={{ flexDirection: "row", gap: 10 }}>
+                              <GradientButton label="Accepter" onPress={() => handleAcceptRequest(r)} style={{ flex: 1, height: 44, borderRadius: 14 }} />
+                              <TouchableOpacity onPress={() => handleRejectRequest(r)} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: "#F45B69", borderRadius: 14, height: 44 }}>
+                                <Text style={{ color: "#F45B69", fontWeight: "bold" }}>Refuser</Text>
+                              </TouchableOpacity>
+                            </View>
+                          </LinearGradient>
                         );
                     })
                 )}
@@ -1277,35 +1358,53 @@ setIsLeaving(false);
                 ) : (
                     clubJoinRequests.map((r) => {
                         const sender = r.userProfile || {};
-                        const displayName = (sender.firstName || sender.username) ? [sender.firstName, sender.lastName].filter(Boolean).join(' ') : r.userId;
+                        const isMe = r.userId === currentUid;
+                        let username = '';
+                        let avatarColor = '';
+                        let initials = '';
+                        let displayName = '';
+                        if (isMe) {
+                          username = user?.username || '';
+                          avatarColor = user?.avatarColor || '#19D07D';
+                          initials = (user?.username || user?.firstName || user?.lastName || 'Moi').split(' ').map((n) => n && typeof n === 'string' ? n[0] : '').join('').toUpperCase().slice(0, 2) || 'M';
+                          displayName = 'Moi';
+                        } else {
+                          username = sender.username || sender.firstName || sender.lastName || r.userId;
+                          avatarColor = sender.avatarColor || '#19D07D';
+                          initials = (sender.username || sender.firstName || sender.lastName || r.userId)
+                            .split(' ')
+                            .map((n: string) => typeof n === 'string' ? n[0] : '')
+                            .join('').toUpperCase().slice(0, 2) || '?';
+                          displayName = sender.username || [sender.firstName, sender.lastName].filter(Boolean).join(' ') || r.userId;
+                        }
                         const avatarUri = sender.photoURL || null;
 
                         return (
-                            <LinearGradient
-                                key={r.id}
-                                colors={isLight ? ["rgba(255,255,255,0.9)", "rgba(255,255,255,0.6)"] : ["rgba(255,255,255,0.05)", "rgba(255,255,255,0.02)"]}
-                                style={{ padding: 16, borderRadius: 20, marginBottom: 12, borderWidth: 1, borderColor: isLight ? "rgba(255,255,255,0.6)" : "transparent" }}
-                            >
-                                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 16 }}>
-                                    {avatarUri ? (
-                                        <Image source={{ uri: avatarUri }} style={{ width: 50, height: 50, borderRadius: 25, marginRight: 12 }} />
-                                    ) : (
-                                        <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: isLight ? "#E0F7EF" : colors.pill, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                                            <Text style={{ color: isLight ? "#008F6B" : colors.text, fontSize: 20, fontWeight: 'bold' }}>{(displayName || '?').charAt(0).toUpperCase()}</Text>
-                                        </View>
-                                    )}
-                                    <View>
-                                        <Text style={{ color: isLight ? "#0A3F33" : colors.text, fontSize: 17, fontFamily: FontFamilies.heading }}>{displayName}</Text>
-                                        <Text style={{ color: isLight ? "#4A665F" : colors.mutedText }}>veut rejoindre le club</Text>
-                                    </View>
+                          <LinearGradient
+                            key={r.id}
+                            colors={isLight ? ["rgba(255,255,255,0.9)", "rgba(255,255,255,0.6)"] : ["rgba(255,255,255,0.05)", "rgba(255,255,255,0.02)"]}
+                            style={{ padding: 16, borderRadius: 20, marginBottom: 12, borderWidth: 1, borderColor: isLight ? "rgba(255,255,255,0.6)" : "transparent" }}
+                          >
+                            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 16 }}>
+                              {avatarUri ? (
+                                <Image source={{ uri: avatarUri }} style={{ width: 50, height: 50, borderRadius: 25, marginRight: 12 }} />
+                              ) : (
+                                <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: avatarColor, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                                  <Text style={{ color: ["#FFFFFF", "#fff", "#ffffff", "#FFF"].includes(avatarColor) ? "#1A1A1A" : "#fff", fontSize: 20, fontWeight: 'bold' }}>{initials}</Text>
                                 </View>
-                                <View style={{ flexDirection: "row", gap: 10 }}>
-                                    <GradientButton label="Accepter" onPress={() => handleAcceptClubRequest(r.userId)} style={{ flex: 1, height: 44, borderRadius: 14 }} />
-                                    <TouchableOpacity onPress={() => handleRejectClubRequest(r.userId)} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: "#F45B69", borderRadius: 14, height: 44 }}>
-                                        <Text style={{ color: "#F45B69", fontWeight: "bold" }}>Refuser</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </LinearGradient>
+                              )}
+                              <View>
+                                <Text style={{ color: isLight ? "#0A3F33" : colors.text, fontSize: 17, fontFamily: FontFamilies.heading }}>{displayName}</Text>
+                                <Text style={{ color: isLight ? "#4A665F" : colors.mutedText }}>veut rejoindre le club</Text>
+                              </View>
+                            </View>
+                            <View style={{ flexDirection: "row", gap: 10 }}>
+                              <GradientButton label="Accepter" onPress={() => handleAcceptClubRequest(r.userId)} style={{ flex: 1, height: 44, borderRadius: 14 }} />
+                              <TouchableOpacity onPress={() => handleRejectClubRequest(r.userId)} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: "#F45B69", borderRadius: 14, height: 44 }}>
+                                <Text style={{ color: "#F45B69", fontWeight: "bold" }}>Refuser</Text>
+                              </TouchableOpacity>
+                            </View>
+                          </LinearGradient>
                         );
                     })
                 )}
@@ -1587,6 +1686,7 @@ setIsLeaving(false);
                 contentContainerStyle={{ paddingBottom: 100 }}
                 showsVerticalScrollIndicator={false}
                 renderItem={({ item, index }) => {
+
                 // --- ROLES & PERMISSIONS ---
                 const targetIsOwner = joinedClub?.ownerId === item.id;
                 const targetIsOfficer = (joinedClub?.officers || []).includes(item.id);
@@ -1599,13 +1699,21 @@ setIsLeaving(false);
                 const isMe = item.id === myUid;
                 const canManageUser = !isMe && (iAmOwner || (iAmOfficer && targetIsMember));
 
-                // --- STYLE HEADER ADAPTÉ ---
+                // --- LOGIQUE HEADER POUR AVATAR/NOM (robuste) ---
+                const displayName = (item.name ?? '').trim() || 'Utilisateur';
+                const initials = displayName.split(' ').map((n: string) => n && typeof n === 'string' ? n[0] : '').join('').toUpperCase().slice(0, 2) || '?';
+                // Optionally, generate a color from the id for variety
+                const avatarColors = ['#19D07D', '#008F6B', '#FF8C66', '#FFD700', '#38BDF8', '#A78BFA'];
+                const avatarBgColor = avatarColors[Math.abs(item.id.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)) % avatarColors.length];
+                const isWhiteBg = ["#FFFFFF", "#ffffff", "#fff", "#FFF"].includes(avatarBgColor);
                 const borderColor = isLight ? "rgba(255, 255, 255, 0.6)" : "rgba(0, 151, 178, 0.3)";
                 const textColor = isLight ? "#0A3F33" : colors.text;
 
+                // --- PREMIUM/OWNER badge logic (optional, can be extended) ---
+                // const isPremium = item.isPremium; // If available
+
                 return (
                   <LinearGradient
-                    // Même dégradé "Glass" que le Header
                     colors={isLight 
                         ? (isMe ? ["#D1FAE5", "#E0F7EF"] : ["rgba(240, 253, 244, 0.9)", "rgba(255, 255, 255, 0.6)"]) 
                         : (isMe ? ["rgba(0, 143, 107, 0.2)", "rgba(0, 143, 107, 0.1)"] : ["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"])
@@ -1630,42 +1738,41 @@ setIsLeaving(false);
                             #{index + 1}
                         </Text>
                     </View>
-                    
-                    {/* 2. AVATAR (Connecté au style Header) */}
-                    {item.avatar ? (
-                      <Image 
-                        source={{ uri: item.avatar }} 
-                        style={{ width: 48, height: 48, borderRadius: 24, borderWidth: 2, borderColor: isLight ? "#FFF" : "rgba(255,255,255,0.1)" }} 
-                      />
-                    ) : (
-                      // ✅ MODIF 3 : Affichage Avatar dynamique (Style Header)
-                      (() => {
-                        const avatarBg = (item as any).avatarColor || "#19D07D";
-                        const isWhiteBg = ["#FFFFFF", "#ffffff", "#fff", "#FFF"].includes(avatarBg);
-                        const initial = (item.name || "?").trim().charAt(0).toUpperCase(); // Prend la 1ère lettre du username
-                      
-                        return (
-                          <View style={{ 
-                            width: 40, height: 40, borderRadius: 20, marginHorizontal: 12, 
-                            backgroundColor: avatarBg, // Couleur persos
-                            alignItems: 'center', justifyContent: 'center',
-                            borderWidth: 1, borderColor: isLight ? "rgba(0,0,0,0.1)" : "transparent"
+
+                    {/* 2. AVATAR (Logique Header + étoile chef) */}
+                    <View style={{ position: 'relative', marginHorizontal: 12 }}>
+                      {item.avatar ? (
+                        <Image 
+                          source={{ uri: item.avatar }} 
+                          style={{ width: 48, height: 48, borderRadius: 24, borderWidth: 2, borderColor: isLight ? "#FFF" : "rgba(255,255,255,0.1)" }} 
+                        />
+                      ) : (
+                        <View style={{ 
+                          width: 48, height: 48, borderRadius: 24, 
+                          backgroundColor: avatarBgColor,
+                          alignItems: 'center', justifyContent: 'center',
+                          borderWidth: 2, borderColor: isLight ? "#FFF" : "rgba(255,255,255,0.1)"
+                        }}>
+                          <Text style={{ 
+                            color: isWhiteBg ? "#1A1A1A" : "#FFFFFF", 
+                            fontFamily: FontFamilies.heading, fontSize: 20 
                           }}>
-                            <Text style={{ 
-                              color: isWhiteBg ? "#1A1A1A" : "#FFFFFF", // Texte noir si fond blanc
-                              fontFamily: FontFamilies.heading, fontSize: 16 
-                            }}>
-                              {initial}
-                            </Text>
-                          </View>
-                        );
-                      })()
-                    )}
+                            {initials}
+                          </Text>
+                        </View>
+                      )}
+                      {/* Étoile chef */}
+                      {targetIsOwner && (
+                        <View style={{ position: 'absolute', right: -6, top: -6, backgroundColor: 'transparent' }}>
+                          <Ionicons name="star" size={22} color="#FFD700" style={{ textShadowColor: '#000', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 2 }} />
+                        </View>
+                      )}
+                    </View>
 
                     {/* 3. NOM & ROLE (Typography Header) */}
                     <View style={{ flex: 1, marginLeft: 12 }}>
                         <Text style={{ color: textColor, fontFamily: FontFamilies.heading, fontSize: 17 }} numberOfLines={1}>
-                            {isMe ? "Moi" : item.name}
+                            {isMe ? "Moi" : displayName}
                         </Text>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
                             {!targetIsMember && (
@@ -1676,7 +1783,7 @@ setIsLeaving(false);
                                 </View>
                             )}
                             <Text style={{ color: isLight ? "#4A665F" : colors.mutedText, fontFamily: FontFamilies.body, fontSize: 13 }}>
-                                {rankingPointsMap.get(item.id) || 0} pts
+                                {classementPointsMap.get(item.id) || 0} pts
                             </Text>
                         </View>
                     </View>
@@ -1685,7 +1792,7 @@ setIsLeaving(false);
                     {canManageUser && (
                         <View style={{ flexDirection: 'row', gap: 8 }}>
                             {targetIsMember && (
-                                <TouchableOpacity onPress={() => Alert.alert("Promouvoir", `Nommer ${item.name} Adjoint ?`, [{ text: "Annuler" }, { text: "Oui", onPress: () => promoteToOfficer(item.id) }])} 
+                                <TouchableOpacity onPress={() => Alert.alert("Promouvoir", `Nommer ${displayName} Adjoint ?`, [{ text: "Annuler" }, { text: "Oui", onPress: () => promoteToOfficer(item.id) }])} 
                                     style={{ padding: 8, backgroundColor: isLight ? "#F0FDF4" : "rgba(0,143,107,0.2)", borderRadius: 12 }}>
                                     <Ionicons name="arrow-up" size={18} color="#008F6B" />
                                 </TouchableOpacity>
@@ -1696,7 +1803,7 @@ setIsLeaving(false);
                                     <Ionicons name="arrow-down" size={18} color="#F59E0B" />
                                 </TouchableOpacity>
                             )}
-                            <TouchableOpacity onPress={() => Alert.alert("Exclure", `Retirer ${item.name} ?`, [{ text: "Annuler" }, { text: "Exclure", style: "destructive", onPress: () => handleRemoveMember(item.id) }])} 
+                            <TouchableOpacity onPress={() => Alert.alert("Exclure", `Retirer ${displayName} ?`, [{ text: "Annuler" }, { text: "Exclure", style: "destructive", onPress: () => handleRemoveMember(item.id) }])} 
                                 style={{ padding: 8, backgroundColor: isLight ? "#FEF2F2" : "rgba(239, 68, 68, 0.2)", borderRadius: 12 }}>
                                 <Ionicons name="trash-outline" size={18} color="#EF4444" />
                             </TouchableOpacity>
@@ -1794,100 +1901,178 @@ setIsLeaving(false);
               contentContainerStyle={{ paddingBottom: 100 }}
               showsVerticalScrollIndicator={false}
               renderItem={({ item }) => {
+
                 // --- 1. IDENTIFICATION DES RÔLES ---
                 const targetIsOwner = joinedClub?.ownerId === item.id;
                 const targetIsOfficer = (joinedClub?.officers || []).includes(item.id);
                 const targetIsMember = !targetIsOwner && !targetIsOfficer;
-                
-                const roleLabel = targetIsOwner ? '👑 Chef' : targetIsOfficer ? '⭐ Adjoint' : 'Membre';
+                const roleLabel = targetIsOwner ? 'Chef' : targetIsOfficer ? 'Adjoint' : 'Membre';
 
                 // --- 2. IDENTIFICATION DE "MOI" ---
                 const myUid = auth.currentUser?.uid;
                 const iAmOwner = joinedClub?.ownerId === myUid;
                 const iAmOfficer = (joinedClub?.officers || []).includes(myUid ?? "");
                 const isMe = item.id === myUid;
-
-                // --- 3. LOGIQUE DE PERMISSION ---
-                // Le Chef peut agir sur tout le monde (sauf lui-même)
-                // L'Adjoint peut agir UNIQUEMENT sur les Membres simples
                 const canManageUser = !isMe && (iAmOwner || (iAmOfficer && targetIsMember));
+
+                // --- LOGIQUE HEADER POUR AVATAR/NOM (robuste et harmonisée) ---
+                let displayName = (item.name ?? '').trim() || 'Utilisateur';
+                let initials = '';
+                let avatarBgColor = '';
+                let username = '';
+                if (isMe) {
+                  displayName = user?.username || user?.firstName || user?.lastName || 'Moi';
+                  username = user?.username || '';
+                  avatarBgColor = user?.avatarColor || '#19D07D';
+                  initials = (user?.username || user?.firstName || user?.lastName || 'Moi').split(' ').map((n) => n && typeof n === 'string' ? n[0] : '').join('').toUpperCase().slice(0, 2) || 'M';
+                } else {
+                  // Couleur calculée à partir de l'id (logique existante)
+                  const avatarColors = ['#19D07D', '#008F6B', '#FF8C66', '#FFD700', '#38BDF8', '#A78BFA'];
+                  avatarBgColor = avatarColors[Math.abs(item.id.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)) % avatarColors.length];
+                  initials = displayName.split(' ').map((n) => n && typeof n === 'string' ? n[0] : '').join('').toUpperCase().slice(0, 2) || '?';
+                }
+                const isWhiteBg = ["#FFFFFF", "#ffffff", "#fff", "#FFF"].includes(avatarBgColor);
+                const borderColor = isLight ? "rgba(255, 255, 255, 0.6)" : "rgba(0, 151, 178, 0.3)";
+                const textColor = isLight ? "#0A3F33" : colors.text;
 
                 return (
                   <LinearGradient
-                    colors={isLight ? (isMe ? ["#D1FAE5", "#E0F7EF"] : ["rgba(255,255,255,0.8)", "rgba(255,255,255,0.5)"]) : ["rgba(255,255,255,0.05)", "rgba(255,255,255,0.02)"]}
+                    colors={isLight 
+                        ? (isMe ? ["#D1FAE5", "#E0F7EF"] : ["rgba(240, 253, 244, 0.9)", "rgba(255, 255, 255, 0.6)"]) 
+                        : (isMe ? ["rgba(0, 143, 107, 0.2)", "rgba(0, 143, 107, 0.1)"] : ["rgba(0, 151, 178, 0.2)", "rgba(0, 151, 178, 0.05)"])
+                    }
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                     style={{ 
-                        flexDirection: 'row', alignItems: 'center', padding: 14, marginBottom: 10, borderRadius: 18,
-                        borderWidth: 1, borderColor: isLight ? (isMe ? "#A7F3D0" : "rgba(255,255,255,0.6)") : "transparent",
-                        shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 6, elevation: 1
+                        flexDirection: 'row', alignItems: 'center', padding: 16, marginBottom: 10, borderRadius: 24,
+                        borderWidth: 1, borderColor: isMe ? (isLight ? "#A7F3D0" : colors.accent) : borderColor,
                     }}
                   >
-                    {/* RANG */}
-                    <Text style={{ width: 30, textAlign: 'center', color: isMe ? "#008F6B" : (isLight ? "#4A665F" : colors.mutedText), fontFamily: FontFamilies.heading, fontSize: 16 }}>{item.rank}</Text>
-                    
-                    {/* AVATAR */}
-                    {item.avatar ? (
-                      <Image source={{ uri: item.avatar }} style={{ width: 40, height: 40, borderRadius: 20, marginHorizontal: 12 }} />
-                    ) : (
-                      <View style={{ width: 40, height: 40, borderRadius: 20, marginHorizontal: 12, backgroundColor: isLight ? "#FFF" : colors.pill, alignItems: 'center', justifyContent: 'center' }}>
-                        <Text style={{ color: isLight ? "#008F6B" : colors.text, fontFamily: FontFamilies.heading }}>{(item.name || '?').charAt(0).toUpperCase()}</Text>
-                      </View>
-                    )}
-
-                    {/* NOM ET ROLE */}
-                    <View style={{ flex: 1 }}>
-                        <Text style={{ color: isMe ? "#008F6B" : (isLight ? "#0A3F33" : colors.text), fontFamily: FontFamilies.headingMedium, fontSize: 16 }} numberOfLines={1}>
-                            {isMe ? "Moi" : item.name}
+                    {/* 1. RANG (Badge style Header) */}
+                    <View style={{ 
+                        width: 32, height: 32, borderRadius: 12, 
+                        backgroundColor: isMe ? (isLight ? "#FF8C66" : colors.accent) : (isLight ? "#FFF" : "rgba(255,255,255,0.1)"),
+                        alignItems: 'center', justifyContent: 'center', marginRight: 12
+                    }}>
+                        <Text style={{ 
+                            fontFamily: FontFamilies.heading, 
+                            fontSize: 14, 
+                            color: isMe ? (isLight ? "#FFF" : "#07321F") : textColor 
+                        }}>
+                            #{item.rank}
                         </Text>
-                        <Text style={{ color: isLight ? "#6E8580" : colors.mutedText, fontSize: 12 }}>{roleLabel}</Text>
                     </View>
 
-                    {/* ACTIONS ET POINTS */}
-                    <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={{ color: isLight ? "#008F6B" : colors.accent, fontFamily: FontFamilies.heading, fontSize: 15, marginBottom: canManageUser ? 6 : 0 }}>
-                            {rankingPointsMap.get(item.id) || 0} pts
+                    {/* 2. AVATAR (Logique Header + étoile chef) */}
+                    <View style={{ position: 'relative', marginHorizontal: 12 }}>
+                      {item.avatar ? (
+                        <Image 
+                          source={{ uri: item.avatar }} 
+                          style={{ width: 48, height: 48, borderRadius: 24, borderWidth: 2, borderColor: isLight ? "#FFF" : "rgba(255,255,255,0.1)" }} 
+                        />
+                      ) : (
+                        <View style={{ 
+                          width: 48, height: 48, borderRadius: 24, 
+                          backgroundColor: avatarBgColor,
+                          alignItems: 'center', justifyContent: 'center',
+                          borderWidth: 2, borderColor: isLight ? "#FFF" : "rgba(255,255,255,0.1)"
+                        }}>
+                          <Text style={{ 
+                            color: isWhiteBg ? "#1A1A1A" : "#FFFFFF", 
+                            fontFamily: FontFamilies.heading, fontSize: 20 
+                          }}>
+                            {initials}
+                          </Text>
+                        </View>
+                      )}
+                      {/* Étoile chef */}
+                      {targetIsOwner && (
+                        <View style={{ position: 'absolute', right: -6, top: -6, backgroundColor: 'transparent' }}>
+                          <Ionicons name="star" size={22} color="#FFD700" style={{ textShadowColor: '#000', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 2 }} />
+                        </View>
+                      )}
+                    </View>
+
+                    {/* 3. NOM & ROLE (Typography Header) */}
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                        <Text style={{ color: textColor, fontFamily: FontFamilies.heading, fontSize: 17 }} numberOfLines={1}>
+                            {isMe ? "Moi" : displayName}
                         </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                            {!targetIsMember && (
+                                <View style={{ backgroundColor: roleLabel === 'Chef' ? (isLight ? '#FFEFD5' : 'rgba(245, 158, 11, 0.2)') : (isLight ? '#E0F2FE' : 'rgba(56, 189, 248, 0.2)'), paddingHorizontal: 6, borderRadius: 6, marginRight: 6 }}>
+                                    <Text style={{ fontSize: 10, fontFamily: FontFamilies.bodyStrong, color: roleLabel === 'Chef' ? (isLight ? '#B7791F' : '#FCD34D') : (isLight ? '#0284C7' : '#38BDF8') }}>
+                                        {roleLabel.toUpperCase()}
+                                    </Text>
+                                </View>
+                            )}
+                            <Text style={{ color: isLight ? "#4A665F" : colors.mutedText, fontFamily: FontFamilies.body, fontSize: 13 }}>
+                                {classementPointsMap.get(item.id) || 0} pts
+                            </Text>
+                        </View>
+                    </View>
 
-                        {/* BOUTONS D'ACTION (Si j'ai la permission) */}
-                        {canManageUser && (
-                            <View style={{ flexDirection: 'row', gap: 12 }}>
-                                
-                                {/* CAS 1 : CIBLE EST MEMBRE (Je peux le promouvoir) */}
-                                {targetIsMember && (
-                                    <TouchableOpacity 
-                                        onPress={() => Alert.alert("Promouvoir", `Nommer ${item.name} Adjoint ?`, [
-                                            { text: "Annuler", style: "cancel" },
-                                            { text: "Oui", onPress: () => promoteToOfficer(item.id) }
-                                        ])}
-                                    >
-                                        <Ionicons name="arrow-up-circle-outline" size={22} color="#008F6B" />
-                                    </TouchableOpacity>
-                                )}
-
-                                {/* CAS 2 : CIBLE EST ADJOINT (Seul le CHEF peut rétrograder) */}
-                                {targetIsOfficer && iAmOwner && (
-                                    <TouchableOpacity 
-                                        onPress={() => Alert.alert("Rétrograder", `Retirer le grade d'adjoint à ${item.name} ?`, [
-                                            { text: "Annuler", style: "cancel" },
-                                            { text: "Oui", onPress: () => demoteOfficer(item.id) }
-                                        ])}
-                                    >
-                                        <Ionicons name="arrow-down-circle-outline" size={22} color="#F59E0B" />
-                                    </TouchableOpacity>
-                                )}
-
-                                {/* SUPPRIMER (Possible pour Chef ou Adjoint sur Membre) */}
+                    {/* 4. ACTIONS (Icones épurées) */}
+                    {canManageUser && (
+                        <View style={{ flexDirection: 'row', gap: 12 }}>
+                            {/* CAS 1 : CIBLE EST MEMBRE (Je peux le promouvoir) */}
+                            {targetIsMember && (
                                 <TouchableOpacity 
-                                    onPress={() => Alert.alert("Exclure", `Retirer ${item.name} du club ?`, [
+                                    onPress={() => Alert.alert("Promouvoir", `Nommer ${displayName} Adjoint ?`, [
                                         { text: "Annuler", style: "cancel" },
-                                        { text: "Exclure", style: "destructive", onPress: () => handleRemoveMember(item.id) }
+                                        { text: "Oui", onPress: () => promoteToOfficer(item.id) }
                                     ])}
                                 >
-                                    <Ionicons name="trash-outline" size={22} color="#F45B69" />
+                                    <Ionicons name="arrow-up-circle-outline" size={22} color="#008F6B" />
                                 </TouchableOpacity>
-                            </View>
-                        )}
-                    </View>
+                            )}
+
+                            {/* NOUVEAU : CHEF PEUT PROMOUVOIR UN ADJOINT EN CHEF */}
+                            {targetIsOfficer && iAmOwner && !isMe && (
+                                <TouchableOpacity
+                                    onPress={() =>
+                                        Alert.alert(
+                                            "Promouvoir Chef",
+                                            `Promouvoir ${displayName} comme nouveau chef ?\nTu deviendras adjoint à la place.`,
+                                            [
+                                                { text: "Annuler", style: "cancel" },
+                                                { text: "Oui", onPress: () => transferOwnership(item.id) }
+                                            ]
+                                        )
+                                    }
+                                >
+                                    <Ionicons name="star-outline" size={22} color="#FFD700" />
+                                </TouchableOpacity>
+                            )}
+
+                            {/* CAS 2 : CIBLE EST ADJOINT (Seul le CHEF peut rétrograder) */}
+                            {targetIsOfficer && iAmOwner && (
+                                <TouchableOpacity 
+                                    onPress={() =>
+                                        Alert.alert(
+                                            "Rétrograder",
+                                            `Retirer le grade d'adjoint à ${item.name} ?`,
+                                            [
+                                                { text: "Annuler", style: "cancel" },
+                                                { text: "Oui", onPress: () => demoteOfficer(item.id) }
+                                            ]
+                                        )
+                                    }
+                                >
+                                    <Ionicons name="arrow-down-circle-outline" size={22} color="#F59E0B" />
+                                </TouchableOpacity>
+                            )}
+
+                            {/* SUPPRIMER (Possible pour Chef ou Adjoint sur Membre) */}
+                            <TouchableOpacity 
+                                onPress={() => Alert.alert("Exclure", `Retirer ${item.name} du club ?`, [
+                                    { text: "Annuler", style: "cancel" },
+                                    { text: "Exclure", style: "destructive", onPress: () => handleRemoveMember(item.id) }
+                                ])}
+                            >
+                                <Ionicons name="trash-outline" size={22} color="#F45B69" />
+                            </TouchableOpacity>
+                        </View>
+                    )}
                   </LinearGradient>
                 );
               }}

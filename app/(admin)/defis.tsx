@@ -8,30 +8,30 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import {
-    addDoc,
-    collection,
-    deleteDoc,
-    doc,
-    getDocs,
-    orderBy,
-    query,
-    serverTimestamp,
-    updateDoc
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  orderBy,
+  query,
+  serverTimestamp,
+  updateDoc
 } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
-    Alert,
-    FlatList,
-    KeyboardAvoidingView,
-    LayoutAnimation,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    UIManager,
-    View,
+  Alert,
+  FlatList,
+  KeyboardAvoidingView,
+  LayoutAnimation,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  UIManager,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -182,8 +182,22 @@ export default function DefisManagerScreen() {
     setIsEditingMode(true);
   };
 
-  const handleSave = async () => {
+const handleSave = async () => {
     if (!user) return;
+
+    // --- VALIDATION AJOUTÉE ---
+    // Si on essaie de mettre en ligne (rotation), on vérifie les champs obligatoires
+    if (statut === 'rotation') {
+      if (!titre.trim() || !description.trim() || !points.trim() || Number(points) <= 0) {
+        Alert.alert(
+          "Champs manquants", 
+          "Pour mettre un défi en ligne, il doit obligatoirement avoir un Titre, une Description et des Points (> 0)."
+        );
+        return; // On bloque l'enregistrement
+      }
+    }
+    // ---------------------------
+
     try {
       const payload = {
         titre, description, categorie, duree,
