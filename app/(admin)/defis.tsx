@@ -1,3 +1,4 @@
+// app/(admin)/defis.tsx
 import { AdminNav } from "@/components/ui/(admin)/AdminNav";
 import { DeleteConfirmModal } from "@/components/ui/(admin)/DeleteConfirmModal";
 import { FontFamilies } from "@/constants/fonts";
@@ -8,30 +9,30 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import {
-    addDoc,
-    collection,
-    deleteDoc,
-    doc,
-    getDocs,
-    orderBy,
-    query,
-    serverTimestamp,
-    updateDoc
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  orderBy,
+  query,
+  serverTimestamp,
+  updateDoc
 } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
-    Alert,
-    FlatList,
-    KeyboardAvoidingView,
-    LayoutAnimation,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    UIManager,
-    View,
+  Alert,
+  FlatList,
+  KeyboardAvoidingView,
+  LayoutAnimation,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  UIManager,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -93,7 +94,11 @@ export default function DefisManagerScreen() {
   // 1. CHARGER LES DONNÉES
   const loadData = async () => {
     const snap = await getDocs(collection(db, "defis"));
+    console.log("📦 defis snap size:", snap.size);
+
     const list = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Defi[];
+    console.log("📦 list length:", list.length);
+
     setDefis(list);
   };
 
@@ -212,6 +217,19 @@ export default function DefisManagerScreen() {
     setCategorie(c);
     setDuree(c === "personnel" ? 1 : 7);
   };
+
+  const [mountKey, setMountKey] = useState(0);
+
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+
+    // when data arrives the first time, force FlatList remount so it measures correctly
+    if (defis.length > 0) {
+      setMountKey((k) => k + 1);
+    }
+  }, [defis.length]);
+
+  const listKey = `${mountKey}-${filterStatus}-${filterType}-${search}`;
 
   // Couleurs
   const bgColors = isDark ? [colors.background, "#1F2937"] : adminTheme.bgGradient;
@@ -376,9 +394,12 @@ export default function DefisManagerScreen() {
 
         {/* LISTE */}
         <FlatList
+            key={listKey}
+            style={{ flex: 1, height: "100%" as any }}
             data={filtered}
             keyExtractor={(d) => d.id}
-            contentContainerStyle={{ paddingBottom: 100 }}
+            contentContainerStyle={{ paddingBottom: 160 }}
+            showsVerticalScrollIndicator={false}
             renderItem={({ item: d }) => {
                 const isOpen = expanded === d.id;
                 return (
@@ -419,6 +440,8 @@ export default function DefisManagerScreen() {
                     </TouchableOpacity>
                 );
             }}
+            disableVirtualization={Platform.OS === "web"}
+            removeClippedSubviews={false}
         />
 
       </SafeAreaView>

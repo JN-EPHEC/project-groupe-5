@@ -73,6 +73,7 @@ export default function ListDefisScreen() {
 
   const loadData = async () => {
     const snap = await getDocs(collection(db, "defis"));
+    console.log("📦 defis snap size:", snap.size);
     const list = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Defi[];
     setDefis(list);
   };

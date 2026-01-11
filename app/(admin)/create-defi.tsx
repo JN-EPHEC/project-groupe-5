@@ -107,7 +107,7 @@ export default function NewDefiScreen() {
           createdAt: serverTimestamp(),
         });
       }
-      router.push("/(admin)/list-defis");
+      router.push("/(admin)/defis");
     } catch (error) {
       console.error("Erreur:", error);
     }

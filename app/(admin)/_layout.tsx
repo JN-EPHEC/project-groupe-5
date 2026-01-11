@@ -1,3 +1,4 @@
+// app/(admin)/_layout.tsx
 import { useUser } from "@/hooks/user-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Redirect, Stack, useRouter } from "expo-router";
