@@ -44,3 +44,8 @@ app-example
 # generated native folders
 /ios
 /android
+
+# ---- GreenUp seed tools (never commit) ----
+serviceAccountKey.json
+tools/seed_defis/*.ndjson
+tools/seed_defis/*.log
