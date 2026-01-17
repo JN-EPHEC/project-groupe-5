@@ -680,7 +680,7 @@ export default function DefiScreen() {
                     onPress={handleOpenRewards}
                     style={{ backgroundColor: isLight ? "#E0F7EF" : "rgba(82, 209, 146, 0.14)", borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: isLight ? "#A7F3D0" : "rgba(82, 209, 146, 0.22)" }}
                   >
-                    <Text style={{ color: isLight ? "#008F6B" : colors.text, fontWeight: "800", fontSize: 13 }}> Récompenses</Text>
+                    <Text style={{ color: isLight ? "#008F6B" : colors.text, fontWeight: "800", fontSize: 13 }}>Récompenses</Text>
                   </TouchableOpacity>
                 </View>
                 {classementLoading ? (

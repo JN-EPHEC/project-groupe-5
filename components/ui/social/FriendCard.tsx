@@ -12,6 +12,10 @@ export interface Friend {
   points: number;
   avatar?: string | null;
   online: boolean;
+  avatarColor?: string;
+  initials?: string;
+  isWhiteBg?: boolean;
+  username?: string;
 }
 
 interface FriendCardProps {
@@ -46,7 +50,10 @@ export const FriendCard: React.FC<FriendCardProps> = ({ friend, rank, onChat, is
   const rankColor = isMe ? (isLight ? "#0F3327" : "#0F3327") : (isLight ? friendTheme.rankColor : colors.accent);
 
   const avatarUri = friend.avatar && friend.avatar.length > 0 ? friend.avatar : null;
-  const initial = friend.name ? friend.name.charAt(0).toUpperCase() : "?";
+  // Use initials and avatarColor from props if present, else fallback
+  const initials = friend.initials || (friend.name ? friend.name.charAt(0).toUpperCase() : "?");
+  const avatarBgColor = friend.avatarColor || (isLight ? "#E0F7EF" : "rgba(255,255,255,0.1)");
+  const isWhiteBg = friend.isWhiteBg || ["#FFFFFF", "#ffffff", "#fff", "#FFF"].includes(avatarBgColor);
 
   // Wrapper : Toujours LinearGradient sauf pour "Moi" en dark (on garde le vert uni pour se distinguer)
   const Wrapper = (isMe && !isLight) ? TouchableOpacity : LinearGradient;
@@ -92,15 +99,15 @@ export const FriendCard: React.FC<FriendCardProps> = ({ friend, rank, onChat, is
         <View style={[
             styles.avatar, 
             styles.avatarFallback, 
-            { backgroundColor: isLight ? "#E0F7EF" : "rgba(255,255,255,0.1)" }, 
+            { backgroundColor: avatarBgColor },
             isMe && { borderWidth: 2, borderColor: textColor }
         ]}>
-          <Text style={[styles.avatarInitial, { color: isLight ? friendTheme.textMain : "#fff" }]}>{initial}</Text>
+          <Text style={[styles.avatarInitial, { color: isWhiteBg ? "#1A1A1A" : "#FFFFFF" }]}>{initials}</Text>
         </View>
       )}
       
       <View>
-        <Text style={[styles.name, { color: textColor }]} numberOfLines={1}>{friend.name}</Text>
+        <Text style={[styles.name, { color: textColor }]} numberOfLines={1}>{friend.username ? friend.username : friend.name}</Text>
         {friend.online && <Text style={{ fontSize: 10, color: '#19D07D', fontWeight: '600' }}>En ligne</Text>}
       </View>
     </View>

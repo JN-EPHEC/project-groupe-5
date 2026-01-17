@@ -82,18 +82,22 @@ export function ClubClassementList() {
             </View>
 
             {/* Points pill */}
-            <View
-              style={{
-                backgroundColor: "#D4F7E7",
-                borderRadius: 12,
-                paddingHorizontal: 10,
-                paddingVertical: 6,
-              }}
-            >
-              <Text style={{ color: "#0F3327", fontWeight: "800" }}>
-                {c.pts} pts
-              </Text>
-            </View>
+              <View
+                style={{
+                  backgroundColor: "#D4F7E7",
+                  borderRadius: 12,
+                  paddingHorizontal: 10,
+                  paddingVertical: 6,
+                }}
+              >
+                <Text style={{ color: "#0F3327", fontWeight: "800" }}>
+                  {c.pts} pts
+                </Text>
+                {/* points = club.points totaux (récupérés du club Firestore) */}
+                {/* Exemple : */}
+                {/* const clubPoints = club.pointsTotal || 0; */}
+                {/* ...affichage... */}
+              </View>
           </View>
         );
       })}

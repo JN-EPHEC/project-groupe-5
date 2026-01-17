@@ -1,11 +1,11 @@
 import { db } from "@/firebaseConfig";
 import {
-  collection,
-  doc,
-  getDoc,
-  onSnapshot,
-  orderBy,
-  query,
+    collection,
+    doc,
+    getDoc,
+    onSnapshot,
+    orderBy,
+    query,
 } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { ClassementUser } from "../types/classement";
@@ -48,7 +48,6 @@ export function useLeagueUsers(
       const enrichedUsers = await Promise.all(
         rawParticipants.map(async (p: any) => {
           let profile: any = {};
-          
           try {
             // Récupération des infos fraîches du profil public
             const userSnap = await getDoc(doc(db, "users", p.uid));
@@ -60,23 +59,43 @@ export function useLeagueUsers(
           }
 
           // Construction robuste du nom d'affichage
-          // Priorité : username > prénom+nom > nom stocké dans le classement > "Utilisateur"
-          const displayName = 
-            profile.username || 
-            [profile.firstName, profile.lastName].filter(Boolean).join(" ").trim() || 
-            p.displayName || 
+          const displayName =
+            profile.username ||
+            [profile.firstName, profile.lastName].filter(Boolean).join(" ").trim() ||
+            p.displayName ||
             "Utilisateur";
+
+          // Logique harmonisée pour avatarUrl, avatarColor, initials
+          const avatarUrl = (typeof profile.photoURL === 'string' && profile.photoURL.length > 0)
+            ? profile.photoURL
+            : (typeof p.avatarUrl === 'string' && p.avatarUrl.length > 0)
+              ? p.avatarUrl
+              : null;
+
+          const avatarColor = profile.avatarColor || p.avatarColor || "#19D07D";
+          const isWhiteBg = ["#FFFFFF", "#ffffff", "#fff", "#FFF"].includes(avatarColor);
+
+          // Initiales robustes : si pas de photo, calculer à partir du nom
+          let initials = "";
+          if (!avatarUrl) {
+            initials = displayName
+              .trim()
+              .split(/\s+/)
+              .map((n: string) => n[0])
+              .join("")
+              .toUpperCase()
+              .slice(0, 2);
+          }
 
           return {
             uid: p.uid,
-            // Les points et la qualif viennent du classement (cycle)
             rankingPoints: p.rankingPoints ?? 0,
             qualified: p.qualified ?? false,
-            
-            // Le style vient du profil utilisateur (global)
-            displayName: displayName,
-            avatarUrl: profile.photoURL || p.avatarUrl || null,
-            avatarColor: profile.avatarColor || "#19D07D", // ✅ Récupération de la couleur perso
+            displayName,
+            avatarUrl,
+            avatarColor,
+            isWhiteBg,
+            initials,
           } as ClassementUser;
         })
       );

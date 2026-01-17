@@ -1,16 +1,16 @@
-// hooks/friends-context.tsx
 import { db } from "@/firebaseConfig";
 import { collection, doc, onSnapshot } from "firebase/firestore";
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
-
 import { useUser } from "./user-context";
 
+// ✅ Added avatarColor to the type
 export type Friend = {
   id: string;
   name: string;
   points: number;
   online: boolean;
   avatar: string | null;
+  avatarColor: string; 
 };
 
 type FriendsContextType = {
@@ -46,6 +46,8 @@ function buildFriend(id: string, payload: Record<string, any> | undefined): Frie
         : (typeof payload?.points === "number" ? payload.points : 0),
     online: Boolean(payload?.online),
     avatar: avatarUrl,
+    // ✅ Extracting avatarColor or providing a default
+    avatarColor: typeof payload?.avatarColor === "string" ? payload.avatarColor : "#19D07D",
   };
 }
 
