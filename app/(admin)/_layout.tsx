@@ -1,70 +1,107 @@
-// app/(admin)/_layout.tsx
-import { useUser } from "@/hooks/user-context";
+import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
-import { Redirect, Stack, useRouter } from "expo-router";
-import { Platform, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Tabs } from "expo-router";
+import React, { useEffect } from "react";
+import { Platform, View } from "react-native";
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-export default function AdminLayout() {
-  const { user } = useUser();
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
+const navTheme = {
+  light: {
+    bg: "rgba(240, 253, 244, 0.95)",
+    border: "rgba(255, 255, 255, 0.8)",
+    activeIconBg: "#008F6B",
+    activeIconColor: "#FFFFFF",
+    inactiveColor: "#6E8580",
+    activeText: "#0A3F33",
+    shadow: "#005c4b",
+  },
+  dark: {
+    bg: "rgba(20, 26, 24, 0.95)",
+    border: "rgba(0, 151, 178, 0.3)",
+    activeIconBg: "rgba(0, 151, 178, 0.2)",
+    activeIconColor: "#E6FFF5",
+    inactiveColor: "#8AA39C",
+    activeText: "#E6FFF5",
+    shadow: "#000",
+  }
+};
 
-  // Si pas admin, on redirige
-  if (!user?.isAdmin) return <Redirect href="/profil" />;
+function CircleIcon({ name, color, focused, light }: any) {
+  const scale = useSharedValue(focused ? 1 : 0.9);
+  useEffect(() => { scale.value = withTiming(focused ? 1.1 : 1, { duration: 200 }); }, [focused]);
+  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const theme = light ? navTheme.light : navTheme.dark;
 
   return (
-    <View style={{ flex: 1 }}>
-      {/* La Stack gère la navigation interne de l'admin */}
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        {/* Ordre logique du Menu */}
-        <Stack.Screen name="defis" />
-        <Stack.Screen name="coupons" />  {/* ✅ NOUVEAU */}
-        <Stack.Screen name="reports" />
-        <Stack.Screen name="feedback" />
-      </Stack>
-
-      {/* BOUTON "QUITTER ADMIN" FLOTTANT */}
-      <TouchableOpacity
-        onPress={() => router.replace("/(tabs)/profil")}
-        activeOpacity={0.8}
-        style={[
-          styles.backButton, 
-          { 
-            top: Platform.OS === 'ios' ? insets.top + 10 : 40, 
-          }
-        ]}
-      >
-        <View style={styles.buttonContent}>
-          <Ionicons name="arrow-back" size={20} color="#111827" />
-        </View>
-      </TouchableOpacity>
+    <View pointerEvents="none" style={{ alignItems: 'center', justifyContent: 'center', marginTop: -4 }}> 
+      <Animated.View style={[{
+            width: 42, height: 42, borderRadius: 21,
+            justifyContent: "center", alignItems: "center",
+            backgroundColor: focused ? theme.activeIconBg : "transparent",
+            borderWidth: focused && !light ? 1 : 0,
+            borderColor: theme.border,
+          }, animatedStyle]}>
+        <Ionicons name={name} size={22} color={focused ? theme.activeIconColor : color} />
+      </Animated.View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  backButton: {
-    position: "absolute",
-    left: 24, // Alignement avec le padding des pages (souvent 24)
-    zIndex: 9999,
-  },
-  buttonContent: {
-    backgroundColor: "#FFFFFF",
-    width: 44,
-    height: 44,
-    borderRadius: 14, // Arrondi moderne
-    justifyContent: "center",
-    alignItems: "center",
-    // Ombre douce et propre
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
-    // Bordure très fine
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.05)"
-  }
-});
+export default function AdminLayout() {
+  const { mode } = useThemeMode();
+  const insets = useSafeAreaInsets();
+  const isLight = mode === "light";
+  const theme = isLight ? navTheme.light : navTheme.dark;
+
+  return (
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarShowLabel: true,
+        tabBarStyle: {
+          position: "absolute",
+          bottom: Platform.OS === "ios" ? insets.bottom + 10 : 20,
+          left: 15, right: 15,
+          height: 84, borderRadius: 42,
+          backgroundColor: theme.bg,
+          borderTopWidth: 0, borderWidth: 1, borderColor: theme.border,
+          elevation: 8, shadowColor: theme.shadow,
+          shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16,
+          paddingBottom: 16, paddingTop: 8,
+        },
+        tabBarLabelStyle: { fontSize: 10, fontWeight: "600", marginTop: 6 },
+        tabBarActiveTintColor: theme.activeText,
+        tabBarInactiveTintColor: theme.inactiveColor,
+      }}
+    >
+      <Tabs.Screen name="index" options={{ 
+        title: "Admin", 
+        tabBarIcon: (p) => <CircleIcon name="shield-checkmark-outline" {...p} light={isLight} /> 
+      }} />
+      
+      <Tabs.Screen name="defis" options={{ 
+        title: "Défis", 
+        tabBarIcon: (p) => <CircleIcon name="trophy-outline" {...p} light={isLight} /> 
+      }} />
+
+      <Tabs.Screen name="coupons" options={{ 
+        title: "Coupons", 
+        tabBarIcon: (p) => <CircleIcon name="ticket-outline" {...p} light={isLight} /> 
+      }} />
+
+      <Tabs.Screen name="feedback" options={{ 
+        title: "Avis", 
+        tabBarIcon: (p) => <CircleIcon name="chatbubble-ellipses-outline" {...p} light={isLight} /> 
+      }} />
+
+      <Tabs.Screen name="reports" options={{ 
+        title: "Alertes", 
+        tabBarIcon: (p) => <CircleIcon name="warning-outline" {...p} light={isLight} /> 
+      }} />
+
+      {/* Pages cachées */}
+      <Tabs.Screen name="create-defi" options={{ href: null }} />
+    </Tabs>
+  );
+}
