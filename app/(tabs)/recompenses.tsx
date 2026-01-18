@@ -19,13 +19,12 @@ const rewardTheme = {
     activeTabText: "#FFFFFF",
     inactiveTabText: "#4A665F",
     textMain: "#0A3F33",
-    // ✅ MODIFIÉ : Vert (#008F6B) pour le bouton actif en mode sombre
     darkActiveTabBg: "#008F6B", 
 };
 
 export default function RewardsScreen() {
   const { colors, mode } = useThemeMode();
-  const { points, spendPoints } = usePoints();
+  const { points } = usePoints(); // Note: spendPoints n'est plus nécessaire ici car géré par la transaction
   const { coupons, addCoupon, hasCoupon } = useCoupons();
   const [activeTab, setActiveTab] = useState<'eco'|'coupons'>('eco');
   const [liveRewards, setLiveRewards] = useState<any[]>([]);
@@ -62,7 +61,6 @@ export default function RewardsScreen() {
           <PointsCard points={points} />
 
           <View style={styles.tabsContainer}>
-             {/* ✅ On garde le fond et la bordure bleutés (0, 151, 178) en mode sombre */}
              <LinearGradient
                 colors={isLight ? ["rgba(255,255,255,0.8)", "rgba(255,255,255,0.5)"] : ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"]}
                 style={[styles.tabsWrapper, { borderColor: isLight ? "rgba(255,255,255,0.5)" : "rgba(0, 151, 178, 0.3)" }]}
@@ -75,9 +73,15 @@ export default function RewardsScreen() {
           {activeTab === 'eco' && (
             <View>
               <Text style={[styles.sectionTitle, { color: isLight ? rewardTheme.textMain : colors.text }]}>Offres du moment</Text>
+              
               <View style={styles.grid}>
                 {liveRewards
-                    .filter((r: any) => !hasCoupon(r.id))
+                    .filter((item: any) => {
+                        const today = new Date().toISOString().split('T')[0];
+                        const isExpired = item.expiresAt < today;
+                        // On cache si déjà obtenu ou expiré
+                        return !hasCoupon(item.id) && !isExpired;
+                    })
                     .map((item: any) => {
                         const outOfStock = item.remainingQuantity <= 0;
                         return (
@@ -87,23 +91,17 @@ export default function RewardsScreen() {
                               redeemed={hasCoupon(item.id)}
                               canAfford={points >= item.pointsCost && !outOfStock}
                               onRedeem={async (id: string, cost: number) => {
-                                if (hasCoupon(id)) return;
-                                if (outOfStock) {
-                                    alert("Stock épuisé !");
-                                    return;
-                                }
-                                const successDb = await addCoupon(id);
-                                if (successDb) {
-                                    const pointsOk = spendPoints(cost, `Échange: ${item.name}`);
-                                    if(pointsOk) {
-                                        setActiveTab('coupons');
-                                    }
+                                // Appel de la transaction atomique (Points + Stock + Coupon)
+                                // @ts-ignore : on passe le coût pour la transaction interne
+                                const success = await addCoupon(id, cost);
+                                if (success) {
+                                    setActiveTab('coupons');
                                 }
                               }}
                             />
                             {outOfStock && (
-                                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 20 }}>
-                                    <Text style={{ color: 'white', fontWeight: 'bold', backgroundColor: 'red', padding: 5, borderRadius: 5 }}>ÉPUISÉ</Text>
+                                <View style={styles.outOfStockOverlay}>
+                                    <Text style={styles.outOfStockText}>ÉPUISÉ</Text>
                                 </View>
                             )}
                           </View>
@@ -117,8 +115,10 @@ export default function RewardsScreen() {
             <View>
               <Text style={[styles.sectionTitle, { color: isLight ? rewardTheme.textMain : colors.text }]}>Mes coupons actifs</Text>
               {coupons.length === 0 && (
-                <View style={{ padding: 20, alignItems: 'center' }}>
-                    <Text style={{ color: colors.mutedText, textAlign: 'center' }}>Aucun coupon disponible.</Text>
+                <View style={{ padding: 40, alignItems: 'center' }}>
+                    <Text style={{ color: colors.mutedText, textAlign: 'center', fontFamily: FontFamilies.body }}>
+                        Aucun coupon disponible pour le moment.
+                    </Text>
                 </View>
               )}
               {coupons.map((c) => <CouponCard key={c.id} coupon={c} />)}
@@ -137,19 +137,47 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 18, fontFamily: FontFamilies.heading, marginBottom: 12, marginTop: 8 },
   tabsContainer: { marginBottom: 24 },
   tabsWrapper: { flexDirection: 'row', padding: 4, borderRadius: 24, borderWidth: 1 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  gridItem: { width: '48%', marginBottom: 16 },
+  grid: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    justifyContent: 'flex-start',
+    marginHorizontal: -8 
+  },
+  gridItem: { 
+    width: '50%', 
+    paddingHorizontal: 8, 
+    marginBottom: 16,
+    minHeight: 220 
+  },
+  outOfStockOverlay: { 
+    position: 'absolute', 
+    top: 0, 
+    left: 8, 
+    right: 8, 
+    bottom: 0, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    backgroundColor: 'rgba(0,0,0,0.3)', 
+    borderRadius: 20 
+  },
+  outOfStockText: { 
+    color: 'white', 
+    fontWeight: 'bold', 
+    backgroundColor: 'red', 
+    padding: 5, 
+    borderRadius: 5 
+  },
 });
 
 function TabButton({ label, active, onPress, isLight }: { label: string; active: boolean; onPress: () => void; isLight: boolean }) {
   return (
     <TouchableOpacity
       onPress={onPress}
+      activeOpacity={0.7}
       style={{
         flex: 1,
         paddingVertical: 10,
         borderRadius: 20,
-        // ✅ CHANGÉ : Utilise rewardTheme.darkActiveTabBg (vert) en mode sombre
         backgroundColor: active ? (isLight ? rewardTheme.activeTabBg : rewardTheme.darkActiveTabBg) : "transparent",
         alignItems: 'center',
         shadowColor: active ? "#000" : "transparent",

@@ -1,68 +1,34 @@
-// ✅ CORRECTION ICI : Ajout des accolades
 import { NotificationBell } from "@/components/ui/common/NotificationBell";
-import { ChallengeHistoryList } from "@/components/ui/profil/ChallengeHistoryList";
 import { Header } from "@/components/ui/profil/Header";
 import { SettingsSection } from "@/components/ui/profil/SettingsSection";
-import { StatCard } from "@/components/ui/profil/StatCard";
 import { ShareQRModal } from "@/components/ui/qr/ShareQRModal";
 import PremiumCard from "@/components/ui/recompenses/PremiumCard";
 import { FontFamilies } from "@/constants/fonts";
 import { auth, db } from "@/firebaseConfig";
-import { useFriends } from "@/hooks/friends-context";
-import { usePoints } from "@/hooks/points-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { useUser } from "@/hooks/user-context";
-import { useClassement } from "@/src/classement/hooks/useClassement";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import { addDoc, collection, onSnapshot } from "firebase/firestore";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 // 🎨 THEME PROFIL
 const profileTheme = {
-    bgGradient: ["#DDF7E8", "#F4FDF9"] as const,
-    accent: "#008F6B", // Vert Marque
-    textMain: "#0A3F33",
+  bgGradient: ["#DDF7E8", "#F4FDF9"] as const,
+  accent: "#008F6B", // Vert Marque
+  textMain: "#0A3F33",
 };
 
 export default function ProfilScreen() {
   const { colors, mode } = useThemeMode();
   const isLight = mode === "light";
-  const { points } = usePoints();
   const { user } = useUser();
   const fullName = `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim();
-  const { friends } = useFriends();
   const [showQR, setShowQR] = useState(false);
   const router = useRouter();
-
-  const { users: classementUsers, loading: classementLoading } = useClassement();
-
-  const { challengeRank } = useMemo(() => {
-    if (classementLoading || !classementUsers || !user) {
-      return { challengeRank: null };
-    }
-    const currentUserData = classementUsers.find((u) => u.uid === user.uid);
-    return {
-      challengeRank: currentUserData?.rank,
-    };
-  }, [classementUsers, classementLoading, user]);
-
-  const individualRankLabel = useMemo(() => {
-    if (challengeRank === null || challengeRank === undefined) return "—";
-    return `#${challengeRank}`;
-  }, [challengeRank]);
-
-  const myPoints = useMemo(() => (typeof points === "number" ? points : user?.points ?? 0), [points, user?.points]);
-
-  const friendRankLabel = useMemo(() => {
-    const totals = [...friends.map((friend) => friend.points || 0), myPoints].sort((a, b) => b - a);
-    const pos = totals.findIndex((value) => value === myPoints) + 1;
-    return `#${pos || 1}`;
-  }, [friends, myPoints]);
-
 
   const startSubscription = async () => {
     const current = auth.currentUser;
@@ -85,14 +51,8 @@ export default function ProfilScreen() {
       onSnapshot(sessionRef, (snap) => {
         const data = snap.data();
         if (!data) return;
-
-        if (data.error) {
-          alert(data.error.message);
-        }
-
-        if (data.url) {
-          Linking.openURL(data.url);
-        }
+        if (data.error) alert(data.error.message);
+        if (data.url) Linking.openURL(data.url);
       });
     } catch (error: any) {
       alert(error?.message || "Une erreur est survenue.");
@@ -100,14 +60,6 @@ export default function ProfilScreen() {
   };
 
   const sectionSpacing = { marginBottom: 17 } as const;
-
-  // Vérifications existantes
-  const hasHeader = typeof Header !== "undefined";
-  const hasStatCard = typeof StatCard !== "undefined";
-  const hasChallengeHistory = typeof ChallengeHistoryList !== "undefined";
-  const hasSettingsSection = typeof SettingsSection !== "undefined";
-  const hasShareQR = typeof ShareQRModal !== "undefined";
-  const hasPremiumCard = typeof PremiumCard !== "undefined";
 
   // Wrapper Fond
   const BackgroundComponent = isLight ? LinearGradient : View;
@@ -121,108 +73,64 @@ export default function ProfilScreen() {
       
       <SafeAreaView style={{ flex: 1 }}>
         <ScrollView
-          style={[styles.container]}
+          style={styles.container}
           contentContainerStyle={{ paddingBottom: 160 }}
           showsVerticalScrollIndicator={false}
         >
           {/* TITLE & NOTIF */}
           <View style={styles.titleRow}>
-            <Text style={[styles.titleText, { color: isLight ? profileTheme.textMain : colors.text }]}>Profil</Text>
+            <Text style={[styles.titleText, { color: isLight ? profileTheme.textMain : colors.text }]}>
+              Profil
+            </Text>
             <View style={{ position: 'absolute', right: 0, top: 4 }}>
               <NotificationBell />
             </View>
           </View>
 
           {/* HEADER (Avatar + Nom) */}
-          {hasHeader ? <Header /> : <Text style={{ color: isLight ? colors.text : "#fff" }}>Profil indisponible</Text>}
+          <Header />
 
           {/* ACTIONS RAPIDES (Modifier / Partager) */}
           <View style={[sectionSpacing, styles.firstBlockMargin]}>
             <View style={styles.actionRow}>
-              {/* Bouton Modifier */}
               <TouchableOpacity
                 style={{ flex: 1 }}
                 onPress={() => router.push("/edit-profile")}
                 activeOpacity={0.85}
               >
                 <LinearGradient
-                    colors={isLight ? ["#008F6B", "#10B981"] : [colors.cardAlt, colors.card]}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                    style={styles.primaryBtn}
+                  colors={isLight ? ["#008F6B", "#10B981"] : [colors.cardAlt, colors.card]}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                  style={styles.primaryBtn}
                 >
-                    <Text style={styles.primaryBtnText}>Modifier mon profil</Text>
+                  <Text style={styles.primaryBtnText}>Modifier mon profil</Text>
                 </LinearGradient>
               </TouchableOpacity>
 
-              {/* Bouton Partager */}
               <TouchableOpacity
                 style={{ flex: 1 }}
                 onPress={() => setShowQR(true)}
                 activeOpacity={0.85}
               >
                 <LinearGradient
-                    colors={isLight ? ["#008F6B", "#10B981"] : [colors.cardAlt, colors.card]}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                    style={styles.primaryBtn}
+                  colors={isLight ? ["#008F6B", "#10B981"] : [colors.cardAlt, colors.card]}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                  style={styles.primaryBtn}
                 >
-                    <Text style={styles.primaryBtnText}>Partager mon profil</Text>
+                  <Text style={styles.primaryBtnText}>Partager mon profil</Text>
                 </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* STAT CARDS (Navigation vers classements) */}
-          <View style={sectionSpacing}>
-            <View style={styles.row}>
-              <TouchableOpacity
-                style={{ flex: 1, marginRight: 10 }}
-                activeOpacity={0.8}
-                onPress={() => {
-                  router.push({
-                    pathname: "/(tabs)/defi",
-                    params: { 
-                      view: "classement", 
-                      rankingTab: "perso", 
-                      t: Date.now()
-                    }
-                  });
-                }}
-              >
-                <StatCard icon="trophy-outline" label="Classement individuel" value={individualRankLabel} />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={{ flex: 1 }}
-                activeOpacity={0.8}
-                onPress={() => {
-                  router.push({
-                    pathname: "/(tabs)/social",
-                    params: { 
-                      tab: "amis", 
-                      reset: "true",
-                      t: Date.now() 
-                    }
-                  });
-                }}
-              >
-                <StatCard icon="person-outline" label="Classement entre amis" value={friendRankLabel} />
               </TouchableOpacity>
             </View>
           </View>
 
           {/* PREMIUM */}
           <View style={sectionSpacing}>
-            {hasPremiumCard ? <PremiumCard onSubscribe={startSubscription} /> : <Text style={{ color: isLight ? colors.text : "#fff" }}>Premium indisponible</Text>}
-          </View>
-
-          {/* HISTORIQUE */}
-          <View style={sectionSpacing}>
-            {hasChallengeHistory ? <ChallengeHistoryList /> : <Text style={{ color: isLight ? colors.text : "#fff" }}>Historique indisponible</Text>}
+            <PremiumCard onSubscribe={startSubscription} />
           </View>
 
           {/* SETTINGS */}
           <View style={[sectionSpacing, styles.tighterSpacing]}>
-            {hasSettingsSection ? <SettingsSection /> : <Text style={{ color: isLight ? colors.text : "#fff" }}>Paramètres indisponibles</Text>}
+            <SettingsSection />
           </View>
 
           {/* ADMIN ACCESS */}
@@ -233,15 +141,9 @@ export default function ProfilScreen() {
             >
                <LinearGradient
                   colors={["#FF8C66", "#FF9D7E"]}
-                  style={{
-                    paddingVertical: 14,
-                    paddingHorizontal: 16,
-                    borderRadius: 16,
-                    marginTop: 10,
-                    alignItems: 'center'
-                  }}
+                  style={styles.adminBtn}
                >
-                  <Text style={{ color: "#fff", fontFamily: FontFamilies.heading, fontSize: 16 }}>
+                  <Text style={styles.adminBtnText}>
                     Accéder à l’espace administrateur
                   </Text>
                </LinearGradient>
@@ -249,19 +151,15 @@ export default function ProfilScreen() {
           )}
 
           {/* QR CODE MODAL */}
-          {hasShareQR ? (
-            <ShareQRModal
-              visible={showQR}
-              onClose={() => setShowQR(false)}
-              title="Partager mon profil"
-              subtitle="Scanne pour voir mon profil"
-              qrValue={`app://user/${encodeURIComponent(fullName)}`}
-              shareText={`Voici mon profil sur l'app : app://user/${encodeURIComponent(fullName)}`}
-              accentColor={colors.accent}
-            />
-          ) : showQR ? (
-            <Text style={{ color: isLight ? colors.text : "#fff", textAlign: "center", marginTop: 12 }}>QR indisponible</Text>
-          ) : null}
+          <ShareQRModal
+            visible={showQR}
+            onClose={() => setShowQR(false)}
+            title="Partager mon profil"
+            subtitle="Scanne pour voir mon profil"
+            qrValue={`app://user/${encodeURIComponent(fullName)}`}
+            shareText={`Voici mon profil sur l'app : app://user/${encodeURIComponent(fullName)}`}
+            accentColor={colors.accent}
+          />
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -270,7 +168,6 @@ export default function ProfilScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 20 },
-  row: { flexDirection: "row", justifyContent: "space-between" },
   firstBlockMargin: { marginTop: 10 },
   tighterSpacing: { marginTop: -4 },
   titleRow: { 
@@ -294,4 +191,12 @@ const styles = StyleSheet.create({
   },
   primaryBtnText: { fontFamily: FontFamilies.heading, textAlign: "center", color: "#FFF", fontSize: 14 },
   actionRow: { flexDirection: "row", gap: 12 },
+  adminBtn: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    marginTop: 10,
+    alignItems: 'center'
+  },
+  adminBtnText: { color: "#fff", fontFamily: FontFamilies.heading, fontSize: 16 }
 });

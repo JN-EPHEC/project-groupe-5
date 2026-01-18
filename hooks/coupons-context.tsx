@@ -15,8 +15,8 @@ export type Coupon = {
 
 type CouponsContextType = {
   coupons: Coupon[];
-  // addCoupon renvoie maintenant true si succès, false si échec (stock épuisé)
-  addCoupon: (rewardId: string) => Promise<boolean>; 
+  // ✅ Ajout de pointsCost pour la transaction atomique
+  addCoupon: (rewardId: string, pointsCost: number) => Promise<boolean>; 
   hasCoupon: (rewardId: string) => boolean;
   loading: boolean;
 };
@@ -38,24 +38,19 @@ export function CouponsProvider({ children }: { children: React.ReactNode }) {
 
     const unsubscribe = onSnapshot(collection(db, "users", user.uid, "coupons"), (snapshot) => {
       const list: Coupon[] = [];
-      // On compare des chaînes ISO (YYYY-MM-DD) car c'est plus fiable que new Date() sur mobile
       const todayISO = new Date().toISOString().split('T')[0]; 
 
       snapshot.forEach((document) => {
         const data = document.data() as Coupon;
         
-        // Sécurité : si pas de date, on garde par défaut (ou on supprime, au choix)
         if (!data.expiresAt) {
             list.push(data);
             return;
         }
 
-        // Comparaison simple de chaînes : "2024-01-01" < "2025-01-01" est TRUE
         if (data.expiresAt < todayISO) {
-          // Expiré : on supprime de Firebase
           deleteDoc(doc(db, "users", user.uid, "coupons", document.id)).catch(err => console.log("Auto-delete error", err));
         } else {
-          // Valide : on garde dans la liste
           list.push(data);
         }
       });
@@ -67,49 +62,59 @@ export function CouponsProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, [user]);
 
-  // 2. TRANSACTION D'ACHAT (Sécurisée pour le stock)
-  const addCoupon = async (rewardId: string): Promise<boolean> => {
+  // 2. TRANSACTION D'ACHAT (Sécurisée pour le stock ET les points)
+  const addCoupon = async (rewardId: string, pointsCost: number): Promise<boolean> => {
     if (!user) return false;
 
     try {
         await runTransaction(db, async (transaction) => {
-            // A. Lire la récompense dans la collection globale "rewards"
+            // A. Références
             const rewardRef = doc(db, "rewards", rewardId);
+            const userRef = doc(db, "users", user.uid);
+            const userCouponRef = doc(db, "users", user.uid, "coupons", rewardId);
+
+            // B. Lectures (Toutes les lectures doivent être faites avant les écritures)
             const rewardDoc = await transaction.get(rewardRef);
+            const userDoc = await transaction.get(userRef);
+            const userCouponDoc = await transaction.get(userCouponRef);
 
-            if (!rewardDoc.exists()) {
-                throw "Cette récompense n'existe plus.";
-            }
-
+            // C. Vérifications
+            if (!rewardDoc.exists()) throw "Cette récompense n'existe plus.";
+            if (!userDoc.exists()) throw "Erreur profil utilisateur.";
+            
             const rewardData = rewardDoc.data();
+            const userData = userDoc.data();
 
-            // B. Vérifier le stock
-            if (rewardData.remainingQuantity <= 0) {
-                throw "Stock épuisé !";
+            if (rewardData.remainingQuantity <= 0) throw "Stock épuisé !";
+            if (!rewardData.isActive) throw "Offre désactivée.";
+            
+            // Vérification des points EN DIRECT dans la base
+            if (userData.points < pointsCost) {
+                throw "Points insuffisants pour cet achat.";
             }
 
-            if (!rewardData.isActive) {
-                throw "Offre désactivée.";
-            }
-
-            // Vérifier expiration à l'achat aussi
             const todayISO = new Date().toISOString().split('T')[0];
             if (rewardData.expiresAt && rewardData.expiresAt < todayISO) {
                  throw "Cette offre a expiré.";
             }
 
-            // C. Vérifier si l'utilisateur l'a déjà (Double sécurité)
-            const userCouponRef = doc(db, "users", user.uid, "coupons", rewardId);
-            const userCouponDoc = await transaction.get(userCouponRef);
             if (userCouponDoc.exists()) {
                 throw "Vous avez déjà ce coupon.";
             }
 
-            // D. Décrémenter le stock GLOBAL
-            const newQuantity = rewardData.remainingQuantity - 1;
-            transaction.update(rewardRef, { remainingQuantity: newQuantity });
+            // D. ÉCRITURES ATOMIQUES
+            
+            // 1. Décrémenter le stock GLOBAL
+            transaction.update(rewardRef, { 
+                remainingQuantity: rewardData.remainingQuantity - 1 
+            });
 
-            // E. Ajouter le coupon au USER
+            // 2. Décrémenter les points de l'utilisateur
+            transaction.update(userRef, { 
+                points: userData.points - pointsCost 
+            });
+
+            // 3. Créer le coupon
             const newCoupon: Coupon = {
                 id: rewardId,
                 name: rewardData.name,
@@ -121,11 +126,10 @@ export function CouponsProvider({ children }: { children: React.ReactNode }) {
             transaction.set(userCouponRef, newCoupon);
         });
 
-        return true; // Succès
+        return true; 
     } catch (e: any) {
-        console.error("Erreur transaction coupon:", e);
-        // On renvoie l'erreur sous forme d'alerte UI plus tard
-        Alert.alert("Échec", typeof e === "string" ? e : "Impossible d'obtenir le coupon.");
+        console.error("Erreur transaction achat:", e);
+        Alert.alert("Échange impossible", typeof e === "string" ? e : "Une erreur est survenue.");
         return false;
     }
   };

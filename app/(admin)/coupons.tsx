@@ -9,18 +9,18 @@ import { useRouter } from "expo-router";
 import { addDoc, collection, deleteDoc, doc, onSnapshot, updateDoc } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
-  Alert,
-  FlatList,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    FlatList,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -215,7 +215,7 @@ export default function AdminCouponsScreen() {
                 </View>
 
                 <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
-                    <ScrollView contentContainerStyle={{ padding: 20 }}>
+                    <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 120 }}>
                         
                         {/* PHOTOS CAROUSEL */}
                         <Text style={{ color: "#4A665F", marginBottom: 10, fontWeight: '600' }}>Photos ({form.images.length}/5)</Text>
