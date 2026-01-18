@@ -1,0 +1,152 @@
+rules_version = '2';
+service cloud.firestore {
+  function isAuthenticated() {
+    return request.auth != null;
+  }
+
+  function clubMembership(clubId) {
+    return isAuthenticated() &&
+      (let clubDoc = get(/databases/$(database)/documents/clubs/$(clubId));
+        clubDoc.exists() &&
+        (
+          clubDoc.data.ownerId == request.auth.uid ||
+          (clubDoc.data.members is list && clubDoc.data.members.hasAny([request.auth.uid])) ||
+          (clubDoc.data.members is map && clubDoc.data.members.keys().hasAny([request.auth.uid]))
+        )
+      );
+  }
+
+  match /databases/{database}/documents {
+
+    // --- CLUBS ---
+    match /clubs/{clubId} {
+
+      // Lire les clubs → autorisé à tous les utilisateurs connectés
+      allow read: if isAuthenticated();
+
+      // Créer un club → autorisé si l’utilisateur est connecté
+      allow create: if isAuthenticated();
+
+      // Mettre à jour un club :
+      // - le propriétaire peut modifier
+      // - un membre peut mettre à jour
+      // - tout utilisateur connecté peut modifier uniquement le champ 'members' (pour rejoindre/quitter)
+      allow update: if isAuthenticated() && (
+        request.auth.uid == resource.data.ownerId ||
+        request.auth.uid in resource.data.members ||
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(['members'])
+      );
+
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.ownerId;
+
+      match /messages/{messageId} {
+        allow read: if clubMembership(clubId);
+        allow create: if clubMembership(clubId) && request.resource.data.userId == request.auth.uid;
+      }
+    }
+
+    // ----------------------------------------------------
+    // PREUVES
+    // ----------------------------------------------------
+    match /preuves/{preuveId} {
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.userId;
+
+      allow read, update: if request.auth != null
+        && (
+          request.auth.uid == resource.data.userId ||
+          resource.data.assignedValidators.hasAny([request.auth.uid])
+        );
+
+      allow delete: if false;
+    }
+
+    // ----------------------------------------------------
+    // USERS + FRIEND SYSTEM
+    // ----------------------------------------------------
+    match /users/{userId} {
+
+      // 🔎 Tous les utilisateurs connectés peuvent lire les profils
+      allow read: if isAuthenticated();
+
+      // ✏️ Seul le propriétaire peut modifier SON doc user
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+
+      // ---------------------------
+      // FRIEND REQUESTS SUBCOLLECTION
+      // users/{targetId}/friendRequests/{requestId}
+      // ---------------------------
+      match /friendRequests/{requestId} {
+
+        // 📌 Lecture : uniquement le destinataire
+        allow read: if isAuthenticated() && request.auth.uid == userId;
+
+        // ✉️ Création par l'expéditeur : le champ 'from' doit correspondre à l'UID authentifié
+        allow create: if request.auth != null && request.resource.data.from == request.auth.uid && request.resource.data.status == 'pending';
+
+        // ☑️ Accepter / Refuser → uniquement par le destinataire
+        allow update: if request.auth != null && request.auth.uid == userId;
+
+        // ❌ Suppression uniquement par le destinataire (pour nettoyer après rejet)
+        allow delete: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // ---------------------------
+      // FRIENDS SUBCOLLECTION
+      // users/{uid}/friends/{friendId}
+      // ---------------------------
+      match /friends/{friendId} {
+        // Owner can read their friends
+        allow read: if request.auth != null && request.auth.uid == userId;
+        // Allow creation by either owner or the counterpart friend (to write symmetric relation)
+        allow create: if isAuthenticated() && (request.auth.uid == userId || request.auth.uid == friendId);
+        // Allow updates from owner or counterpart; deletes remain owner-only
+        allow update: if isAuthenticated() && (request.auth.uid == userId || request.auth.uid == friendId);
+        allow delete: if isAuthenticated() && request.auth.uid == userId;
+      }
+
+      // ---------------------------
+      // ACTIVE DEFI SUBCOLLECTION
+      // users/{uid}/activeDefi/{docId}
+      // ---------------------------
+      match /activeDefi/{docId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      }
+
+      // ---------------------------
+      // HISTORY SUBCOLLECTIONS (if used later)
+      // users/{uid}/history/{docId}
+      // ---------------------------
+      match /history/{docId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      }
+    }
+
+    // ----------------------------------------------------
+    // DEFIS
+    // ----------------------------------------------------
+    match /defis/{defiId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ----------------------------------------------------
+    // STRIPE CHECKOUT SESSIONS
+    // ----------------------------------------------------
+    match /customers/{userId} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+
+      match /checkout_sessions/{sessionId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      }
+
+      match /subscriptions/{subscriptionId} {
+        allow read: if isAuthenticated() && request.auth.uid == userId;
+      }
+
+      match /payments/{paymentId} {
+        allow read: if isAuthenticated() && request.auth.uid == userId;
+      }
+    }
+  }
+}

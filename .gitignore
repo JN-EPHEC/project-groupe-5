@@ -1,6 +1,7 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
 firebase.env.js
+devAuth.env.js
 
 # dependencies
 node_modules/
@@ -43,3 +44,8 @@ app-example
 # generated native folders
 /ios
 /android
+
+# ---- GreenUp seed tools (never commit) ----
+serviceAccountKey.json
+tools/seed_defis/*.ndjson
+tools/seed_defis/*.log

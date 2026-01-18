@@ -1,0 +1,23 @@
+name: Reset Classement Cycle
+
+on:
+  schedule:
+    # Tous les lundis à midi (heure UTC)
+    - cron: '0 12 * * 1'
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      - name: Install dependencies
+        run: npm install
+      - name: Run resetClassementCycle script
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
+        run: node scripts/resetClassementCycle.js

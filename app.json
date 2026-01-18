@@ -4,39 +4,75 @@
     "slug": "Project-BA",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/logo_G2_degradé-removebg-preview.png",
     "scheme": "projectba",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tonnom.projectba",
+      "infoPlist": {
+        "NSCameraUsageDescription": "GreenUp a besoin d'accéder à votre caméra pour prendre en photo vos défis.",
+        "NSPhotoLibraryUsageDescription": "GreenUp a besoin d'accéder à vos photos pour choisir une preuve.",
+        "NSMicrophoneUsageDescription": "GreenUp a besoin du micro pour enregistrer le son des vidéos de défis."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "foregroundImage": "./assets/images/logo_G2_degradé-removebg-preview.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.tonnom.projectba",
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "RECORD_AUDIO",
+        "NOTIFICATIONS"
+      ]
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/logo_G2_degradé-removebg-preview.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/logo_G2_degradé-removebg-preview.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
           "dark": {
             "backgroundColor": "#000000"
           }
+        }
+      ],
+      "expo-web-browser",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "GreenUp a besoin d'accéder à votre caméra pour vous permettre de prendre en photo vos défis écologiques.",
+          "microphonePermission": "GreenUp a besoin d'accéder à votre micro pour les vidéos de défis."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "GreenUp a besoin d'accéder à vos photos pour vous permettre de sélectionner une preuve de défi depuis votre galerie."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/logo_G2_degradé-removebg-preview.png",
+          "color": "#008F6B",
+          "defaultChannel": "default"
         }
       ]
     ],
