@@ -47,7 +47,7 @@ export function ClubChallengeCard({ challenge, participating, status, onParticip
   const categoryIcon = "people-outline" as any;
 
   // Members / progress — UI: hardcoded denominator per design
-  const CLUB_DENOMINATOR = 50;
+  const clubDenominator = Math.max(1, (challenge as any).goalParticipants ?? 50);
   const progressCount = (challenge as any).progressCount ?? 0;
   const [confirmVisible, setConfirmVisible] = useState(false);
   const { currentClub, reviewCompletedClub, reviewRequiredCountClub } = useChallenges();
@@ -157,10 +157,10 @@ export function ClubChallengeCard({ challenge, participating, status, onParticip
           <Text style={{ color: cardText, fontWeight: "700", marginBottom: 6 }}>Progression du club</Text>
 
           <View style={{ height: 10, borderRadius: 8, backgroundColor: isLight ? "#E5E7EB" : "rgba(255,255,255,0.1)", overflow: "hidden" }}>
-            <View style={{ width: `${Math.round((progressCount / CLUB_DENOMINATOR) * 100)}%`, height: "100%", backgroundColor: accentColor }} />
+            <View style={{ width: `${Math.round((progressCount / clubDenominator) * 100)}%`, height: "100%", backgroundColor: accentColor }} />
           </View>
 
-          <Text style={{ color: cardMuted, marginTop: 4 }}>{progressCount}/{CLUB_DENOMINATOR} membres ont validé</Text>
+          <Text style={{ color: cardMuted, marginTop: 4 }}>{progressCount}/{clubDenominator} membres ont validé</Text>
         </View>
       )}
 

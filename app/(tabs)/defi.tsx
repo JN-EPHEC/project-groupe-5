@@ -575,13 +575,6 @@ export default function DefiScreen() {
                       categorie="personnel"
                       isOngoing={false}
                       onToggle={toggleOngoing}
-                      onReport={() =>
-                        handleOpenReport(
-                          challenge.firestoreId || String(challenge.id),
-                          challenge.title,
-                          challenge.firestoreId || String(challenge.id)
-                        )
-                      }
                     />
                   ))
                 )}
@@ -772,7 +765,7 @@ export default function DefiScreen() {
                   challenge={{
                     ...currentClub,
                     participants: 12,          // temporary static values
-                    goalParticipants: 50,      // will soon be dynamic
+                    goalParticipants: members.length,      // will soon be dynamic
                   }}
                   participating={true}
                   status={currentClub.status}
@@ -796,6 +789,7 @@ export default function DefiScreen() {
                       categorie="club"
                       isOngoing={false}
                       onToggle={toggleOngoing}
+                      clubGoalParticipants={members.length}
                     />
                   ))
                 )}
@@ -838,6 +832,9 @@ export default function DefiScreen() {
           
           <View style={[styles.adOverlay, { top: insets.top + 10 }]}>
             <Text style={styles.adTag}>Publicité</Text>
+            <TouchableOpacity onPress={handleAdFinished} style={styles.adSkipBtn}>
+              <Text style={styles.adSkipText}>Passer</Text>
+            </TouchableOpacity>
             {/* La croix apparaît à la fin */}
             {adFinished && (
               <TouchableOpacity onPress={handleAdFinished} style={styles.adCloseBtn}>
@@ -864,4 +861,15 @@ const styles = StyleSheet.create({
   adOverlay: { position: "absolute", right: 20, alignItems: "flex-end", gap: 10 },
   adTag: { color: "white", backgroundColor: "rgba(0,0,0,0.5)", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, fontSize: 12, fontWeight: "bold", overflow: "hidden" },
   adCloseBtn: { backgroundColor: "white", width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
+  adSkipBtn: {
+  backgroundColor: "rgba(255,255,255,0.85)",
+  paddingHorizontal: 10,
+  paddingVertical: 6,
+  borderRadius: 12,
+},
+adSkipText: {
+  color: "black",
+  fontWeight: "800",
+  fontSize: 12,
+},
 });
