@@ -4,12 +4,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useState } from "react"; // ✅ AJOUT useState
 import { Image, Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { CATEGORY_CONFIG } from "./constants";
 
 export type ValidationItem = {
   id: number | string;
   title: string;
   description: string;
+  defiTitle?: string;   // Firestore: titre
+  preuve?: string;      // Firestore: preuve
   category: string;
   difficulty: "Facile" | "Moyen" | "Difficile" | string;
   points: number;
@@ -53,10 +54,8 @@ export function ValidationCard({ item, onValidate, onReject, onReport }: Props) 
   const cardMuted = isLight ? validationTheme.textMuted : colors.mutedText;
 
   // Gestion catégorie
-  const categoryConfig = CATEGORY_CONFIG[item.category as keyof typeof CATEGORY_CONFIG] || { 
-      label: item.category, 
-      icon: "leaf-outline" 
-  };
+  const categoryLabel = item.audience === "Club" ? "Club" : "Perso";
+  const categoryIcon = item.audience === "Club" ? "people-outline" : "person-outline";
 
   const hasValidComment =
     typeof item.comment === "string" && item.comment.trim().length > 0;
@@ -82,8 +81,8 @@ export function ValidationCard({ item, onValidate, onReject, onReport }: Props) 
       {/* HEADER */}
       <View style={styles.header}>
         <View style={[styles.categoryPill, { backgroundColor: isLight ? "rgba(0,143,107,0.1)" : "rgba(0, 151, 178, 0.2)" }]}> 
-          <Ionicons name={categoryConfig.icon as any} size={14} color={isLight ? "#008F6B" : colors.accent} />
-          <Text style={[styles.categoryText, { color: isLight ? "#008F6B" : colors.accent }]}>{categoryConfig.label}</Text>
+          <Ionicons name={categoryIcon as any} size={14} color={isLight ? "#008F6B" : colors.accent} />
+          <Text style={[styles.categoryText, { color: isLight ? "#008F6B" : colors.accent }]}>{categoryLabel}</Text>
         </View>
 
         {item.audience !== "Club" && (
@@ -94,11 +93,13 @@ export function ValidationCard({ item, onValidate, onReject, onReport }: Props) 
         )}
       </View>
 
-      {/* TITRE & AUTEUR */}
-      <Text style={[styles.title, { color: cardText }]}>{item.title}</Text>
-      <Text style={[styles.subtitle, { color: cardMuted }]}>
-        Par {item.userName || "Utilisateur"}
-      </Text>
+      {/* TITRE (Defi.titre) */}
+      <Text style={[styles.title, { color: cardText }]}>{item.defiTitle ?? item.title}</Text>
+
+      {/* PREUVE (Defi.preuve) */}
+      {item.preuve ? (
+        <Text style={[styles.subtitle, { color: cardMuted }]}>{item.preuve}</Text>
+      ) : null}
 
       {/* PHOTO DE PREUVE (Cliquable & Corrigée) */}
       {item.photoUrl && (
