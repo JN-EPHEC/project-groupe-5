@@ -2,6 +2,7 @@ import { FontFamilies } from "@/constants/fonts";
 import { db } from "@/firebaseConfig";
 import { useClub } from "@/hooks/club-context";
 import { useThemeMode } from "@/hooks/theme-context";
+import { useStreaks } from "@/hooks/use-streaks";
 import { useUser } from "@/hooks/user-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -22,6 +23,7 @@ const headerTheme = {
 
 export const Header = () => {
   const { user, loading } = useUser();
+  const { currentStreak } = useStreaks();
   const { joinedClub } = useClub();
   const { colors, mode } = useThemeMode();
   const [liveColor, setLiveColor] = useState<string | null>(null);
@@ -73,7 +75,7 @@ export const Header = () => {
                 <Text style={{ color: isWhiteBg ? "#1A1A1A" : "#FFFFFF", fontSize: 28, fontFamily: FontFamilies.heading }}>{initials}</Text>
             </View>
             )}
-            <View style={[styles.badge, { backgroundColor: badgeColor }]}><Text style={[styles.badgeText, { color: isLight ? "#FFFFFF" : "#07321F" }]}>10</Text></View>
+            <View style={[styles.badge, { backgroundColor: badgeColor }]}><Text style={[styles.badgeText, { color: isLight ? "#FFFFFF" : "#07321F" }]}>{currentStreak}</Text></View>
         </View>
         <Text style={[styles.name, { color: isLight ? headerTheme.textMain : colors.text }]}>Bonjour {displayName}</Text>
         {isPremium && <Text style={styles.premiumText}>MEMBRE PREMIUM</Text>}

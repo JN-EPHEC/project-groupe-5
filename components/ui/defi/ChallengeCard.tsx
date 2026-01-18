@@ -15,6 +15,7 @@ type Props = {
   status?: "active" | "pendingValidation" | "validated";
   onValidatePhoto?: () => void;
   onReport?: () => void;
+  clubGoalParticipants?: number;
 };
 
 // 🎨 THEME CHALLENGE CARD
@@ -41,6 +42,7 @@ export function ChallengeCard({
   status,
   onValidatePhoto,
   onReport,
+  clubGoalParticipants,
 }: Props) {
   const { colors, mode } = useThemeMode();
   const [confirmVisible, setConfirmVisible] = useState(false);
@@ -67,8 +69,8 @@ export function ChallengeCard({
     return false;
   }, [isOngoing, reviewCompleted, reviewRequiredCount, current, challenge.id]);
 
-  const CLUB_DENOMINATOR = 50;
   const clubProgressValue = 0;
+  const clubDenominator = Math.max(1, clubGoalParticipants ?? 50);
 
   const isLightMode = mode === "light";
   
@@ -182,9 +184,9 @@ export function ChallengeCard({
             <>
               <View style={{ marginTop: 12 }}>
                 <View style={{ height: 8, backgroundColor: isLightMode ? "#E5E7EB" : "rgba(255,255,255,0.1)", borderRadius: 6, overflow: "hidden" }}>
-                  <View style={{ width: `${Math.round((clubProgressValue / CLUB_DENOMINATOR) * 100)}%`, height: "100%", backgroundColor: accentColor }} />
+                  <View style={{ width: `${Math.round((clubProgressValue / clubDenominator) * 100)}%`, height: "100%", backgroundColor: accentColor }} />
                 </View>
-                <Text style={{ color: cardMuted, marginTop: 6, fontSize: 13 }}>{clubProgressValue}/{CLUB_DENOMINATOR} membres ont validé</Text>
+                <Text style={{ color: cardMuted, marginTop: 6, fontSize: 13 }}>{clubProgressValue}/{clubDenominator} membres ont validé</Text>
               </View>
               <TouchableOpacity
                 onPress={() => onToggle(challenge.id)}

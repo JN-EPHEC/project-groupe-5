@@ -14,7 +14,7 @@ const sections = [
   },
   {
     title: "1. Objet",
-    body: "L'application GreenUp (ci-après \"l'Application\"), développée dans le cadre d'un projet académique à l'UCLouvain, a pour objet de permettre aux utilisateurs de réaliser des défis écologiques, de valider ces actions par des preuves photo, de partager leurs progrès sur un fil d'actualité et d'obtenir des récompenses virtuelles ou physiques via des partenaires locaux.",
+    body: "L'application GreenUp (ci-après \"l'Application\"), développée dans le cadre d'un projet académique à l'EPHEC, a pour objet de permettre aux utilisateurs de réaliser des défis écologiques, de valider ces actions par des preuves photo, de partager leurs progrès sur un fil d'actualité et d'obtenir des récompenses virtuelles ou physiques via des partenaires locaux.",
   },
   {
     title: "2. Accès et Inscription",

@@ -6,7 +6,7 @@ import { usePoints } from "@/hooks/points-context";
 import { useThemeMode } from "@/hooks/theme-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { addDoc, collection, getDocs, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, doc, getDoc, getDocs, serverTimestamp } from "firebase/firestore";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -216,6 +216,7 @@ export default function DefiScreen() {
   const { queue: validationQueue, removeFromQueue } = useValidationQueue(
     difficultyKey as any
   );
+  const [defiMeta, setDefiMeta] = useState<Record<string, { titre?: string; preuve?: string }>>({});
 
   const difficultyKeyClub = currentClub
     ? (
@@ -229,6 +230,44 @@ export default function DefiScreen() {
     difficultyKeyClub as any,
     "club"
   );
+
+  useEffect(() => {
+    const run = async () => {
+      const ids = Array.from(
+        new Set(
+          [...validationQueue, ...validationQueueClub]
+            .map((p) => p.defiId)
+            .filter(Boolean)
+        )
+      ) as string[];
+
+      // only fetch missing ones
+      const missing = ids.filter((id) => !defiMeta[id]);
+      if (missing.length === 0) return;
+
+      const entries = await Promise.all(
+        missing.map(async (id) => {
+          try {
+            const snap = await getDoc(doc(db, "defis", id));
+            if (!snap.exists()) return [id, {}] as const;
+            const data: any = snap.data();
+            return [id, { titre: data.titre, preuve: data.preuve }] as const;
+          } catch {
+            return [id, {}] as const;
+          }
+        })
+      );
+
+      setDefiMeta((prev) => {
+        const next = { ...prev };
+        for (const [id, meta] of entries) next[id] = meta;
+        return next;
+      });
+    };
+
+    run();
+  }, [validationQueue, validationQueueClub]); // eslint-disable-line react-hooks/exhaustive-deps
+
 
   useEffect(() => {
     const loadRotatingDefis = async () => {
@@ -514,8 +553,10 @@ export default function DefiScreen() {
                     key={p.id}
                     item={{
                       id: index + 1,
-                      title: "Preuve à valider",
-                      description: "",
+                      defiTitle: defiMeta[p.defiId]?.titre,
+                      preuve: defiMeta[p.defiId]?.preuve,
+                      title: "",
+                      description: "", // or p.defiTitle if you prefer
                       category: "Recyclage",
                       difficulty: current?.difficulty ?? "Facile",
                       points: typeof current?.points === "number" ? current.points : 10,
@@ -575,13 +616,6 @@ export default function DefiScreen() {
                       categorie="personnel"
                       isOngoing={false}
                       onToggle={toggleOngoing}
-                      onReport={() =>
-                        handleOpenReport(
-                          challenge.firestoreId || String(challenge.id),
-                          challenge.title,
-                          challenge.firestoreId || String(challenge.id)
-                        )
-                      }
                     />
                   ))
                 )}
@@ -772,7 +806,7 @@ export default function DefiScreen() {
                   challenge={{
                     ...currentClub,
                     participants: 12,          // temporary static values
-                    goalParticipants: 50,      // will soon be dynamic
+                    goalParticipants: members.length,      // will soon be dynamic
                   }}
                   participating={true}
                   status={currentClub.status}
@@ -796,6 +830,7 @@ export default function DefiScreen() {
                       categorie="club"
                       isOngoing={false}
                       onToggle={toggleOngoing}
+                      clubGoalParticipants={members.length}
                     />
                   ))
                 )}
@@ -838,6 +873,9 @@ export default function DefiScreen() {
           
           <View style={[styles.adOverlay, { top: insets.top + 10 }]}>
             <Text style={styles.adTag}>Publicité</Text>
+            <TouchableOpacity onPress={handleAdFinished} style={styles.adSkipBtn}>
+              <Text style={styles.adSkipText}>Passer</Text>
+            </TouchableOpacity>
             {/* La croix apparaît à la fin */}
             {adFinished && (
               <TouchableOpacity onPress={handleAdFinished} style={styles.adCloseBtn}>
@@ -864,4 +902,15 @@ const styles = StyleSheet.create({
   adOverlay: { position: "absolute", right: 20, alignItems: "flex-end", gap: 10 },
   adTag: { color: "white", backgroundColor: "rgba(0,0,0,0.5)", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, fontSize: 12, fontWeight: "bold", overflow: "hidden" },
   adCloseBtn: { backgroundColor: "white", width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
+  adSkipBtn: {
+  backgroundColor: "rgba(255,255,255,0.85)",
+  paddingHorizontal: 10,
+  paddingVertical: 6,
+  borderRadius: 12,
+},
+adSkipText: {
+  color: "black",
+  fontWeight: "800",
+  fontSize: 12,
+},
 });
