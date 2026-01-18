@@ -15,7 +15,7 @@ const sections = [
   },
   {
     title: "1. Responsable du Traitement",
-    body: "Le traitement des données est assuré par l'équipe projet GreenUp (UCLouvain). Contact pour toute demande RGPD : contact@greenup-app.com",
+    body: "Le traitement des données est assuré par l'équipe projet GreenUp (EPHEC). Contact pour toute demande RGPD : contact@greenup-app.com",
   },
   {
     title: "2. Données Collectées",
