@@ -9,7 +9,7 @@ import { useThemeMode } from "@/hooks/theme-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 // 🎨 THEME RECOMPENSES
@@ -24,14 +24,16 @@ const rewardTheme = {
 
 export default function RewardsScreen() {
   const { colors, mode } = useThemeMode();
-  const { points } = usePoints(); // Note: spendPoints n'est plus nécessaire ici car géré par la transaction
+  const { points } = usePoints(); 
   const { coupons, addCoupon, hasCoupon } = useCoupons();
+  
   const [activeTab, setActiveTab] = useState<'eco'|'coupons'>('eco');
   const [liveRewards, setLiveRewards] = useState<any[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false); // Empêche le double clic et les bugs de solde
 
   const isLight = mode === "light";
 
-  // CHARGER LES RÉCOMPENSES DEPUIS FIREBASE
+  // 1. CHARGER LES RÉCOMPENSES EN TEMPS RÉEL
   useEffect(() => {
     const q = query(collection(db, "rewards"), where("isActive", "==", true));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -40,6 +42,24 @@ export default function RewardsScreen() {
     });
     return () => unsubscribe();
   }, []);
+
+  // 2. FONCTION DE RÉCRUPÉRATION (REDEEM)
+  const handleRedeem = async (id: string, cost: number) => {
+    if (isProcessing) return; // Sécurité anti-spam
+    
+    setIsProcessing(true);
+    try {
+      // Appel de la transaction atomique définie dans le context
+      const success = await addCoupon(id, cost);
+      
+      if (success) {
+        // On bascule sur l'onglet coupons seulement si ça a marché
+        setActiveTab('coupons');
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const BackgroundComponent = isLight ? LinearGradient : View;
   const bgProps = isLight 
@@ -56,10 +76,13 @@ export default function RewardsScreen() {
           contentContainerStyle={{ paddingBottom: 100, paddingHorizontal: 20 }}
           showsVerticalScrollIndicator={false}
         >
-          <Text style={[styles.screenTitle, { color: isLight ? rewardTheme.textMain : colors.text }]}>Récompenses</Text>
+          <Text style={[styles.screenTitle, { color: isLight ? rewardTheme.textMain : colors.text }]}>
+            Récompenses
+          </Text>
 
           <PointsCard points={points} />
 
+          {/* TABS */}
           <View style={styles.tabsContainer}>
              <LinearGradient
                 colors={isLight ? ["rgba(255,255,255,0.8)", "rgba(255,255,255,0.5)"] : ["rgba(0, 151, 178, 0.15)", "rgba(0, 151, 178, 0.05)"]}
@@ -70,6 +93,15 @@ export default function RewardsScreen() {
              </LinearGradient>
           </View>
 
+          {/* LOADING OVERLAY QUAND ON ACHÈTE */}
+          {isProcessing && (
+            <View style={styles.processingOverlay}>
+              <ActivityIndicator size="large" color={rewardTheme.activeTabBg} />
+              <Text style={{ color: colors.text, marginTop: 10 }}>Traitement en cours...</Text>
+            </View>
+          )}
+
+          {/* CONTENU ONGLET 1 : OFFRES */}
           {activeTab === 'eco' && (
             <View>
               <Text style={[styles.sectionTitle, { color: isLight ? rewardTheme.textMain : colors.text }]}>Offres du moment</Text>
@@ -79,25 +111,20 @@ export default function RewardsScreen() {
                     .filter((item: any) => {
                         const today = new Date().toISOString().split('T')[0];
                         const isExpired = item.expiresAt < today;
-                        // On cache si déjà obtenu ou expiré
+                        // On n'affiche que ce qui n'est pas encore acheté et non expiré
                         return !hasCoupon(item.id) && !isExpired;
                     })
                     .map((item: any) => {
                         const outOfStock = item.remainingQuantity <= 0;
+                        const canAfford = points >= item.pointsCost;
+
                         return (
                           <View key={item.id} style={[styles.gridItem, outOfStock && { opacity: 0.5 }]}>
                             <RewardCard
                               item={item}
-                              redeemed={hasCoupon(item.id)}
-                              canAfford={points >= item.pointsCost && !outOfStock}
-                              onRedeem={async (id: string, cost: number) => {
-                                // Appel de la transaction atomique (Points + Stock + Coupon)
-                                // @ts-ignore : on passe le coût pour la transaction interne
-                                const success = await addCoupon(id, cost);
-                                if (success) {
-                                    setActiveTab('coupons');
-                                }
-                              }}
+                              redeemed={false}
+                              canAfford={canAfford && !outOfStock && !isProcessing}
+                              onRedeem={handleRedeem}
                             />
                             {outOfStock && (
                                 <View style={styles.outOfStockOverlay}>
@@ -111,17 +138,19 @@ export default function RewardsScreen() {
             </View>
           )}
 
+          {/* CONTENU ONGLET 2 : MES COUPONS */}
           {activeTab === 'coupons' && (
             <View>
               <Text style={[styles.sectionTitle, { color: isLight ? rewardTheme.textMain : colors.text }]}>Mes coupons actifs</Text>
-              {coupons.length === 0 && (
+              {coupons.length === 0 ? (
                 <View style={{ padding: 40, alignItems: 'center' }}>
                     <Text style={{ color: colors.mutedText, textAlign: 'center', fontFamily: FontFamilies.body }}>
                         Aucun coupon disponible pour le moment.
                     </Text>
                 </View>
+              ) : (
+                coupons.map((c) => <CouponCard key={c.id} coupon={c} />)
               )}
-              {coupons.map((c) => <CouponCard key={c.id} coupon={c} />)}
             </View>
           )}
 
@@ -158,7 +187,8 @@ const styles = StyleSheet.create({
     alignItems: 'center', 
     justifyContent: 'center', 
     backgroundColor: 'rgba(0,0,0,0.3)', 
-    borderRadius: 20 
+    borderRadius: 20,
+    pointerEvents: 'none'
   },
   outOfStockText: { 
     color: 'white', 
@@ -167,6 +197,16 @@ const styles = StyleSheet.create({
     padding: 5, 
     borderRadius: 5 
   },
+  processingOverlay: {
+    marginVertical: 10,
+    padding: 15,
+    backgroundColor: 'rgba(0,143,107,0.05)',
+    borderRadius: 20,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 10
+  }
 });
 
 function TabButton({ label, active, onPress, isLight }: { label: string; active: boolean; onPress: () => void; isLight: boolean }) {
